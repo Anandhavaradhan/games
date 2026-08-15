@@ -238,7 +238,6 @@ stairs.forEach(s=>{
 function blocksSight(f,x,z){ if(x<0||z<0||x>=W||z>=D)return true;
   if(holeSet.has(`${f},${x},${z}`))return false; return maps[f][z][x]==='#';}
 function rampH(s,x,z){const zc=z/CS;const t=Math.min(1,Math.max(0,((s.zMax+0.5)-zc)/(s.zMax-s.zMin+1)));return s.floor*FH+t*FH;}
-function nodeH(n){return n.ramp!=null?rampH(stairs[n.ramp],(n.x+.5)*CS,(n.z+.5)*CS):n.f*FH;}
 function losClear(f,x0,z0,x1,z1){
   let gx=Math.floor(x0/CS),gz=Math.floor(z0/CS);const tx=Math.floor(x1/CS),tz=Math.floor(z1/CS);
   const dx=x1-x0,dz=z1-z0,sx=dx>0?1:-1,sz=dz>0?1:-1;
@@ -324,12 +323,12 @@ stairs.forEach(s=>{const base=s.floor*FH-0.3;
   for(let z=s.zMin;z<=s.zMax;z++){
     const htc=rampH(s,(s.x+.5)*CS,(z+0.5)*CS);
     for(let i=0;i<3;i++){
-      const zc=z+(2-i)/3+1/6;                       // slice centre, north slice = higher
+      const zc=z+(2-i)/3+1/6;
       const ht=rampH(s,(s.x+.5)*CS,zc*CS);
       const m=new THREE.Mesh(new THREE.BoxGeometry(CS*0.98,1,CS/3*0.98),darkWood);
       m.position.set((s.x+.5)*CS,(base+ht)/2,zc*CS);
       m.scale.y=Math.max(0.1,ht-base);scene.add(m);}
-    if(z!==s.zMin)for(const sd of[-1,1]){          // parapets, open at the top landing side
+    if(z!==s.zMin)for(const sd of[-1,1]){
       const p=new THREE.Mesh(new THREE.BoxGeometry(0.12,1.0,CS*0.98),darkWood);
       p.position.set((s.x+.5)*CS+sd*(CS/2-0.06),htc+0.5,(z+0.5)*CS);scene.add(p);}
   }});
@@ -338,7 +337,7 @@ stairs.forEach(s=>{const base=s.floor*FH-0.3;
  stairs.forEach(s=>{const f=s.floor+1;
   for(let z=s.zMin;z<=s.zMax;z++)[[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
     const nx=s.x+d[0],nz=z+d[1]; if(!nodes.has(nk(f,nx,nz)))return;
-    if(d[0]!==0&&z===s.zMin)return; // landing sides at top stay open
+    if(d[0]!==0&&z===s.zMin)return;
     segs.push({f,x:s.x,z,d});});});
  const railMat=new THREE.MeshStandardMaterial({color:0x1c130c,roughness:.9});
  segs.forEach(sg=>{const y=sg.f*FH,cx=(sg.x+.5)*CS,cz=(sg.z+.5)*CS;
@@ -487,7 +486,6 @@ Object.assign(M,{state:'patrol',wpIdx:0,path:null,pathI:0,repathT:0,lastSeen:nul
 let got=0,doorOpen=false,deaths=0,graceT=5,state='title',caughtT=0,elapsed=0,hintT=0;
 
 function cellOf(x,z){return[Math.floor(x/CS),Math.floor(z/CS)];}
-/* height-based, link-checked destination resolution — the core stair fix */
 function resolveDest(ent,tx,tz){
   const cur=ent.nodeKey, nbrs=adj.get(cur);
   let best=null,bestScore=1e9;
@@ -765,7 +763,7 @@ let ghostYaw=Math.PI;
 /* ================= SEQUENCES & FX ================= */
 function updateCaught(dt){caughtT+=dt;
   if(caughtT>8){doDeath();return;}
-  const head=new THREE.Vector3(M.g.position.x,M.g.position.y+2.3,M.g.position.z);
+  const head=new THREE.Vector3(M.x,M.y+2.3,M.z);
   P.x+=(head.x-P.x)*Math.min(1,dt*3.5);P.z+=(head.z-P.z)*Math.min(1,dt*3.5);
   P.y+=(head.y-0.4-P.y)*Math.min(1,dt*3);
   ghost.g.position.set(P.x,P.y,P.z);ghost.mat.opacity=Math.max(0,0.9-caughtT*0.5);
