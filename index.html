@@ -71,17 +71,19 @@
     <p>You died in this mansion, and your soul was caught in its Heart — a beating sigil deep in the cellar.
     Something else lives here too: a tall, patient thing that feeds on souls, walking four floors night after night.
     Eight embers of your passing are scattered through the house. Gather them, break the seal on the front door, and leave.
-    If it takes you, the Heart drags you back down to the cellar… and the hunt begins again.</p>
+    If it takes you, the embers you carried scatter back into the dark, the seal re-forms, and the Heart drags you back
+    down to the cellar to begin again.</p>
     <div class="controls">
       <b>W A S D</b> drift &nbsp;·&nbsp; <b>MOUSE</b> look (<b>Q / E</b> if mouse capture fails)<br>
-      <b>SHIFT</b> burst (loud, burns Essence) &nbsp;·&nbsp; <b>C / RIGHT MOUSE</b> veil — silent, nearly unseen, slow &nbsp;·&nbsp; <b>R</b> return to the Heart
+      <b>SHIFT</b> burst (loud, burns Essence) &nbsp;·&nbsp; <b>C / RIGHT MOUSE</b> veil — silent, nearly unseen, slow<br>
+      <b>R</b> return to the Heart (only when the thing is not near you)
     </div>
     <div class="pulse">CLICK OR PRESS ENTER TO WAKE &nbsp;·&nbsp; HEADPHONES RECOMMENDED</div>
   </div>
   <div id="deathOv" class="overlay hidden">
     <h1>DEVOURED</h1>
     <p id="deathLine"></p>
-    <p style="color:#7d7663">The embers you reclaimed stay reclaimed. The Heart drags you back to the cellar.</p>
+    <p style="color:#7d7663">The embers you carried scatter back into the dark. The seal re-forms. The Heart drags you back to the cellar.</p>
     <div class="pulse">CLICK OR PRESS R TO RISE AGAIN</div>
   </div>
   <div id="winOv" class="overlay hidden">
@@ -228,7 +230,6 @@ nodes.forEach((n,k)=>{
     const m=nodes.get(nk(n.f,n.x+d[0],n.z+d[1])); if(!m)return; const mk=nk(m.f,m.x,m.z);
     if(n.ramp==null&&m.ramp==null)return link(k,mk);
     if(n.ramp!=null&&m.ramp!=null){if(n.ramp===m.ramp&&Math.abs(n.z-m.z)===1&&n.x===m.x)link(k,mk);return;}
-    /* ramp <-> normal lateral edges: none. Stairs enter/exit via explicit links only. */
   });
 });
 stairs.forEach(s=>{
@@ -318,7 +319,6 @@ inst(new THREE.BoxGeometry(1,1,1),wallMat,walls);
  roof.position.set(W*CS/2,NF*FH+0.15,D*CS/2);scene.add(roof);
  const gnd=new THREE.Mesh(new THREE.PlaneGeometry(300,300),new THREE.MeshStandardMaterial({color:0x05070c,roughness:1}));
  gnd.rotation.x=-Math.PI/2;gnd.position.y=-0.03;scene.add(gnd);}
-/* --- stairs: correct step slices + side parapets --- */
 stairs.forEach(s=>{const base=s.floor*FH-0.3;
   for(let z=s.zMin;z<=s.zMax;z++){
     const htc=rampH(s,(s.x+.5)*CS,(z+0.5)*CS);
@@ -332,7 +332,6 @@ stairs.forEach(s=>{const base=s.floor*FH-0.3;
       const p=new THREE.Mesh(new THREE.BoxGeometry(0.12,1.0,CS*0.98),darkWood);
       p.position.set((s.x+.5)*CS+sd*(CS/2-0.06),htc+0.5,(z+0.5)*CS);scene.add(p);}
   }});
-/* --- railings around stairwell holes --- */
 {const segs=[];
  stairs.forEach(s=>{const f=s.floor+1;
   for(let z=s.zMin;z<=s.zMax;z++)[[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
@@ -564,6 +563,7 @@ const SFX={
  heart(v){tone({f:58,f2:30,dur:.16,vol:v});tone({f:52,f2:28,dur:.14,vol:v*.8,delay:.13});},
  sting(){[620,662,831,1244].forEach((f,i)=>tone({f,type:'sawtooth',dur:1.4,vol:.09-i*.012,a:.005,echo:.7}));
    tone({f:60,f2:28,dur:1.2,vol:.3});},
+ lost(v,pan){tone({f:95,f2:40,type:'sawtooth',dur:1.0,vol:v,pan,echo:.3});},
  chime(){[880,1318,1760].forEach((f,i)=>tone({f,dur:2.2,vol:.11,a:.02,echo:.85,delay:i*.07}));},
  roar(){tone({f:110,f2:36,type:'sawtooth',dur:1.5,vol:.5,a:.03,echo:.4});
    noiseHit({dur:1.4,vol:.4,type:'bandpass',f:280,q:2});},
@@ -583,7 +583,12 @@ function lockMouse(){try{const p=canvas.requestPointerLock();
  catch(e){toast('MOUSE CAPTURE BLOCKED — USE Q / E TO LOOK');}}
 addEventListener('keydown',e=>{keys[e.code]=true;
   if(e.code==='Space'||e.code==='Enter'||e.code==='NumpadEnter'){e.preventDefault();advance();}
-  if(e.code==='KeyR'&&(state==='play'||state==='dead'))respawn();
+  if(e.code==='KeyR'){
+    if(state==='dead')respawn();
+    else if(state==='play'){
+      if(M.state==='chase')toast('IT HAS SEEN YOU \u2014 THERE IS NO RETURN',2.5);
+      else if(distPM()<10)toast('THE HEART CANNOT PULL YOU \u2014 IT IS TOO CLOSE',2.5);
+      else respawn();}}
   if(['ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();});
 addEventListener('keyup',e=>keys[e.code]=false);
 addEventListener('mousedown',e=>{if(e.button===2)veilHeld=true;});
@@ -631,7 +636,14 @@ function startGame(){ if(state!=='title')return;
   toast('THE HEART OF HOLLOWMERE',3.5);
   setTimeout(()=>subtitle('Eight embers of your passing are hidden here. The front door is sealed by the Heart.'),3800);
   setTimeout(()=>subtitle('Something else walks these floors. Listen to its steps.'),8200);}
+function resetProgress(){
+  got=0;embers.forEach(e=>{e.taken=false;e.grp.visible=true;});hudEmbers();
+  if(doorOpen){doorOpen=false;nodes.delete(nk(1,11,16));
+    window.__seal.visible=true;window.__outLight.visible=false;window.__doorLight.intensity=0;
+    window.__panels[0].position.x=(11+.5)*CS-0.52;window.__panels[1].position.x=(11+.5)*CS+0.52;}
+  setObjective('Gather the eight embers \u2014 unseal the front door.');}
 function respawn(){
+  resetProgress();
   P=Object.assign(entAt(spawnDef[0],spawnDef[1],spawnDef[2]),{ess:100,veiling:false,dashing:false,moving:false});
   M=Object.assign(entAt(MONSTER_START[0],MONSTER_START[1],MONSTER_START[2]),
     {state:'patrol',wpIdx:0,path:null,pathI:0,repathT:0,lastSeen:null,losLostT:0,searchT:0,invT:0,tx:null,tz:null,tf:null,stepPhase:0,yaw:0});
@@ -639,13 +651,7 @@ function respawn(){
   ghost.g.scale.setScalar(0.92);ghost.g.visible=true;ghost.mat.opacity=0;
   redEl.style.opacity=0;state='play';showOv(null);
   toast('THE HEART PULLS YOU BACK',3);lockMouse();}
-function fullReset(){got=0;doorOpen=false;deaths=0;
-  embers.forEach(e=>{e.taken=false;e.grp.visible=true;});
-  nodes.delete(nk(1,11,16));hudEmbers();
-  setObjective('Gather the eight embers \u2014 unseal the front door.');
-  window.__seal.visible=true;window.__outLight.visible=false;window.__doorLight.intensity=0;
-  window.__panels[0].position.x=(11+.5)*CS-0.52;window.__panels[1].position.x=(11+.5)*CS+0.52;
-  respawn();elapsed=0;}
+function fullReset(){deaths=0;respawn();elapsed=0;}
 function openDoor(){doorOpen=true;SFX.boom();SFX.creak();
   nodes.set(nk(1,11,16),{f:1,x:11,z:16,ramp:null});link(nk(1,11,16),nk(1,11,15));
   window.__seal.visible=false;window.__outLight.visible=true;window.__doorLight.intensity=26;
@@ -656,6 +662,8 @@ function openDoor(){doorOpen=true;SFX.boom();SFX.creak();
 function startCaught(){if(state!=='play')return;state='caught';caughtT=0.0001;SFX.roar();
   ghost.mat.opacity=.9;seenEl.classList.remove('on');}
 function doDeath(){state='dead';deaths++;redEl.style.opacity=0.8;
+  for(let i=0;i<20;i++)spawnPart(P.x,P.y+1,P.z,0xffb060,
+    {x:(Math.random()-.5)*3,y:Math.random()*2.5,z:(Math.random()-.5)*3},1.2,.4);
   $('deathLine').textContent=DEATH_LINES[Math.floor(Math.random()*DEATH_LINES.length)];
   showOv(deathOv);}
 function doWin(){state='win';try{document.exitPointerLock();}catch(e){}SFX.win();
@@ -687,15 +695,20 @@ function updateMonster(dt,t){
     seenEl.classList.remove('on');void seenEl.offsetWidth;seenEl.classList.add('on');}
   if(state==='play'&&M.state==='chase'){
     if(sees){M.losLostT=0;M.lastSeen={x:P.x,z:P.z,f:P.floor};}
-    else{M.losLostT+=dt;if(M.losLostT>3.2){M.state='search';M.searchT=5;
-      setTargetCell(Math.floor(M.lastSeen.x/CS),Math.floor(M.lastSeen.z/CS),M.lastSeen.f);}}
-    M.repathT-=dt;if(M.repathT<=0){M.repathT=0.45;repathTo(cellOf(P.x,P.z)[0],cellOf(P.x,P.z)[1],P.floor);}}
+    else{
+      const mult=(P.veiling?2.5:1)*(M.floor!==P.floor?2:1);
+      M.losLostT+=dt*mult;
+      if(M.losLostT>2.2){M.state='search';M.searchT=4;
+        setTargetCell(Math.floor(M.lastSeen.x/CS),Math.floor(M.lastSeen.z/CS),M.lastSeen.f);
+        subtitle('It loses your trail\u2026',3);
+        SFX.lost(0.25*volAt(distPM(),18),panOf(M.x,M.z));}}}
   else if(state==='play'&&M.state!=='chase'){
     const nr=P.veiling?0:(P.dashing&&P.moving)?8.5:(P.moving?3.3:0);
     if(nr>0&&M.floor===P.floor&&d<nr&&M.state!=='investigate'){
       M.state='investigate';setTargetCell(cellOf(P.x,P.z)[0],cellOf(P.x,P.z)[1],P.floor);}}
   let speed=2.0;
-  if(M.state==='chase'){speed=4.35;}
+  if(M.state==='chase'){speed=4.35;
+    M.repathT-=dt;if(M.repathT<=0){M.repathT=0.45;repathTo(cellOf(P.x,P.z)[0],cellOf(P.x,P.z)[1],P.floor);}}
   else if(M.state==='investigate'){speed=2.6;
     if(!M.path)repathTo(cellOf(M.tx,M.tz)[0],cellOf(M.tx,M.tz)[1],M.tf);
     if(M.path&&M.pathI>=M.path.length){M.invT+=dt;M.yaw+=dt*1.7;if(M.invT>2.8){M.state='patrol';M.invT=0;M.path=null;}}}
