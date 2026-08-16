@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no">
 <title>HOLLOWMERE MANOR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;overflow:hidden;background:#04050a;font-family:'IM Fell English',serif;color:#cfc8b8}
+  html,body{width:100%;height:100%;overflow:hidden;background:#04050a;font-family:'IM Fell English',serif;color:#cfc8b8;
+    overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   #wrap{position:fixed;inset:0}
   canvas{display:block;width:100%;height:100%}
   #fx-vignette{position:absolute;inset:0;pointer-events:none;z-index:5;
@@ -38,6 +39,39 @@
     letter-spacing:10px;color:#ff2a1a;text-shadow:0 0 24px rgba(255,30,10,.8);opacity:0}
   #seen.on{animation:seenA 1s ease-out}
   @keyframes seenA{0%{opacity:0;transform:translateX(-50%) scale(1.5)}12%{opacity:1;transform:translateX(-50%) scale(1)}70%{opacity:1}100%{opacity:0}}
+  /* ---------- settings ---------- */
+  #gearBtn{position:absolute;top:52px;right:18px;z-index:15;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+    border:1px solid #3a3630;background:rgba(8,9,14,.55);color:#9a927e;font-size:19px;cursor:pointer;pointer-events:auto}
+  #gearBtn:hover{color:#d8cfb6;border-color:#6a5a42}
+  body.title #gearBtn{animation:pulse 2.1s ease-in-out infinite}
+  #setPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:26;width:min(380px,90vw);
+    background:rgba(6,7,12,.95);border:1px solid #3a3630;padding:22px 26px;text-align:left;display:none}
+  #setPanel h3{font-family:'Cinzel Decorative',serif;letter-spacing:4px;font-size:17px;color:#d8cfb6;margin-bottom:16px;text-align:center}
+  .srow{margin:15px 0}
+  .slab{display:flex;justify-content:space-between;font-size:13px;letter-spacing:2px;color:#8f8874;margin-bottom:7px}
+  .slab .sv{color:#cfc8b8}
+  input[type=range]{width:100%;accent-color:#9fc4ff;height:22px}
+  #invertBtn{width:100%;padding:10px 12px;border:1px solid #3a3630;background:rgba(15,17,26,.7);color:#cfc8b8;
+    font-family:'IM Fell English',serif;font-size:14px;letter-spacing:1px;cursor:pointer;text-align:center}
+  #setClose{margin-top:18px;width:100%;padding:11px;border:1px solid #4a4436;background:rgba(20,18,14,.7);
+    color:#e5dcc2;font-family:'Cinzel Decorative',serif;font-size:14px;letter-spacing:4px;cursor:pointer;text-align:center}
+  #setClose:hover{border-color:#8a7f60}
+  /* ---------- touch controls ---------- */
+  #touchUI{display:none;position:absolute;inset:0;z-index:12;pointer-events:none}
+  body.touch #touchUI{display:block}
+  #zoneL{position:absolute;left:0;top:0;width:50%;height:100%;pointer-events:auto;touch-action:none}
+  #zoneR{position:absolute;right:0;top:0;width:50%;height:100%;pointer-events:auto;touch-action:none}
+  #stickBase{display:none;position:absolute;width:112px;height:112px;border-radius:50%;z-index:13;pointer-events:none;
+    border:2px solid rgba(180,200,255,.35);background:rgba(20,30,50,.25)}
+  #stickKnob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;
+    background:rgba(160,190,255,.5);box-shadow:0 0 12px rgba(140,180,255,.4)}
+  #tbtns{position:absolute;right:14px;bottom:20px;display:flex;align-items:flex-end;gap:12px;z-index:14;pointer-events:none}
+  .tbtn{pointer-events:auto;touch-action:none;border-radius:50%;border:2px solid rgba(200,190,160,.4);
+    background:rgba(15,15,22,.55);color:#cfc8b8;display:flex;align-items:center;justify-content:center;
+    font-family:'Cinzel Decorative',serif;letter-spacing:1px;width:70px;height:70px;font-size:11px}
+  .tbtn.big{width:92px;height:92px;font-size:13px}
+  .tbtn.small{width:54px;height:54px;font-size:9px}
+  .tbtn:active{background:rgba(70,70,95,.65)}
   .overlay{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;
     background:radial-gradient(ellipse at center,rgba(6,8,14,.55) 0%,rgba(3,4,8,.92) 78%);text-align:center;padding:20px;cursor:pointer}
   .hidden{display:none!important}
@@ -46,24 +80,58 @@
   @keyframes flick{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.55}94%{opacity:1}96%{opacity:.7}97%{opacity:1}}
   .overlay h2{font-family:'Cinzel Decorative',serif;font-size:clamp(13px,2vw,18px);letter-spacing:6px;color:#8a4a42;margin-top:10px}
   .overlay p{max-width:640px;font-size:17px;line-height:1.65;color:#a89f8a;margin-top:22px;font-style:italic}
-  .controls{margin-top:26px;border:1px solid #3a3630;padding:16px 30px;font-size:15px;color:#9a927e;line-height:2;letter-spacing:1px;background:rgba(8,9,14,.55)}
+  .controls{margin-top:22px;border:1px solid #3a3630;padding:16px 30px;font-size:15px;color:#9a927e;line-height:2;letter-spacing:1px;background:rgba(8,9,14,.55)}
   .controls b{color:#d8cfb6;font-weight:normal;letter-spacing:2px}
-  .pulse{margin-top:34px;font-family:'Cinzel Decorative',serif;font-size:17px;letter-spacing:5px;color:#e5dcc2;animation:pulse 2.1s ease-in-out infinite}
+  .ovbtn{margin-top:22px;border:1px solid #3a3630;padding:10px 28px;font-family:'Cinzel Decorative',serif;font-size:14px;
+    letter-spacing:4px;color:#cfc8b8;background:rgba(8,9,14,.55);cursor:pointer;pointer-events:auto}
+  .ovbtn:hover{color:#fff;border-color:#8a7f60}
+  .pulse{margin-top:22px;font-family:'Cinzel Decorative',serif;font-size:17px;letter-spacing:5px;color:#e5dcc2;animation:pulse 2.1s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:.35;text-shadow:0 0 6px rgba(255,200,120,.2)}50%{opacity:1;text-shadow:0 0 20px rgba(255,200,120,.7)}}
   .stat{font-size:16px;color:#8f8874;margin-top:8px;letter-spacing:2px}
   #deathOv h1{color:#c22a1c;text-shadow:0 0 40px rgba(255,40,20,.6)}
+  @media (pointer: coarse){
+    #esswrap{left:auto;right:14px;top:58px;bottom:auto;width:150px}
+    #objective{max-width:220px;font-size:12px}
+    #embers{font-size:18px;letter-spacing:4px}
+    .overlay{overflow-y:auto;justify-content:flex-start;padding-top:7vh;padding-bottom:7vh}
+    .overlay p{font-size:15px}
+    .controls{font-size:13px;padding:12px 18px}
+    #subtitle{font-size:14px}
+  }
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="game"></canvas>
   <div id="fx-vignette"></div><div id="fx-danger"></div><div id="fx-flash"></div><div id="fx-red"></div><div id="fx-grain"></div>
+  <div id="touchUI">
+    <div id="zoneL"></div><div id="zoneR"></div>
+    <div id="stickBase"><div id="stickKnob"></div></div>
+    <div id="tbtns">
+      <div id="btnHeart" class="tbtn small">HEART</div>
+      <div id="btnVeil" class="tbtn">VEIL</div>
+      <div id="btnBurst" class="tbtn big">BURST</div>
+    </div>
+  </div>
   <div id="hud">
     <div id="embers"></div>
     <div id="objective"></div>
     <div id="floorlabel"></div>
     <div id="esswrap"><div id="esslabel">ESSENCE</div><div id="essbar"><div id="essfill"></div></div></div>
     <div id="toast"></div><div id="subtitle"></div><div id="seen">IT HAS SEEN YOU</div>
+  </div>
+  <div id="gearBtn">⚙</div>
+  <div id="setPanel">
+    <h3>SETTINGS</h3>
+    <div class="srow">
+      <div class="slab"><span>LOOK SENSITIVITY</span><span class="sv" id="sensVal"></span></div>
+      <input type="range" id="sensRange" min="0.2" max="3" step="0.05">
+    </div>
+    <div class="srow">
+      <div class="slab"><span>VERTICAL LOOK</span></div>
+      <div id="invertBtn"></div>
+    </div>
+    <div id="setClose">CLOSE</div>
   </div>
   <div id="titleOv" class="overlay">
     <h1>HOLLOWMERE</h1>
@@ -73,24 +141,30 @@
     Eight embers of your passing are scattered through the house. Gather them, break the seal on the front door, and leave.
     If it takes you, the embers you carried scatter back into the dark, the seal re-forms, and the Heart drags you back
     down to the cellar to begin again.</p>
-    <div class="controls">
+    <div class="controls" id="ctrlDesktop">
       <b>W A S D</b> drift &nbsp;·&nbsp; <b>MOUSE</b> look (<b>Q / E</b> if mouse capture fails)<br>
       <b>SHIFT</b> burst (loud, burns Essence) &nbsp;·&nbsp; <b>C / RIGHT MOUSE</b> veil — silent, nearly unseen, slow<br>
-      <b>R</b> return to the Heart (only when the thing is not near you)
+      <b>R</b> return to the Heart (only when the thing is not near) &nbsp;·&nbsp; <b>ESC</b> settings
     </div>
-    <div class="pulse">CLICK OR PRESS ENTER TO WAKE &nbsp;·&nbsp; HEADPHONES RECOMMENDED</div>
+    <div class="controls hidden" id="ctrlTouch">
+      <b>LEFT THUMB</b> press &amp; drag to drift &nbsp;·&nbsp; <b>RIGHT THUMB</b> drag to look<br>
+      hold <b>BURST</b> to rush (loud) &nbsp;·&nbsp; hold <b>VEIL</b> to vanish from its eyes<br>
+      <b>HEART</b> returns you to the Heart — but only when the thing is not near &nbsp;·&nbsp; <b>⚙</b> settings
+    </div>
+    <button id="titleSettings" class="ovbtn">SETTINGS</button>
+    <div class="pulse">TAP OR PRESS ENTER TO WAKE &nbsp;·&nbsp; HEADPHONES RECOMMENDED</div>
   </div>
   <div id="deathOv" class="overlay hidden">
     <h1>DEVOURED</h1>
     <p id="deathLine"></p>
     <p style="color:#7d7663">The embers you carried scatter back into the dark. The seal re-forms. The Heart drags you back to the cellar.</p>
-    <div class="pulse">CLICK OR PRESS R TO RISE AGAIN</div>
+    <div class="pulse">TAP OR PRESS R TO RISE AGAIN</div>
   </div>
   <div id="winOv" class="overlay hidden">
     <h1 style="color:#d9d2bd">OUT OF THE HOUSE</h1>
     <p>You slip through the great door as the mansion howls behind you. Somewhere inside, the Heart beats on without you. Dawn is coming.</p>
     <div class="stat" id="winStats"></div>
-    <div class="pulse">CLICK OR ENTER TO HAUNT AGAIN</div>
+    <div class="pulse">TAP OR ENTER TO HAUNT AGAIN</div>
   </div>
   <div id="pauseOv" class="overlay hidden">
     <h1 style="font-size:40px">THE DARK WAITS</h1>
@@ -122,6 +196,11 @@ const CDNS=[
 ];
 for(const url of CDNS){try{THREE=await import(url);if(THREE&&THREE.WebGLRenderer)break;THREE=null;}catch(e){console.warn('CDN failed:',url,e);}}
 if(!THREE){fatal('Could not load three.js from any CDN. An internet connection is required.');throw new Error('three.js failed to load');}
+
+const isTouch=(window.matchMedia&&matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window)||navigator.maxTouchPoints>0;
+
+/* ================= SETTINGS ================= */
+const settings={sens:isTouch?1.3:1.0, invertY:isTouch?true:false};
 
 /* ================= CONSTANTS & MAPS ================= */
 const CS=2.2, FH=3.75, W=23, D=17, RAD=0.32, TOTAL_EMBERS=8;
@@ -263,7 +342,7 @@ const canvas=document.getElementById('game');
 let renderer;
 try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}
 catch(e){fatal('WebGL is not available in this browser, so the 3D game cannot render.');throw e;}
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));
+renderer.setPixelRatio(Math.min(devicePixelRatio,isTouch?1.25:1.6));
 renderer.setSize(innerWidth,innerHeight);
 renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.2;
 const scene=new THREE.Scene();
@@ -332,11 +411,12 @@ stairs.forEach(s=>{const base=s.floor*FH-0.3;
       const p=new THREE.Mesh(new THREE.BoxGeometry(0.12,1.0,CS*0.98),darkWood);
       p.position.set((s.x+.5)*CS+sd*(CS/2-0.06),htc+0.5,(z+0.5)*CS);scene.add(p);}
   }});
+/* --- railings around stairwell holes (top of the well stays open: no gate) --- */
 {const segs=[];
  stairs.forEach(s=>{const f=s.floor+1;
   for(let z=s.zMin;z<=s.zMax;z++)[[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
     const nx=s.x+d[0],nz=z+d[1]; if(!nodes.has(nk(f,nx,nz)))return;
-    if(d[0]!==0&&z===s.zMin)return;
+    if(z===s.zMin)return;
     segs.push({f,x:s.x,z,d});});});
  const railMat=new THREE.MeshStandardMaterial({color:0x1c130c,roughness:.9});
  segs.forEach(sg=>{const y=sg.f*FH,cx=(sg.x+.5)*CS,cz=(sg.z+.5)*CS;
@@ -483,6 +563,7 @@ Object.assign(P,{ess:100,veiling:false,dashing:false,moving:false});
 Object.assign(M,{state:'patrol',wpIdx:0,path:null,pathI:0,repathT:0,lastSeen:null,losLostT:0,searchT:0,invT:0,
   tx:null,tz:null,tf:null,stepPhase:0,yaw:0});
 let got=0,doorOpen=false,deaths=0,graceT=5,state='title',caughtT=0,elapsed=0,hintT=0;
+let settingsOpen=false,suppressPause=false;
 
 function cellOf(x,z){return[Math.floor(x/CS),Math.floor(z/CS)];}
 function resolveDest(ent,tx,tz){
@@ -576,28 +657,30 @@ const SFX={
    noiseHit({dur:1.2,vol:.035,type:'bandpass',f:900+Math.random()*600,q:8,pan:-pan,echo:.9,delay:.35});},
  win(){[392,494,587,784].forEach((f,i)=>tone({f,dur:3,vol:.1,a:.3,echo:.6,delay:i*.35}));}};
 
-/* ================= INPUT ================= */
-const keys={};let veilHeld=false,camYaw=Math.PI,camPitch=0.45;
-function lockMouse(){try{const p=canvas.requestPointerLock();
+/* ================= INPUT (keyboard + mouse) ================= */
+const keys={};let veilHeld=false,touchBurst=false,camYaw=Math.PI,camPitch=0.45;
+function lockMouse(){if(isTouch)return;
+ try{const p=canvas.requestPointerLock();
   if(p&&p.catch)p.catch(()=>toast('MOUSE CAPTURE BLOCKED — USE Q / E TO LOOK'));}
  catch(e){toast('MOUSE CAPTURE BLOCKED — USE Q / E TO LOOK');}}
 addEventListener('keydown',e=>{keys[e.code]=true;
-  if(e.code==='Space'||e.code==='Enter'||e.code==='NumpadEnter'){e.preventDefault();advance();}
-  if(e.code==='KeyR'){
-    if(state==='dead')respawn();
-    else if(state==='play'){
-      if(M.state==='chase')toast('IT HAS SEEN YOU \u2014 THERE IS NO RETURN',2.5);
-      else if(distPM()<10)toast('THE HEART CANNOT PULL YOU \u2014 IT IS TOO CLOSE',2.5);
-      else respawn();}}
+  if(e.code==='Space'||e.code==='Enter'||e.code==='NumpadEnter'){
+    e.preventDefault();
+    if(settingsOpen){closeSettings();}else advance();}
+  if(e.code==='Escape'&&state==='play'){e.preventDefault();toggleSettings();}
+  if(e.code==='KeyR')tryHeart();
   if(['ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();});
 addEventListener('keyup',e=>keys[e.code]=false);
 addEventListener('mousedown',e=>{if(e.button===2)veilHeld=true;});
 addEventListener('mouseup',e=>{if(e.button===2)veilHeld=false;});
 addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('mousemove',e=>{if(document.pointerLockElement!==canvas)return;
-  camYaw-=e.movementX*0.0024;camPitch=Math.max(-0.3,Math.min(0.95,camPitch+e.movementY*0.0022));});
+  camYaw-=e.movementX*0.0024*settings.sens;
+  camPitch=Math.max(-0.3,Math.min(0.95,camPitch+e.movementY*0.0022*settings.sens));});
 document.addEventListener('pointerlockchange',()=>{
-  if(document.pointerLockElement!==canvas&&state==='play')showOv(pauseOv);});
+  if(document.pointerLockElement===canvas){suppressPause=false;return;}
+  if(suppressPause)return;
+  if(state==='play')openSettings();});
 document.addEventListener('pointerlockerror',()=>toast('MOUSE CAPTURE BLOCKED — USE Q / E TO LOOK'));
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);});
@@ -605,6 +688,7 @@ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updat
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
 const titleOv=$('titleOv'),deathOv=$('deathOv'),winOv=$('winOv'),pauseOv=$('pauseOv');
+const setPanel=$('setPanel'),gearBtn=$('gearBtn'),sensRange=$('sensRange'),sensVal=$('sensVal'),invertBtn=$('invertBtn');
 const embersEl=$('embers'),objEl=$('objective'),floorEl=$('floorlabel'),essEl=$('essfill');
 const toastEl=$('toast'),subEl=$('subtitle'),seenEl=$('seen'),dangerEl=$('fx-danger'),
       flashEl=$('fx-flash'),redEl=$('fx-red');
@@ -618,6 +702,7 @@ function subtitle(t,dur=4){subEl.textContent=t;subEl.style.opacity=1;clearTimeou
   subT=setTimeout(()=>subEl.style.opacity=0,dur*1000);}
 function showOv(ov){[titleOv,deathOv,winOv,pauseOv].forEach(o=>o.classList.add('hidden'));
   if(ov)ov.classList.remove('hidden');}
+function setScreenState(){document.body.classList.toggle('title',state==='title');}
 {const c=document.createElement('canvas');c.width=c.height=140;const g=c.getContext('2d');
  const im=g.createImageData(140,140);for(let i=0;i<im.data.length;i+=4){const v=Math.random()*255;
    im.data[i]=im.data[i+1]=im.data[i+2]=v;im.data[i+3]=255;}g.putImageData(im,0,0);
@@ -629,10 +714,70 @@ const WHISPERS=["\u2026it drags something heavy upstairs\u2026","\u2026the walls
  "\u2026do not look at it for too long\u2026","\u2026it wore someone\u2019s face, once\u2026",
  "\u2026the heart of the house is beating\u2026","\u2026under the floor, something answers\u2026"];
 
+/* ================= SETTINGS PANEL ================= */
+function syncSetUI(){
+  sensRange.value=settings.sens;
+  sensVal.textContent=settings.sens.toFixed(2);
+  invertBtn.textContent=settings.invertY?'REVERSED \u2014 DRAG DOWN LOOKS DOWN':'NORMAL \u2014 DRAG UP LOOKS UP';
+  $('setClose').textContent=(state==='play')?'RESUME':'CLOSE';}
+sensRange.addEventListener('input',()=>{settings.sens=parseFloat(sensRange.value);sensVal.textContent=settings.sens.toFixed(2);});
+sensRange.addEventListener('pointerdown',e=>e.stopPropagation());
+invertBtn.addEventListener('click',e=>{e.stopPropagation();settings.invertY=!settings.invertY;syncSetUI();});
+function openSettings(){if(settingsOpen)return;settingsOpen=true;syncSetUI();setPanel.style.display='block';
+  if(!isTouch&&document.pointerLockElement){suppressPause=true;try{document.exitPointerLock();}catch(e){}}}
+function closeSettings(){if(!settingsOpen)return;settingsOpen=false;setPanel.style.display='none';
+  if(state==='play')lockMouse();}
+function toggleSettings(){settingsOpen?closeSettings():openSettings();}
+gearBtn.addEventListener('click',e=>{e.stopPropagation();toggleSettings();});
+gearBtn.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});
+$('setClose').addEventListener('click',e=>{e.stopPropagation();closeSettings();});
+$('titleSettings').addEventListener('click',e=>{e.stopPropagation();openSettings();});
+
+/* ================= TOUCH CONTROLS ================= */
+const stick={id:null,bx:0,by:0,dx:0,dy:0};
+if(isTouch){
+  document.body.classList.add('touch');
+  $('ctrlDesktop').classList.add('hidden');$('ctrlTouch').classList.remove('hidden');
+  const zoneL=$('zoneL'),zoneR=$('zoneR'),base=$('stickBase'),knob=$('stickKnob');
+  zoneL.addEventListener('touchstart',e=>{e.preventDefault();
+    if(stick.id!==null)return;const t=e.changedTouches[0];
+    stick.id=t.identifier;stick.bx=t.clientX;stick.by=t.clientY;stick.dx=0;stick.dy=0;
+    base.style.display='block';base.style.left=(stick.bx-56)+'px';base.style.top=(stick.by-56)+'px';
+    knob.style.transform='translate(0,0)';},{passive:false});
+  zoneL.addEventListener('touchmove',e=>{e.preventDefault();
+    for(const t of e.changedTouches){if(t.identifier!==stick.id)continue;
+      let dx=t.clientX-stick.bx,dy=t.clientY-stick.by;const m=Math.hypot(dx,dy),R=52;
+      if(m>R){dx*=R/m;dy*=R/m;}
+      stick.dx=dx/R;stick.dy=dy/R;
+      knob.style.transform=`translate(${dx}px,${dy}px)`;}},{passive:false});
+  const endL=e=>{for(const t of e.changedTouches){if(t.identifier===stick.id){
+    stick.id=null;stick.dx=0;stick.dy=0;base.style.display='none';knob.style.transform='translate(0,0)';}}};
+  zoneL.addEventListener('touchend',endL);zoneL.addEventListener('touchcancel',endL);
+  let lookId=null,lx=0,ly=0;
+  zoneR.addEventListener('touchstart',e=>{e.preventDefault();
+    if(lookId!==null)return;const t=e.changedTouches[0];lookId=t.identifier;lx=t.clientX;ly=t.clientY;},{passive:false});
+  zoneR.addEventListener('touchmove',e=>{e.preventDefault();
+    for(const t of e.changedTouches){if(t.identifier!==lookId)continue;
+      camYaw-=(t.clientX-lx)*0.006*settings.sens;
+      camPitch=Math.max(-0.3,Math.min(0.95,camPitch+(settings.invertY?1:-1)*(t.clientY-ly)*0.004*settings.sens));
+      lx=t.clientX;ly=t.clientY;}},{passive:false});
+  const endR=e=>{for(const t of e.changedTouches){if(t.identifier===lookId)lookId=null;}};
+  zoneR.addEventListener('touchend',endR);zoneR.addEventListener('touchcancel',endR);
+  const hold=(el,on,off)=>{
+    el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();on();},{passive:false});
+    el.addEventListener('touchend',e=>{e.preventDefault();e.stopPropagation();off();},{passive:false});
+    el.addEventListener('touchcancel',()=>off());};
+  hold($('btnBurst'),()=>touchBurst=true,()=>touchBurst=false);
+  hold($('btnVeil'),()=>veilHeld=true,()=>veilHeld=false);
+  $('btnHeart').addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();tryHeart();},{passive:false});
+}
+document.addEventListener('touchmove',e=>{if(!e.target.closest('.overlay'))e.preventDefault();},{passive:false});
+
 /* ================= GAME FLOW ================= */
 function startGame(){ if(state!=='title')return;
   try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){console.warn(e);}
-  state='play';showOv(null);lockMouse();elapsed=0;
+  closeSettings();
+  state='play';showOv(null);setScreenState();lockMouse();elapsed=0;
   toast('THE HEART OF HOLLOWMERE',3.5);
   setTimeout(()=>subtitle('Eight embers of your passing are hidden here. The front door is sealed by the Heart.'),3800);
   setTimeout(()=>subtitle('Something else walks these floors. Listen to its steps.'),8200);}
@@ -643,13 +788,13 @@ function resetProgress(){
     window.__panels[0].position.x=(11+.5)*CS-0.52;window.__panels[1].position.x=(11+.5)*CS+0.52;}
   setObjective('Gather the eight embers \u2014 unseal the front door.');}
 function respawn(){
-  resetProgress();
+  resetProgress();closeSettings();
   P=Object.assign(entAt(spawnDef[0],spawnDef[1],spawnDef[2]),{ess:100,veiling:false,dashing:false,moving:false});
   M=Object.assign(entAt(MONSTER_START[0],MONSTER_START[1],MONSTER_START[2]),
     {state:'patrol',wpIdx:0,path:null,pathI:0,repathT:0,lastSeen:null,losLostT:0,searchT:0,invT:0,tx:null,tz:null,tf:null,stepPhase:0,yaw:0});
-  graceT=5;caughtT=0;updateCaught._g=false;
+  graceT=5;caughtT=0;updateCaught._g=false;veilHeld=false;touchBurst=false;
   ghost.g.scale.setScalar(0.92);ghost.g.visible=true;ghost.mat.opacity=0;
-  redEl.style.opacity=0;state='play';showOv(null);
+  redEl.style.opacity=0;state='play';showOv(null);setScreenState();
   toast('THE HEART PULLS YOU BACK',3);lockMouse();}
 function fullReset(){deaths=0;respawn();elapsed=0;}
 function openDoor(){doorOpen=true;SFX.boom();SFX.creak();
@@ -660,17 +805,25 @@ function openDoor(){doorOpen=true;SFX.boom();SFX.creak();
   subtitle('The house screams. It knows.',4);
   if(M.floor===1&&distPM()<30){M.state='investigate';setTargetCell(11,15,1);}}
 function startCaught(){if(state!=='play')return;state='caught';caughtT=0.0001;SFX.roar();
+  veilHeld=false;touchBurst=false;
   ghost.mat.opacity=.9;seenEl.classList.remove('on');}
-function doDeath(){state='dead';deaths++;redEl.style.opacity=0.8;
+function doDeath(){state='dead';deaths++;redEl.style.opacity=0.8;setScreenState();
   for(let i=0;i<20;i++)spawnPart(P.x,P.y+1,P.z,0xffb060,
     {x:(Math.random()-.5)*3,y:Math.random()*2.5,z:(Math.random()-.5)*3},1.2,.4);
   $('deathLine').textContent=DEATH_LINES[Math.floor(Math.random()*DEATH_LINES.length)];
   showOv(deathOv);}
-function doWin(){state='win';try{document.exitPointerLock();}catch(e){}SFX.win();
+function doWin(){state='win';setScreenState();try{document.exitPointerLock();}catch(e){}SFX.win();
   const m=Math.floor(elapsed/60),s=Math.floor(elapsed%60);
   $('winStats').textContent=`TIME ${m}:${s.toString().padStart(2,'0')} \u00b7 SOULS LOST ${deaths} \u00b7 EMBERS ${got}/${TOTAL_EMBERS}`;
   showOv(winOv);}
+function tryHeart(){
+  if(state==='dead')respawn();
+  else if(state==='play'){
+    if(M.state==='chase')toast('IT HAS SEEN YOU \u2014 THERE IS NO RETURN',2.5);
+    else if(distPM()<10)toast('THE HEART CANNOT PULL YOU \u2014 IT IS TOO CLOSE',2.5);
+    else respawn();}}
 function advance(){
+  if(settingsOpen){closeSettings();return;}
   if(state==='title')startGame();
   else if(state==='dead')respawn();
   else if(state==='win')fullReset();
@@ -739,13 +892,15 @@ let trailT=0;
 function updatePlayer(dt,t){
   if(keys.KeyQ)camYaw+=2.4*dt;
   if(keys.KeyE)camYaw-=2.4*dt;
-  const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
-  const r=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+  let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
+  let r=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+  if(stick.id!==null){f+=-stick.dy;r+=stick.dx;}
+  const ml0=Math.hypot(f,r);if(ml0>1){f/=ml0;r/=ml0;}
   const fx=Math.sin(camYaw),fz=Math.cos(camYaw),rx=-Math.cos(camYaw),rz=Math.sin(camYaw);
   let mx=fx*f+rx*r, mz=fz*f+rz*r;const ml=Math.hypot(mx,mz);
   P.moving=ml>0.01;if(ml>0){mx/=ml;mz/=ml;}
   P.veiling=(keys.KeyC||veilHeld)&&P.ess>0.5;
-  P.dashing=(keys.ShiftLeft||keys.ShiftRight)&&P.moving&&!P.veiling&&P.ess>0.5;
+  P.dashing=(keys.ShiftLeft||keys.ShiftRight||touchBurst)&&P.moving&&!P.veiling&&P.ess>0.5;
   if(P.dashing)P.ess-=30*dt;else if(P.veiling)P.ess-=16*dt;else P.ess+=15*dt;
   P.ess=Math.max(0,Math.min(100,P.ess));
   const sp=P.veiling?1.7:P.dashing?5.6:3.5;
@@ -853,8 +1008,9 @@ let last=performance.now();
 function loop(now){requestAnimationFrame(loop);
   try{
   const dt=Math.min(0.05,(now-last)/1000);last=now;const t=now/1000;
-  if(state==='play'){elapsed+=dt;updatePlayer(dt,t);updateMonster(dt,t);}
-  else if(state==='caught'){updateCaught(dt);updateMonster(dt,t);}
+  const paused=settingsOpen;
+  if(state==='play'){if(!paused){elapsed+=dt;updatePlayer(dt,t);updateMonster(dt,t);}}
+  else if(state==='caught'){updateCaught(dt);if(!paused)updateMonster(dt,t);}
   else if(state==='title'){mon.g.position.set(M.x,M.y,M.z);mon.g.rotation.y=t*0.2;}
   if(state==='dead'&&deathOv.classList.contains('hidden'))showOv(deathOv);
   updateFX(dt,t);updateCamera(dt,t);
@@ -862,7 +1018,7 @@ function loop(now){requestAnimationFrame(loop);
   renderer.render(scene,camera);
   }catch(e){fatal('Runtime error: '+e.message);}}
 requestAnimationFrame(loop);
-showOv(titleOv);
+showOv(titleOv);setScreenState();
 window.__HM_BOOTED=true;
 </script>
 </body>
