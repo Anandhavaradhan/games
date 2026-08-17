@@ -39,7 +39,6 @@
     letter-spacing:10px;color:#ff2a1a;text-shadow:0 0 24px rgba(255,30,10,.8);opacity:0}
   #seen.on{animation:seenA 1s ease-out}
   @keyframes seenA{0%{opacity:0;transform:translateX(-50%) scale(1.5)}12%{opacity:1;transform:translateX(-50%) scale(1)}70%{opacity:1}100%{opacity:0}}
-  /* ---------- settings ---------- */
   #gearBtn{position:absolute;top:52px;right:18px;z-index:15;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
     border:1px solid #3a3630;background:rgba(8,9,14,.55);color:#9a927e;font-size:19px;cursor:pointer;pointer-events:auto}
   #gearBtn:hover{color:#d8cfb6;border-color:#6a5a42}
@@ -56,7 +55,6 @@
   #setClose{margin-top:18px;width:100%;padding:11px;border:1px solid #4a4436;background:rgba(20,18,14,.7);
     color:#e5dcc2;font-family:'Cinzel Decorative',serif;font-size:14px;letter-spacing:4px;cursor:pointer;text-align:center}
   #setClose:hover{border-color:#8a7f60}
-  /* ---------- touch controls ---------- */
   #touchUI{display:none;position:absolute;inset:0;z-index:12;pointer-events:none}
   body.touch #touchUI{display:block}
   #zoneL{position:absolute;left:0;top:0;width:50%;height:100%;pointer-events:auto;touch-action:none}
@@ -138,18 +136,20 @@
     <h2>THE HEART OF THE HOUSE IS HUNGRY</h2>
     <p>You died in this mansion, and your soul was caught in its Heart — a beating sigil deep in the cellar.
     Something else lives here too: a tall, patient thing that feeds on souls, walking four floors night after night.
-    Eight embers of your passing are scattered through the house. Gather them, break the seal on the front door, and leave.
+    Eight embers of your passing are hidden through the house — two on each floor, never in the same place twice.
+    Gather them, break the seal on the front door, and leave.
     If it takes you, the embers you carried scatter back into the dark, the seal re-forms, and the Heart drags you back
     down to the cellar to begin again.</p>
     <div class="controls" id="ctrlDesktop">
       <b>W A S D</b> drift &nbsp;·&nbsp; <b>MOUSE</b> look (<b>Q / E</b> if mouse capture fails)<br>
       <b>SHIFT</b> burst (loud, burns Essence) &nbsp;·&nbsp; <b>C / RIGHT MOUSE</b> veil — silent, nearly unseen, slow<br>
-      <b>R</b> return to the Heart (only when the thing is not near) &nbsp;·&nbsp; <b>ESC</b> settings
+      <b>R</b> shift your soul back to the Heart — only you move; the embers and the thing stay put (blocked while it is near)<br>
+      <b>ESC</b> settings
     </div>
     <div class="controls hidden" id="ctrlTouch">
       <b>LEFT THUMB</b> press &amp; drag to drift &nbsp;·&nbsp; <b>RIGHT THUMB</b> drag to look<br>
       hold <b>BURST</b> to rush (loud) &nbsp;·&nbsp; hold <b>VEIL</b> to vanish from its eyes<br>
-      <b>HEART</b> returns you to the Heart — but only when the thing is not near &nbsp;·&nbsp; <b>⚙</b> settings
+      <b>HEART</b> shifts only you back to the Heart (blocked while the thing is near) &nbsp;·&nbsp; <b>⚙</b> settings
     </div>
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
     <div class="pulse">TAP OR PRESS ENTER TO WAKE &nbsp;·&nbsp; HEADPHONES RECOMMENDED</div>
@@ -199,7 +199,6 @@ if(!THREE){fatal('Could not load three.js from any CDN. An internet connection i
 
 const isTouch=(window.matchMedia&&matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
-/* ================= SETTINGS ================= */
 const settings={sens:isTouch?1.3:1.0, invertY:isTouch?true:false};
 
 /* ================= CONSTANTS & MAPS ================= */
@@ -290,9 +289,9 @@ const PATROL=[[11,2,0],[4,13,0],[20,12,0],[3,2,1],[11,15,1],[19,2,1],[6,11,1],[3
 const MONSTER_START=[11,13,2];
 const FLOOR_NAMES=["THE CELLAR","GROUND FLOOR","UPPER FLOOR","THE ATTIC"];
 
-const embersDef=[]; let spawnDef=[11,8,0], exitCell=[11,15,1];
+let spawnDef=[11,8,0], exitCell=[11,15,1];
 maps.forEach((g,f)=>{for(let z=0;z<D;z++)for(let x=0;x<W;x++){const c=g[z][x];
-  if(c==='e'){embersDef.push({x,z,f});g[z][x]='.';}
+  if(c==='e'){g[z][x]='.';}
   else if(c==='S'){spawnDef=[x,z,f];g[z][x]='.';}
   else if(c==='D'){if(f===1&&z===15){exitCell=[x,z,f];}g[z][x]='.';}}});
 const holeSet=new Set();
@@ -314,7 +313,9 @@ nodes.forEach((n,k)=>{
 stairs.forEach(s=>{
   const topK=nk(s.floor,s.x,s.zMin), botK=nk(s.floor,s.x,s.zMax);
   s.topLinks.forEach(l=>link(topK,nk(l[2],l[0],l[1])));
-  s.bottomLinks.forEach(l=>link(botK,nk(l[2],l[0],l[1])));});
+  s.bottomLinks.forEach(l=>link(botK,nk(l[2],l[0],l[1])));
+  const fk=nk(s.floor+1,s.x,s.zMin-1);        // walk straight forward off the top step
+  if(nodes.has(fk))link(topK,fk);});
 function blocksSight(f,x,z){ if(x<0||z<0||x>=W||z>=D)return true;
   if(holeSet.has(`${f},${x},${z}`))return false; return maps[f][z][x]==='#';}
 function rampH(s,x,z){const zc=z/CS;const t=Math.min(1,Math.max(0,((s.zMax+0.5)-zc)/(s.zMax-s.zMin+1)));return s.floor*FH+t*FH;}
@@ -411,7 +412,6 @@ stairs.forEach(s=>{const base=s.floor*FH-0.3;
       const p=new THREE.Mesh(new THREE.BoxGeometry(0.12,1.0,CS*0.98),darkWood);
       p.position.set((s.x+.5)*CS+sd*(CS/2-0.06),htc+0.5,(z+0.5)*CS);scene.add(p);}
   }});
-/* --- railings around stairwell holes (top of the well stays open: no gate) --- */
 {const segs=[];
  stairs.forEach(s=>{const f=s.floor+1;
   for(let z=s.zMin;z<=s.zMax;z++)[[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
@@ -546,12 +546,39 @@ function buildMonster(){const g=new THREE.Group();
   scene.add(g);
   return{g,headG,jaw,armL,armR,light,eyeMat};}
 const ghost=buildGhost(), mon=buildMonster();
-const embers=embersDef.map(d=>{const grp=new THREE.Group();
+
+/* --- embers: 2 per floor, randomised every run --- */
+const embers=[];
+for(let i=0;i<NF*2;i++){const grp=new THREE.Group();
   const core=new THREE.Mesh(new THREE.SphereGeometry(0.16,12,10),new THREE.MeshStandardMaterial({color:0xffc27a,
     emissive:0xffa040,emissiveIntensity:2.6,roughness:.4}));grp.add(core);
   const halo=glowSprite(0xffb060,1.5);grp.add(halo);
-  grp.position.set((d.x+.5)*CS,d.f*FH+1.15,(d.z+.5)*CS);scene.add(grp);
-  return{x:(d.x+.5)*CS,z:(d.z+.5)*CS,f:d.f,grp,taken:false,halo};});
+  grp.position.set(0,-10,0);scene.add(grp);
+  embers.push({x:0,z:0,f:0,grp,taken:false,halo});}
+const emberPools=[];
+for(let f=0;f<NF;f++){const list=[];
+  for(let z=1;z<D-1;z++)for(let x=1;x<W-1;x++){
+    const n=nodes.get(nk(f,x,z));if(!n||n.ramp!=null)continue;
+    if(f===spawnDef[2]&&Math.abs(x-spawnDef[0])+Math.abs(z-spawnDef[1])<=2)continue;
+    if(f===exitCell[2]&&x===exitCell[0]&&z===exitCell[1])continue;
+    list.push([x,z]);}
+  emberPools.push(list);}
+function randomizeEmbers(){
+  let idx=0;
+  for(let f=0;f<NF;f++){
+    const pool=emberPools[f].slice();const picks=[];
+    for(let k=0;k<2;k++){let choice=null;
+      for(let tries=0;tries<50;tries++){
+        const c=pool[Math.floor(Math.random()*pool.length)];
+        if(picks.length&&Math.abs(c[0]-picks[0][0])+Math.abs(c[1]-picks[0][1])<5)continue;
+        choice=c;break;}
+      if(!choice)choice=pool[Math.floor(Math.random()*pool.length)];
+      picks.push(choice);pool.splice(pool.indexOf(choice),1);}
+    for(const[x,z]of picks){const e=embers[idx++];
+      e.f=f;e.x=(x+.5)*CS;e.z=(z+.5)*CS;e.taken=false;e.grp.visible=true;
+      e.grp.position.set(e.x,f*FH+1.15,e.z);}}}
+randomizeEmbers();
+
 const parts=[];
 function spawnPart(x,y,z,col,vel,ttl,scale=0.3){const sp=glowSprite(col,scale);sp.position.set(x,y,z);scene.add(sp);
   parts.push({sp,vx:vel.x,vy:vel.y,vz:vel.z,ttl,ttl0:ttl});}
@@ -657,7 +684,7 @@ const SFX={
    noiseHit({dur:1.2,vol:.035,type:'bandpass',f:900+Math.random()*600,q:8,pan:-pan,echo:.9,delay:.35});},
  win(){[392,494,587,784].forEach((f,i)=>tone({f,dur:3,vol:.1,a:.3,echo:.6,delay:i*.35}));}};
 
-/* ================= INPUT (keyboard + mouse) ================= */
+/* ================= INPUT ================= */
 const keys={};let veilHeld=false,touchBurst=false,camYaw=Math.PI,camPitch=0.45;
 function lockMouse(){if(isTouch)return;
  try{const p=canvas.requestPointerLock();
@@ -779,16 +806,17 @@ function startGame(){ if(state!=='title')return;
   closeSettings();
   state='play';showOv(null);setScreenState();lockMouse();elapsed=0;
   toast('THE HEART OF HOLLOWMERE',3.5);
-  setTimeout(()=>subtitle('Eight embers of your passing are hidden here. The front door is sealed by the Heart.'),3800);
+  setTimeout(()=>subtitle('Eight embers hide here \u2014 two on each floor, never where they were before.'),3800);
   setTimeout(()=>subtitle('Something else walks these floors. Listen to its steps.'),8200);}
 function resetProgress(){
-  got=0;embers.forEach(e=>{e.taken=false;e.grp.visible=true;});hudEmbers();
+  got=0;hudEmbers();
   if(doorOpen){doorOpen=false;nodes.delete(nk(1,11,16));
     window.__seal.visible=true;window.__outLight.visible=false;window.__doorLight.intensity=0;
     window.__panels[0].position.x=(11+.5)*CS-0.52;window.__panels[1].position.x=(11+.5)*CS+0.52;}
   setObjective('Gather the eight embers \u2014 unseal the front door.');}
 function respawn(){
   resetProgress();closeSettings();
+  randomizeEmbers();
   P=Object.assign(entAt(spawnDef[0],spawnDef[1],spawnDef[2]),{ess:100,veiling:false,dashing:false,moving:false});
   M=Object.assign(entAt(MONSTER_START[0],MONSTER_START[1],MONSTER_START[2]),
     {state:'patrol',wpIdx:0,path:null,pathI:0,repathT:0,lastSeen:null,losLostT:0,searchT:0,invT:0,tx:null,tz:null,tf:null,stepPhase:0,yaw:0});
@@ -797,6 +825,18 @@ function respawn(){
   redEl.style.opacity=0;state='play';showOv(null);setScreenState();
   toast('THE HEART PULLS YOU BACK',3);lockMouse();}
 function fullReset(){deaths=0;respawn();elapsed=0;}
+/* R / HEART: teleports ONLY the player — embers, door and monster untouched */
+function heartShift(){
+  const keepEss=P.ess;
+  P=Object.assign(entAt(spawnDef[0],spawnDef[1],spawnDef[2]),{ess:keepEss,veiling:false,dashing:false,moving:false});
+  ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.3;
+  toast('THE HEART PULLS YOU BACK',2.5);}
+function tryHeart(){
+  if(state==='dead')respawn();
+  else if(state==='play'){
+    if(M.state==='chase')toast('IT HAS SEEN YOU \u2014 THERE IS NO RETURN',2.5);
+    else if(distPM()<10)toast('THE HEART CANNOT PULL YOU \u2014 IT IS TOO CLOSE',2.5);
+    else heartShift();}}
 function openDoor(){doorOpen=true;SFX.boom();SFX.creak();
   nodes.set(nk(1,11,16),{f:1,x:11,z:16,ramp:null});link(nk(1,11,16),nk(1,11,15));
   window.__seal.visible=false;window.__outLight.visible=true;window.__doorLight.intensity=26;
@@ -816,12 +856,6 @@ function doWin(){state='win';setScreenState();try{document.exitPointerLock();}ca
   const m=Math.floor(elapsed/60),s=Math.floor(elapsed%60);
   $('winStats').textContent=`TIME ${m}:${s.toString().padStart(2,'0')} \u00b7 SOULS LOST ${deaths} \u00b7 EMBERS ${got}/${TOTAL_EMBERS}`;
   showOv(winOv);}
-function tryHeart(){
-  if(state==='dead')respawn();
-  else if(state==='play'){
-    if(M.state==='chase')toast('IT HAS SEEN YOU \u2014 THERE IS NO RETURN',2.5);
-    else if(distPM()<10)toast('THE HEART CANNOT PULL YOU \u2014 IT IS TOO CLOSE',2.5);
-    else respawn();}}
 function advance(){
   if(settingsOpen){closeSettings();return;}
   if(state==='title')startGame();
