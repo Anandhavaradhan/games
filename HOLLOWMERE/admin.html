@@ -466,6 +466,24 @@ function saveForm(uid){
     stats:st
   },'Record saved');
 }
+/* Post the player's best time to the leaderboard. This creates or updates
+   leaderboard/{uid} with their current stats. */
+async function postToLeaderboard(uid){
+  const p=players.find(x=>x.uid===uid);if(!p)return;
+  const st=p.stats||{};
+  if(!st.bestTime){alert('Player has no best time set. Set one in the form and save first.');return;}
+  try{
+    await F.setDoc(F.doc(db,'leaderboard',uid),{
+      name:String(p.name||'Unnamed').slice(0,40),
+      bestTime:st.bestTime,
+      legend:String(p.main||'').slice(0,40),
+      deaths:Math.max(0,Math.floor(st.deaths||0)),
+      embers:Math.max(0,Math.min(8,Math.floor(st.embers||0))),
+      at:F.serverTimestamp()
+    });
+    flash('Posted to leaderboard');
+  }catch(e){alert('Could not post to leaderboard: '+e.message);}
+}
 async function deleteRun(uid,runId){
   if(!confirm('Delete this run from the history?'))return;
   try{
@@ -568,6 +586,7 @@ function renderDrawer(){
   if(!editing)return;
   const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.onclick=fn;};
   on('e_save',()=>saveForm(p.uid));
+  on('e_post',()=>postToLeaderboard(p.uid));
   on('e_grant',()=>grantAll(p.uid));
   on('e_revoke',()=>revokeAll(p.uid));
   on('e_pend',()=>clearPending(p.uid));
@@ -584,8 +603,8 @@ function editPanel(p){
   const ownIds=ALL_IDS.filter(id=>own.has(id));
   const opts=(ownIds.length?ownIds:FREE_IDS).map(id=>'<option value="'+esc(id)+'"'+(p.main===id?' selected':'')+'>'+esc(legendName(id))+'</option>').join('');
   const field=(id,label,v,extra)=>'<div><label for="'+id+'">'+label+'</label><input id="'+id+'" type="number" min="0" '+(extra||'')+' value="'+v+'"></div>';
-  return '<div class="edits"><h4>Keeper’s edits</h4>'
-    +'<div class="hint">These write straight to the player’s record. The legend tiles below are clickable while this is open.</div>'
+  return '<div class="edits"><h4>Keeper's edits</h4>'
+    +'<div class="hint">These write straight to the player's record. The legend tiles below are clickable while this is open.</div>'
     +'<div class="frm">'
     +'<div style="grid-column:1/-1"><label for="e_name">Name on the leaderboard</label><input id="e_name" type="text" maxlength="40" value="'+esc(p.name||'')+'"></div>'
     +field('e_ether','Ether',p.ether||0)
@@ -600,11 +619,12 @@ function editPanel(p){
     +'<div style="grid-column:1/-1"><label for="e_main">Haunts as</label><select id="e_main">'+opts+'</select></div>'
     +'</div>'
     +'<div class="editbar"><button class="btn primary" id="e_save">Save changes</button>'
+    +'<button class="btn" id="e_post">Post to leaderboard</button>'
     +'<button class="btn" id="e_grant">Grant all '+TOTAL+' legends</button>'
     +'<button class="btn" id="e_revoke">Reset legends</button>'
     +((p.pending||[]).length?'<button class="btn" id="e_pend">Clear unclaimed ether</button>':'')
     +(note?'<span class="saved">'+esc(note)+'</span>':'')+'</div>'
-    +'<div class="danger"><button class="btn bad" id="e_del">Delete this player’s record</button></div>'
+    +'<div class="danger"><button class="btn bad" id="e_del">Delete this player's record</button></div>'
     +'</div>';
 }
 </script>
