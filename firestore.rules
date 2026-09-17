@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn()    { return request.auth != null; }
+    function isSelf(uid)   { return signedIn() && request.auth.uid == uid; }
+    function isAdmin()     { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    function validPlayer() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name','email','provider','ether','unlocked','main','escapes','pending',
+                               'music','lastDay','v','stats','live','lastSeen','createdAt'])
+        && d.name is string && d.name.size() <= 60
+        && d.ether is int && d.ether >= 0 && d.ether <= 10000000
+        && d.unlocked is list && d.unlocked.size() <= 40
+        && d.main is string && d.main.size() <= 40
+        && d.escapes is int && d.escapes >= 0
+        && d.pending is list && d.pending.size() <= 20
+        && d.stats is map && d.live is map
+        && d.lastSeen == request.time;
+    }
+
+    function validRun() {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['result','nightTime','legend','embers','memories','ether',
+                               'deathsTonight','seen','floor','at'])
+        && r.result in ['escape','death']
+        && r.nightTime is number && r.nightTime >= 0
+        && r.at == request.time;
+    }
+
+    // A player reads and writes only their own record; admins can read everyone's.
+    match /players/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create, update: if isSelf(uid) && validPlayer();
+      allow delete: if false;
+
+      match /runs/{runId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if isSelf(uid) && validRun();
+        allow update, delete: if false;
+      }
+    }
+
+    // LEADERBOARD — one public entry per player, fastest escape only.
+    // Anyone (even a guest) can read it. A player can only post their own entry,
+    // only a time at least as fast as the one stored, and not while blocked.
+    function banned(uid) { return exists(/databases/$(database)/documents/boardBans/$(uid)); }
+    function validEntry() {
+      let e = request.resource.data;
+      return e.keys().hasOnly(['name','bestTime','legend','deaths','embers','at'])
+        && e.name is string && e.name.size() >= 1 && e.name.size() <= 40
+        && e.bestTime is number && e.bestTime >= 20 && e.bestTime <= 86400
+        && e.legend is string && e.legend.size() <= 40
+        && e.deaths is int && e.deaths >= 0 && e.deaths <= 100000
+        && e.embers is int && e.embers >= 0 && e.embers <= 8
+        && e.at == request.time;
+    }
+    match /leaderboard/{uid} {
+      allow read: if true;
+      allow create: if isSelf(uid) && validEntry() && !banned(uid);
+      allow update: if isSelf(uid) && validEntry() && !banned(uid)
+                    && request.resource.data.bestTime <= resource.data.bestTime;
+      allow delete: if isAdmin();
+    }
+
+    // Players an admin has blocked from the leaderboard (set from admin.html).
+    match /boardBans/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Admins are added by hand in the Firebase console; nobody can write this from the site.
+    match /admins/{uid} {
+      allow read: if isSelf(uid);
+      allow write: if false;
+    }
+  }
+}
