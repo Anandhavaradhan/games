@@ -603,8 +603,8 @@ function editPanel(p){
   const ownIds=ALL_IDS.filter(id=>own.has(id));
   const opts=(ownIds.length?ownIds:FREE_IDS).map(id=>'<option value="'+esc(id)+'"'+(p.main===id?' selected':'')+'>'+esc(legendName(id))+'</option>').join('');
   const field=(id,label,v,extra)=>'<div><label for="'+id+'">'+label+'</label><input id="'+id+'" type="number" min="0" '+(extra||'')+' value="'+v+'"></div>';
-  return '<div class="edits"><h4>Keeper's edits</h4>'
-    +'<div class="hint">These write straight to the player's record. The legend tiles below are clickable while this is open.</div>'
+  return '<div class="edits"><h4>Keeper\'s edits</h4>'
+    +'<div class="hint">These write straight to the player\'s record. The legend tiles below are clickable while this is open.</div>'
     +'<div class="frm">'
     +'<div style="grid-column:1/-1"><label for="e_name">Name on the leaderboard</label><input id="e_name" type="text" maxlength="40" value="'+esc(p.name||'')+'"></div>'
     +field('e_ether','Ether',p.ether||0)
@@ -624,7 +624,7 @@ function editPanel(p){
     +'<button class="btn" id="e_revoke">Reset legends</button>'
     +((p.pending||[]).length?'<button class="btn" id="e_pend">Clear unclaimed ether</button>':'')
     +(note?'<span class="saved">'+esc(note)+'</span>':'')+'</div>'
-    +'<div class="danger"><button class="btn bad" id="e_del">Delete this player's record</button></div>'
+    +'<div class="danger"><button class="btn bad" id="e_del">Delete this player\'s record</button></div>'
     +'</div>';
 }
 </script>
