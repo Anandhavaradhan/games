@@ -514,7 +514,6 @@ async function deletePlayer(uid){
 }
 
 async function openDrawer(uid){
-async function openDrawer(uid){
   openUid=uid;editing=false;note='';drawer.hidden=false;scrim.hidden=false;renderDrawer();
   try{
     /* No orderBy: Firestore silently drops any document missing the ordered
