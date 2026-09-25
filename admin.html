@@ -1,0 +1,637 @@
+<!doctype html>
+<!--
+  HOLLOWMERE — KEEPER'S LEDGER (admin dashboard)
+  Open it at  https://<you>.github.io/<repo>/admin.html
+  Only accounts listed in the Firestore collection "admins" can see any data;
+  everyone else gets instructions instead (firestore.rules enforces this, not the page).
+  Shows: headline figures, who is in the house right now (live clocks),
+  the leaderboard (with remove / block), every player, and each player's run history.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Hollowmere · Keeper's ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=IM+Fell+English:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --night:#07080d; --crypt:#0f1119; --crypt2:#141722; --line:#252836;
+    --bone:#ddd5c0; --ash:#8c8573; --dim:#5d6072;
+    --ember:#ffb85c; --veil:#9fc4ff; --blood:#e0563f;
+    --data:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --serif:'IM Fell English',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--night);color:var(--bone);font-family:var(--data);font-size:14px;line-height:1.45}
+  body{min-height:100vh;background:radial-gradient(ellipse at 20% -10%,rgba(255,140,50,.07),transparent 50%),var(--night)}
+  button,input{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--veil);outline-offset:2px}
+  .num{font-variant-numeric:tabular-nums}
+  /* ---- leaderboard section ---- */
+  .board{list-style:none;border:1px solid var(--line);border-radius:4px;overflow-x:auto}
+  .board li{display:grid;grid-template-columns:32px minmax(130px,1.3fr) minmax(120px,1fr) 80px 90px 100px auto;
+    align-items:center;gap:14px;padding:9px 14px;border-top:1px solid var(--line);min-width:760px}
+  .board li:first-child{border-top:0}
+  .board .bk{color:var(--dim);text-align:right}
+  .board li.top .bk{color:var(--ember)}
+  .board .bname{background:none;border:0;text-align:left;cursor:pointer;color:var(--bone);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .board .bname:hover{color:var(--ember)}
+  .board .bleg,.board .bd,.board .bw{color:var(--ash);font-size:13px;white-space:nowrap}
+  .board .bleg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}
+  .board .bt{color:var(--ember);font-size:16px;text-align:right}
+  .board .bx{display:flex;gap:6px;justify-content:flex-end}
+  .mini{border:1px solid var(--line);background:var(--crypt2);padding:4px 9px;font-size:12px;border-radius:3px;cursor:pointer;color:var(--ash)}
+  .mini:hover{border-color:#4a4d60;color:var(--bone)}
+  .mini.warn:hover{border-color:var(--blood);color:var(--blood)}
+
+  header.top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:22px clamp(16px,4vw,40px) 18px;border-bottom:1px solid var(--line)}
+  .mark{font-family:'Cinzel Decorative',Georgia,serif;font-weight:700;font-size:22px;letter-spacing:.12em;color:var(--bone)}
+  .sub{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--ash)}
+  .who{margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--ash);font-size:13px}
+  .btn{border:1px solid var(--line);background:var(--crypt2);padding:8px 14px;cursor:pointer;border-radius:3px}
+  .btn:hover{border-color:#4a4d60}
+  .btn.primary{border-color:#6b5534;background:#221a10;color:var(--ember)}
+  .btn.primary:hover{border-color:var(--ember)}
+
+  main{padding:24px clamp(16px,4vw,40px) 60px;max-width:1400px}
+  .state{max-width:520px;margin:10vh auto;text-align:left}
+  .state h2{font-family:var(--serif);font-weight:normal;font-size:28px;margin-bottom:10px}
+  .state p{color:var(--ash);margin-top:8px}
+  .state code{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:var(--crypt2);padding:2px 6px;border-radius:3px;color:var(--bone);word-break:break-all}
+  .state .row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .field{display:block;width:100%;margin-top:10px;padding:10px 12px;background:var(--crypt);border:1px solid var(--line);border-radius:3px}
+  .err{color:var(--blood);margin-top:10px;min-height:20px}
+
+  .summary{display:flex;flex-wrap:wrap;gap:28px 44px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+  .fig b{display:block;font-size:26px;font-weight:500;letter-spacing:-.01em}
+  .fig span{color:var(--ash);font-size:13px}
+  .fig.hot b{color:var(--ember)}
+
+  h3{font-family:var(--serif);font-weight:normal;font-style:italic;font-size:21px;color:var(--bone);margin:30px 0 14px;display:flex;align-items:baseline;gap:10px}
+  h3 small{font-family:var(--data);font-style:normal;font-size:13px;color:var(--dim)}
+
+  /* ---- the one loud thing: who is in the house right now ---- */
+  .live{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .lcard{position:relative;padding:16px 18px 14px;background:linear-gradient(160deg,#1b1510,#0f1119 70%);border:1px solid #3d2f1e;border-radius:4px;cursor:pointer;text-align:left;overflow:hidden}
+  .lcard::before{content:'';position:absolute;inset:0 auto 0 0;width:3px;background:var(--tint,var(--ember))}
+  .lcard.hunted{border-color:#5a2419;background:linear-gradient(160deg,#241010,#0f1119 70%)}
+  .lcard .nm{font-size:16px;font-weight:600}
+  .lcard .st{color:var(--ash);font-size:13px;margin-top:2px}
+  .lcard.hunted .st{color:var(--blood)}
+  .clock{font-family:var(--serif);font-size:38px;line-height:1;margin-top:12px;color:var(--ember);text-shadow:0 0 22px rgba(255,160,60,.35)}
+  .lcard.hunted .clock{color:#ff7a5e;text-shadow:0 0 22px rgba(255,60,30,.4)}
+  .diamonds{margin-top:10px;letter-spacing:4px;font-size:13px;color:#3a3630}
+  .diamonds i{font-style:normal;color:var(--ember)}
+  .lmeta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ash)}
+  .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ember);margin-right:7px;box-shadow:0 0 0 0 rgba(255,184,92,.6);animation:beat 1.8s infinite}
+  @keyframes beat{0%{box-shadow:0 0 0 0 rgba(255,184,92,.55)}70%{box-shadow:0 0 0 9px rgba(255,184,92,0)}100%{box-shadow:0 0 0 0 rgba(255,184,92,0)}}
+  .empty{color:var(--dim);font-style:italic;font-family:var(--serif);font-size:16px}
+
+  .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .tools input{width:min(320px,100%);padding:9px 12px;background:var(--crypt);border:1px solid var(--line);border-radius:3px}
+  .wrap{overflow-x:auto;border:1px solid var(--line);border-radius:4px}
+  table{border-collapse:collapse;width:100%;min-width:980px}
+  th{position:sticky;top:0;background:var(--crypt2);text-align:left;font-weight:500;font-size:12px;color:var(--ash);padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap;user-select:none}
+  th[aria-sort] {color:var(--bone)}
+  th .ar{color:var(--ember);margin-left:4px}
+  td{padding:10px 12px;border-bottom:1px solid #1a1c27;white-space:nowrap;font-variant-numeric:tabular-nums}
+  tbody tr{cursor:pointer}
+  tbody tr:hover,tbody tr:focus-visible{background:#131623;outline:none}
+  td.r,th.r{text-align:right}
+  .pname{font-weight:600}
+  .pmail{color:var(--dim);font-size:12px}
+  .chip{display:inline-flex;align-items:center;font-size:12px;color:var(--ash)}
+  .chip.on{color:var(--ember)}
+  .chip.hunt{color:var(--blood)}
+  .chip.on::before,.chip.hunt::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px}
+  .ether{color:var(--ember)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:0}
+
+  /* ---- drawer ---- */
+  #drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:var(--crypt);border-left:1px solid var(--line);overflow-y:auto;z-index:10;padding:22px 24px 40px;box-shadow:-30px 0 60px rgba(0,0,0,.5)}
+  #drawer[hidden]{display:none}
+  #scrim{position:fixed;inset:0;background:rgba(3,4,8,.55);z-index:9}
+  #scrim[hidden]{display:none}
+  .dhead{display:flex;align-items:flex-start;gap:12px}
+  .dhead h2{font-family:var(--serif);font-weight:normal;font-size:30px;line-height:1.1}
+  .dhead .x{margin-left:auto}
+  .dsub{color:var(--ash);margin-top:4px}
+  .grid2{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px;margin-top:18px}
+  .grid2 div span{display:block;color:var(--ash);font-size:12px}
+  .grid2 div b{font-size:18px;font-weight:500;white-space:nowrap}
+  .legends{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
+  .lg{position:relative;padding:7px 8px 6px;border:1px solid #1d2030;border-radius:3px;font-size:12px;color:var(--dim);background:#0b0d14}
+  .lg.own{color:var(--bone);border-color:#2c3042;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 16%,transparent),transparent 70%)}
+  .lg.bound{border-color:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
+  .lg small{display:block;font-size:11px;color:var(--dim)}
+  .tier{color:var(--ash);font-size:12px;margin:12px 0 6px}
+  .runs{list-style:none}
+  .runs li{display:grid;grid-template-columns:86px 1fr auto;gap:10px;padding:9px 0;border-bottom:1px solid #1a1c27;align-items:baseline}
+  .runs .res{font-weight:600}
+  .runs .res.escape{color:#9fe0b4}
+  .runs .res.death{color:var(--blood)}
+  .runs .meta{color:var(--ash);font-size:12px}
+  .bar{height:6px;background:#1a1c27;border-radius:3px;overflow:hidden;margin-top:4px}
+  .bar i{display:block;height:100%;background:var(--c,var(--veil))}
+  .uses{display:grid;grid-template-columns:130px 1fr 36px;gap:4px 10px;align-items:center;font-size:12px}
+
+  /* ---- keeper's edits: only visible while the drawer is in edit mode ---- */
+  .lg.can{cursor:pointer}
+  .lg.can:hover{border-color:var(--c);color:var(--bone)}
+  .lg.can::after{content:'+';position:absolute;top:4px;right:7px;color:var(--dim);font-size:13px;line-height:1}
+  .lg.can.own::after{content:'\2212'}
+  .lg.can:hover::after{color:var(--bone)}
+  .edits{margin-top:18px;padding:14px 16px;border:1px solid #3b3450;border-radius:4px;background:#0c0d16}
+  .edits h4{font-family:var(--serif);font-style:italic;font-weight:normal;font-size:18px}
+  .edits .hint{color:var(--dim);font-size:12px;margin:2px 0 12px}
+  .frm{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px 14px}
+  .frm label{display:block;color:var(--ash);font-size:12px;margin-bottom:3px}
+  .frm input,.frm select{width:100%;padding:6px 9px;background:var(--crypt2);border:1px solid var(--line);
+    border-radius:3px;font-variant-numeric:tabular-nums}
+  .editbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0 2px}
+  .saved{color:#9fe0b4;font-size:12px}
+  .danger{margin-top:16px;padding-top:13px;border-top:1px solid #2b1c1a}
+  .btn.bad{border-color:#5a2a22;color:var(--blood)}
+  .btn.bad:hover{border-color:var(--blood);background:#1c100e}
+  .dhead #dedit{margin-left:auto}
+  .dhead #dedit + .x{margin-left:8px}
+  .runs li.ed{grid-template-columns:86px 1fr auto auto}
+  .rx{border:0;background:none;color:var(--dim);cursor:pointer;font-size:17px;line-height:1;padding:0 2px 0 8px}
+  .rx:hover{color:var(--blood)}
+
+  @media (max-width:640px){
+    .who{margin-left:0;width:100%}
+    .grid2{grid-template-columns:repeat(2,1fr)}
+    .clock{font-size:32px}
+  }
+  @media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="mark">Hollowmere</div>
+  <div class="sub">Keeper's ledger</div>
+  <div class="who" id="who"></div>
+</header>
+<main id="app"><div class="state"><p>Opening the ledger…</p></div></main>
+<div id="scrim" hidden></div>
+<aside id="drawer" hidden aria-label="Player record"></aside>
+
+<script type="module">
+import { firebaseConfig } from './firebase-config.js';
+const SDK='https://www.gstatic.com/firebasejs/12.19.0/';
+const ROSTER=[["gunslinger","GUNSLINGER",2,"#ffb45e","CONTROL"],["knight","KNIGHT",2,"#bfd4e6","ESCAPE"],["samurai","SAMURAI",4,"#7fe6b8","CONTROL"],["voyager","VOYAGER",3,"#fff2d2","CONTROL"],["archmage","ARCHMAGE",3,"#c2a3ff","CONTROL"],["corsair","CORSAIR",1,"#57e8c2","CONTROL"],["construct","CONSTRUCT",1,"#d4ff4f","SUPPORT"],["viking","VIKING",3,"#a9e2f5","CONTROL"],["archer","ARCHER",2,"#d8c76a","SUPPORT"],["shinobi","SHINOBI",4,"#ff6e5a","STEALTH"],["sage","PLAGUE SAGE",2,"#ead9ae","SUPPORT"],["abyssal","ABYSSAL",3,"#7fc9e8","ESCAPE"],["colossus","COLOSSUS",1,"#e0875a","SUPPORT"],["reaper","REAPER",4,"#e6f2f2","ESCAPE"],["duelist","DUELIST",3,"#ffd9e2","ESCAPE"],["monk","MONK",3,"#ffe6a8","STEALTH"],["valkyrie","VALKYRIE",4,"#e9ddff","ESCAPE"],["druid","DRUID",2,"#9fe89a","CONTROL"],["pyromancer","PYROMANCER",3,"#ff9a4d","CONTROL"],["cryomancer","CRYOMANCER",3,"#bfe8ff","CONTROL"],["stormcaller","STORMCALLER",3,"#dde9ff","STEALTH"],["paladin","PALADIN",3,"#ffe2b8","CONTROL"],["berserker","BERSERKER",1,"#ff7d5c","ESCAPE"],["assassin","ASSASSIN",4,"#c4b5ff","CONTROL"],["ranger","RANGER",2,"#bfe8a8","INSIGHT"],["beastmaster","BEASTMASTER",3,"#e8c99a","CONTROL"],["necromancer","NECROMANCER",4,"#9fe8c9","CONTROL"],["oracle","ORACLE",4,"#fff6d8","INSIGHT"],["alchemist","ALCHEMIST",2,"#c9f0a8","CONTROL"],["engineer","ENGINEER",2,"#ffd95c","CONTROL"],["marksman","MARKSMAN",3,"#c9d8e8","SUPPORT"],["hoplite","HOPLITE",2,"#e8b08a","CONTROL"],["gladiator","GLADIATOR",2,"#f0c9a8","CONTROL"],["ronin","RONIN",2,"#d8c9a0","ESCAPE"],["warlock","WARLOCK",3,"#a88fe8","STEALTH"],["legionary","LEGIONARY",3,"#ff9a8a","ESCAPE"],["flintlock","FLINTLOCK",1,"#e8d0a0","CONTROL"],["outrider","OUTRIDER",3,"#a8e8d8","ESCAPE"],["exorcist","EXORCIST",3,"#fff2c0","CONTROL"],["bountyhunter","BOUNTY HUNTER",4,"#ffcf8a","INSIGHT"]];   /* [id, name, tier, colour, role] */
+const BY={};ROSTER.forEach(r=>BY[r[0]]=r);
+const TOTAL=ROSTER.length, LIVE_MS=75000;
+const ALL_IDS=ROSTER.map(r=>r[0]);
+const FREE_IDS=['colossus','corsair','construct','flintlock','berserker'];  /* the five the game gives everyone */
+
+const app=document.getElementById('app'), who=document.getElementById('who');
+const drawer=document.getElementById('drawer'), scrim=document.getElementById('scrim');
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ms=v=>!v?0:typeof v.toMillis==='function'?v.toMillis():typeof v==='number'?v:v instanceof Date?v.getTime():0;
+const pad2=n=>String(n).padStart(2,'0');
+function clock(sec){sec=Math.max(0,sec||0);const t=Math.floor(sec*10),s=Math.floor(t/10),h=Math.floor(s/3600),m=Math.floor(s/60)%60;
+  return (h?h+':'+pad2(m):m)+':'+pad2(s%60)+'.'+(t%10);}
+function dur(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.floor(sec/60)%60;return h?h+'h '+pad2(m)+'m':m?m+'m':sec?sec+'s':'—';}
+function ago(t){if(!t)return '—';const d=(Date.now()-t)/1000;
+  if(d<45)return 'just now';if(d<3600)return Math.round(d/60)+' min ago';if(d<86400)return Math.round(d/3600)+' h ago';
+  if(d<86400*14)return Math.round(d/86400)+' d ago';return new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});}
+const legendName=id=>BY[id]?BY[id][1].replace(/(^|\s)(\S)(\S*)/g,(m,a,b,c)=>a+b+c.toLowerCase()):(id||'—');
+const legendColour=id=>BY[id]?BY[id][3]:'#8c8573';
+const titleCase=s=>String(s||'').toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase());
+const plural=(n,w)=>n+' '+w+(n===1?'':'s');
+const providerName=p=>p==='google.com'?'Google':p==='password'?'email and password':(p||'email');
+
+if(!firebaseConfig||!firebaseConfig.apiKey||!firebaseConfig.projectId){
+  app.innerHTML='<div class="state"><h2>Not connected yet</h2><p>Fill in <code>firebase-config.js</code> with your Firebase project settings. SETUP.md walks through it.</p></div>';
+  throw new Error('firebase-config.js is empty');
+}
+let A,F,auth,db;
+try{
+  const [a,b,c]=await Promise.all([import(SDK+'firebase-app.js'),import(SDK+'firebase-auth.js'),import(SDK+'firebase-firestore.js')]);
+  A=b;F=c;const fb=a.initializeApp(firebaseConfig);auth=A.getAuth(fb);db=F.getFirestore(fb);
+}catch(e){
+  app.innerHTML='<div class="state"><h2>Firebase could not load</h2><p>Check your internet connection and reload.</p></div>';
+  throw e;
+}
+
+/* players: every players/{uid} doc (live); board: top of leaderboard/{uid} (live) */
+let board=[], unsubBoard=null, playersLoaded=false;
+let players=[], unsub=null, sortKey='lastSeen', sortDir=-1, filter='', openUid=null, runsCache={};
+let editing=false, note='', noteTimer=null;   /* drawer edit mode + transient "Saved" flash */
+
+function signInView(msg){
+  who.innerHTML='';
+  app.innerHTML='<div class="state"><h2>Sign in to the ledger</h2><p>Use the account you added as an admin.</p>'
+   +'<div class="row"><button class="btn primary" id="g">Continue with Google</button></div>'
+   +'<input class="field" id="em" type="email" placeholder="Email" autocomplete="email">'
+   +'<input class="field" id="pw" type="password" placeholder="Password" autocomplete="current-password">'
+   +'<div class="row"><button class="btn" id="e">Sign in with email</button></div><div class="err" id="err">'+esc(msg||'')+'</div></div>';
+  const err=t=>document.getElementById('err').textContent=t;
+  document.getElementById('g').onclick=()=>A.signInWithPopup(auth,new A.GoogleAuthProvider()).catch(x=>err(x.code==='auth/popup-closed-by-user'?'':x.message));
+  const go=()=>A.signInWithEmailAndPassword(auth,document.getElementById('em').value.trim(),document.getElementById('pw').value).catch(()=>err("That email and password don't match an account."));
+  document.getElementById('e').onclick=go;
+  document.getElementById('pw').onkeydown=e=>{if(e.key==='Enter')go();};
+}
+function whoBar(u){
+  who.innerHTML='<span>'+esc(u.email||u.displayName||u.uid)+'</span><button class="btn" id="so">Sign out</button>';
+  document.getElementById('so').onclick=()=>A.signOut(auth);
+}
+
+A.onAuthStateChanged(auth,async u=>{
+  if(unsub){unsub();unsub=null;}
+  if(unsubBoard){unsubBoard();unsubBoard=null;}
+  playersLoaded=false;board=[];
+  closeDrawer();
+  if(!u){signInView();return;}
+  whoBar(u);
+  app.innerHTML='<div class="state"><p>Checking your keys…</p></div>';
+  let admin=false;
+  try{admin=(await F.getDoc(F.doc(db,'admins',u.uid))).exists();}
+  catch(e){
+    app.innerHTML='<div class="state"><h2>The database refused</h2><p>Publish <code>firestore.rules</code> in the Firebase console (Firestore → Rules), then reload.</p><p>'+esc(e.message)+'</p></div>';return;
+  }
+  if(!admin){
+    app.innerHTML='<div class="state"><h2>This account is not an admin</h2>'
+      +'<p>In the Firebase console open Firestore, start a collection called <code>admins</code>, and add a document whose ID is:</p>'
+      +'<p><code id="uid">'+esc(u.uid)+'</code></p><div class="row"><button class="btn" id="cp">Copy ID</button><button class="btn" onclick="location.reload()">I have added it</button></div>'
+      +'<p>Give it any field, for example <code>role: "owner"</code>.</p></div>';
+    document.getElementById('cp').onclick=e=>{navigator.clipboard&&navigator.clipboard.writeText(u.uid);e.target.textContent='Copied';};
+    return;
+  }
+  app.innerHTML='<div class="state"><p>Reading the ledger…</p></div>';
+  unsub=F.onSnapshot(F.query(F.collection(db,'players'),F.orderBy('lastSeen','desc'),F.limit(1000)),snap=>{
+    players=snap.docs.map(d=>Object.assign({uid:d.id},d.data()));
+    playersLoaded=true;
+    render();
+    if(openUid)renderDrawer();
+  },e=>{app.innerHTML='<div class="state"><h2>Could not read players</h2><p>'+esc(e.message)+'</p></div>';});
+  /* the leaderboard, live: fastest first; equal times go to whoever set theirs first */
+  unsubBoard=F.onSnapshot(F.query(F.collection(db,'leaderboard'),F.orderBy('bestTime'),F.limit(25)),snap=>{
+    board=snap.docs.map(d=>Object.assign({uid:d.id},d.data())).sort((a,b)=>a.bestTime-b.bestTime||ms(a.at)-ms(b.at));
+    if(playersLoaded)render();
+  },e=>console.warn('Leaderboard read failed:',e));
+});
+
+/* Remove a time from the board. With block=true the player is also added to
+   boardBans/{uid}, and firestore.rules stop them posting again until you delete
+   that document in the Firebase console. */
+async function removeFromBoard(uid,block){
+  const r=board.find(x=>x.uid===uid);if(!r)return;
+  const q=block
+    ?'Remove '+r.name+'\'s time and block them from the leaderboard?\n\nTo unblock later, delete boardBans/'+uid+' in the Firebase console.'
+    :'Remove '+r.name+'\'s time ('+clock(r.bestTime)+') from the leaderboard?\n\nThey can post again with their next escape.';
+  if(!confirm(q))return;
+  try{
+    if(block)await F.setDoc(F.doc(db,'boardBans',uid),{name:r.name||'',bestTime:r.bestTime||0,at:F.serverTimestamp()});
+    await F.deleteDoc(F.doc(db,'leaderboard',uid));
+  }catch(e){alert('Could not remove it: '+e.message);}
+}
+
+const isLive=p=>!!(p.live&&p.live.active&&Date.now()-ms(p.live.updatedAt)<LIVE_MS);
+function liveClock(p){
+  const l=p.live||{};let t=l.nightTime||0;
+  if(l.state==='play')t+=Math.min(LIVE_MS,Date.now()-ms(l.updatedAt))/1000;
+  return t;
+}
+function liveState(l){
+  if(l.state==='caught')return 'Being devoured';
+  if(l.state==='dead')return 'On the death screen';
+  return l.hunted?'Being hunted':'Exploring';
+}
+const COLS=[
+  ['name','Player',p=>(p.name||'').toLowerCase()],
+  ['status','Status',p=>isLive(p)?2:1],
+  ['ether','Ether',p=>p.ether||0,'r'],
+  ['legends','Legends',p=>(p.unlocked||[]).length,'r'],
+  ['main','Haunts as',p=>legendName(p.main)],
+  ['escapes','Escapes',p=>p.escapes||0,'r'],
+  ['deaths','Deaths',p=>(p.stats||{}).deaths||0,'r'],
+  ['best','Best night',p=>(p.stats||{}).bestTime||1e12,'r'],
+  ['time','Time played',p=>(p.stats||{}).playTime||0,'r'],
+  ['lastSeen','Last seen',p=>ms(p.lastSeen),'r'],
+  ['joined','Joined',p=>ms(p.createdAt),'r']
+];
+
+function render(){
+  const live=players.filter(isLive);
+  const sum=(f)=>players.reduce((a,p)=>a+(f(p)||0),0);
+  const week=Date.now()-7*864e5;
+  let h='<section class="summary">'
+    +'<div class="fig"><b class="num">'+players.length+'</b><span>players</span></div>'
+    +'<div class="fig hot"><b class="num">'+live.length+'</b><span>in the house now</span></div>'
+    +'<div class="fig"><b class="num">'+sum(p=>p.escapes)+'</b><span>escapes</span></div>'
+    +'<div class="fig"><b class="num">'+sum(p=>(p.stats||{}).runs)+'</b><span>runs played</span></div>'
+    +'<div class="fig"><b class="num">'+dur(sum(p=>(p.stats||{}).playTime))+'</b><span>total time in the house</span></div>'
+    +'<div class="fig"><b class="num">'+players.filter(p=>ms(p.createdAt)>week).length+'</b><span>joined this week</span></div>'
+    +'</section>';
+  h+='<h3><span class="pulse"></span>In the house now <small>'+live.length+' playing</small></h3>';
+  h+=live.length?'<div class="live">'+live.map(liveCard).join('')+'</div>'
+    :'<p class="empty">No one is in the house right now.</p>';
+  /* ---- leaderboard ---- */
+  h+='<h3>Leaderboard <small>fastest escapes · top '+board.length+'</small></h3>';
+  h+=board.length?'<ol class="board">'+board.map((r,i)=>'<li'+(i<3?' class="top"':'')+'>'
+      +'<span class="bk num">'+(i+1)+'</span>'
+      +'<button class="bname" data-uid="'+esc(r.uid)+'">'+esc(r.name)+'</button>'
+      +'<span class="bleg"><i style="background:'+legendColour(r.legend)+'"></i>'+esc(r.legend?legendName(r.legend):'Unknown legend')+'</span>'
+      +'<span class="bd">'+(r.legend?(r.deaths||0)+(r.deaths===1?' death':' deaths'):'\u2014')+'</span>'
+      +'<span class="bt num">'+clock(r.bestTime)+'</span>'
+      +'<span class="bw">'+esc(ago(ms(r.at)))+'</span>'
+      +'<span class="bx"><button class="mini" data-rm="'+esc(r.uid)+'">Remove</button><button class="mini warn" data-ban="'+esc(r.uid)+'">Remove &amp; block</button></span>'
+      +'</li>').join('')+'</ol>'
+    :'<p class="empty">No escapes on the board yet.</p>';
+  h+='<h3>Every player <small>'+players.length+'</small></h3>'
+    +'<div class="tools"><input id="q" type="search" placeholder="Search name or email" value="'+esc(filter)+'"></div>'
+    +'<div class="wrap"><table><thead><tr>'+COLS.map(c=>'<th data-k="'+c[0]+'" class="'+(c[3]||'')+'"'+(sortKey===c[0]?' aria-sort="'+(sortDir>0?'ascending':'descending')+'"':'')+'>'+c[1]
+      +(sortKey===c[0]?'<span class="ar">'+(sortDir>0?'↑':'↓')+'</span>':'')+'</th>').join('')+'</tr></thead><tbody id="tb"></tbody></table></div>';
+  const hadFocus=document.activeElement&&document.activeElement.id==='q';
+  const caret=hadFocus?document.activeElement.selectionStart:null;
+  app.innerHTML=h;
+  fillRows();
+  const q=document.getElementById('q');
+  q.oninput=()=>{filter=q.value;fillRows();};
+  if(hadFocus){q.focus();try{q.setSelectionRange(caret,caret);}catch(e){}}
+  app.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;
+    if(sortKey===k)sortDir=-sortDir;else{sortKey=k;sortDir=(k==='name'||k==='main'||k==='best')?1:-1;}render();});
+  app.querySelectorAll('.lcard').forEach(c=>c.onclick=()=>openDrawer(c.dataset.uid));
+  app.querySelectorAll('.board .bname').forEach(b=>b.onclick=()=>{if(players.some(p=>p.uid===b.dataset.uid))openDrawer(b.dataset.uid);});
+  app.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>removeFromBoard(b.dataset.rm,false));
+  app.querySelectorAll('[data-ban]').forEach(b=>b.onclick=()=>removeFromBoard(b.dataset.ban,true));
+}
+function liveCard(p){
+  const l=p.live||{},n=Math.max(0,Math.min(8,l.embers||0));
+  return '<button class="lcard'+(l.hunted?' hunted':'')+'" data-uid="'+esc(p.uid)+'" style="--tint:'+legendColour(l.legend)+'">'
+    +'<div class="nm">'+esc(p.name||'Unnamed')+'</div>'
+    +'<div class="st">'+esc(liveState(l))+' · '+esc(titleCase(l.floor))+'</div>'
+    +'<div class="clock num" data-clock="'+esc(p.uid)+'">'+clock(liveClock(p))+'</div>'
+    +'<div class="diamonds" aria-label="'+n+' of 8 embers">'+'<i>◆</i>'.repeat(n)+'◆'.repeat(8-n)+'</div>'
+    +'<div class="lmeta"><span><span class="dot" style="background:'+legendColour(l.legend)+'"></span>'+esc(legendName(l.legend))+'</span>'
+    +'<span>'+(l.memories||0)+'/4 memories</span><span>'+plural(l.deathsTonight||0,'death')+' tonight</span><span class="ether">+'+(l.runEther||0)+' ether</span></div>'
+    +'</button>';
+}
+function fillRows(){
+  const col=COLS.find(c=>c[0]===sortKey)||COLS[9];
+  const f=filter.trim().toLowerCase();
+  const rows=players.filter(p=>!f||(p.name||'').toLowerCase().includes(f)||(p.email||'').toLowerCase().includes(f))
+    .sort((a,b)=>{const x=col[2](a),y=col[2](b);return (x>y?1:x<y?-1:0)*sortDir;});
+  const tb=document.getElementById('tb');if(!tb)return;
+  tb.innerHTML=rows.length?rows.map(p=>{
+    const st=p.stats||{},live=isLive(p),l=p.live||{};
+    const status=live?'<span class="chip '+(l.hunted?'hunt':'on')+'">'+esc(liveState(l))+'&nbsp;·&nbsp;<span class="num" data-clock="'+esc(p.uid)+'">'+clock(liveClock(p))+'</span></span>'
+      :'<span class="chip">Away</span>';
+    const pend=(p.pending||[]).reduce((a,e)=>a+(e.n||0),0);
+    return '<tr tabindex="0" data-uid="'+esc(p.uid)+'">'
+      +'<td><div class="pname">'+esc(p.name||'Unnamed')+'</div><div class="pmail">'+esc(p.email||'')+'</div></td>'
+      +'<td>'+status+'</td>'
+      +'<td class="r ether">'+(p.ether||0)+(pend?' <span class="pmail">+'+pend+' unclaimed</span>':'')+'</td>'
+      +'<td class="r">'+(p.unlocked||[]).length+' / '+TOTAL+'</td>'
+      +'<td><span class="dot" style="background:'+legendColour(p.main)+'"></span>'+esc(legendName(p.main))+'</td>'
+      +'<td class="r">'+(p.escapes||0)+'</td>'
+      +'<td class="r">'+(st.deaths||0)+'</td>'
+      +'<td class="r">'+(st.bestTime?clock(st.bestTime):'—')+'</td>'
+      +'<td class="r">'+dur(st.playTime)+'</td>'
+      +'<td class="r">'+(live?'now':ago(ms(p.lastSeen)))+'</td>'
+      +'<td class="r">'+ago(ms(p.createdAt))+'</td></tr>';
+  }).join(''):'<tr><td colspan="11" class="empty">'+(players.length?'No player matches that search.':'No players yet. They appear here the first time someone signs in to the game.')+'</td></tr>';
+  tb.querySelectorAll('tr[data-uid]').forEach(tr=>{tr.onclick=()=>openDrawer(tr.dataset.uid);
+    tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrawer(tr.dataset.uid);}};});
+}
+
+/* live clocks tick between heartbeats */
+setInterval(()=>{
+  document.querySelectorAll('[data-clock]').forEach(el=>{const p=players.find(x=>x.uid===el.dataset.clock);if(p)el.textContent=clock(liveClock(p));});
+},100);
+/* and anyone whose heartbeat stops drops out of "in the house" without a reload */
+let liveCount=-1;
+setInterval(()=>{const n=players.filter(isLive).length;if(liveCount!==-1&&n!==liveCount&&document.activeElement.id!=='q')render();liveCount=n;},5000);
+
+/* =========================================================
+   KEEPER'S EDITS
+   Everything here writes to players/{uid} as an admin. firestore.rules allow it
+   because the signed-in uid has a document in the admins collection; the
+   validPlayer() shape check is skipped for admins on purpose.
+   Admin writes deliberately leave lastSeen alone, so editing someone's record
+   never makes an away player look like they have just been playing.
+   ========================================================= */
+function flash(msg){
+  note=msg;clearTimeout(noteTimer);
+  noteTimer=setTimeout(()=>{note='';if(openUid)renderDrawer();},2600);
+  if(openUid)renderDrawer();
+}
+async function patch(uid,data,msg){
+  try{await F.setDoc(F.doc(db,'players',uid),data,{merge:true});flash(msg||'Saved');}
+  catch(e){alert('Could not save: '+e.message);}
+}
+/* Grant or seal one legend. Sealing the one they are bound to rebinds them to
+   something they still own, so the game never tries to load a sealed legend. */
+function toggleLegend(uid,id){
+  const p=players.find(x=>x.uid===uid);if(!p)return;
+  const own=new Set(p.unlocked||[]),had=own.has(id);
+  had?own.delete(id):own.add(id);
+  const list=ALL_IDS.filter(x=>own.has(x)),upd={unlocked:list};
+  if(had&&p.main===id)upd.main=list[0]||FREE_IDS[0];
+  patch(uid,upd,(had?'Sealed ':'Granted ')+legendName(id));
+}
+function grantAll(uid){patch(uid,{unlocked:ALL_IDS.slice()},'All '+TOTAL+' legends granted');}
+function revokeAll(uid){
+  const p=players.find(x=>x.uid===uid);if(!p)return;
+  if(!confirm('Seal every legend except the five the game gives everyone?'))return;
+  const keep=ALL_IDS.filter(x=>FREE_IDS.indexOf(x)>=0);
+  patch(uid,{unlocked:keep,main:keep.indexOf(p.main)>=0?p.main:keep[0]},'Back to the five starting legends');
+}
+function clearPending(uid){patch(uid,{pending:[]},'Unclaimed ether cleared');}
+/* Save the whole form in one write. Blank or nonsense values keep what was there. */
+function saveForm(uid){
+  const p=players.find(x=>x.uid===uid);if(!p)return;
+  const val=id=>{const el=document.getElementById(id);return el?el.value:'';};
+  const int=(id,fb)=>{const x=parseInt(val(id),10);return isFinite(x)&&x>=0?x:fb;};
+  const flt=(id,fb)=>{const x=parseFloat(val(id));return isFinite(x)&&x>=0?x:fb;};
+  const st=Object.assign({},p.stats||{});
+  st.deaths=int('e_deaths',st.deaths||0);
+  st.runs=int('e_runs',st.runs||0);
+  st.playTime=int('e_play',Math.round((st.playTime||0)/60))*60;
+  st.embers=int('e_embers',st.embers||0);
+  st.memories=int('e_mem',st.memories||0);
+  st.etherEarned=int('e_earned',st.etherEarned||0);
+  const best=flt('e_best',0);
+  if(best>0)st.bestTime=best;else delete st.bestTime;
+  patch(uid,{
+    name:String(val('e_name')||p.name||'Unnamed').slice(0,40),
+    ether:int('e_ether',p.ether||0),
+    main:val('e_main')||p.main||FREE_IDS[0],
+    escapes:int('e_escapes',p.escapes||0),
+    stats:st
+  },'Record saved');
+}
+/* Post the player's best time to the leaderboard. This creates or updates
+   leaderboard/{uid} with their current stats. */
+async function postToLeaderboard(uid){
+  const p=players.find(x=>x.uid===uid);if(!p)return;
+  const st=p.stats||{};
+  if(!st.bestTime){alert('Player has no best time set. Set one in the form and save first.');return;}
+  try{
+    await F.setDoc(F.doc(db,'leaderboard',uid),{
+      name:String(p.name||'Unnamed').slice(0,40),
+      bestTime:st.bestTime,
+      legend:String(p.main||'').slice(0,40),
+      deaths:Math.max(0,Math.floor(st.deaths||0)),
+      embers:Math.max(0,Math.min(8,Math.floor(st.embers||0))),
+      at:F.serverTimestamp()
+    });
+    flash('Posted to leaderboard');
+  }catch(e){alert('Could not post to leaderboard: '+e.message);}
+}
+async function deleteRun(uid,runId){
+  if(!confirm('Delete this run from the history?'))return;
+  try{
+    await F.deleteDoc(F.doc(db,'players',uid,'runs',runId));
+    runsCache[uid]=(runsCache[uid]||[]).filter(r=>r.id!==runId);
+    flash('Run deleted');
+  }catch(e){alert('Could not delete the run: '+e.message);}
+}
+/* Firestore does not cascade into subcollections, so the runs go first.
+   This does NOT delete their Firebase sign-in account. */
+async function deletePlayer(uid){
+  const p=players.find(x=>x.uid===uid);if(!p)return;
+  const nm=p.name||'this player';
+  if(!confirm('Delete '+nm+"'s record?\n\nProgress, run history and their leaderboard time all go. Their sign-in account stays, so if they sign in again the game starts them fresh.\n\nThis cannot be undone."))return;
+  if(!confirm('Last chance — really delete '+nm+'?'))return;
+  try{
+    for(;;){
+      const s=await F.getDocs(F.query(F.collection(db,'players',uid,'runs'),F.limit(300)));
+      if(s.empty)break;
+      const b=F.writeBatch(db);s.docs.forEach(d=>b.delete(d.ref));await b.commit();
+      if(s.size<300)break;
+    }
+    try{await F.deleteDoc(F.doc(db,'leaderboard',uid));}catch(e){}
+    await F.deleteDoc(F.doc(db,'players',uid));
+    delete runsCache[uid];
+    closeDrawer();
+  }catch(e){alert('Could not delete the record: '+e.message);}
+}
+
+async function openDrawer(uid){
+  openUid=uid;editing=false;note='';drawer.hidden=false;scrim.hidden=false;renderDrawer();
+  try{
+    /* No orderBy: Firestore silently drops any document missing the ordered
+       field, so a run written without "at" would never appear. Sort here. */
+    const s=await F.getDocs(F.query(F.collection(db,'players',uid,'runs'),F.limit(100)));
+    runsCache[uid]=s.docs.map(d=>Object.assign({id:d.id},d.data()))
+      .sort((a,b)=>ms(b.at)-ms(a.at)).slice(0,25);
+  }catch(e){runsCache[uid]={error:e.message};}
+  if(openUid===uid)renderDrawer();
+}
+function closeDrawer(){openUid=null;editing=false;note='';drawer.hidden=true;scrim.hidden=true;}
+scrim.onclick=closeDrawer;
+addEventListener('keydown',e=>{if(e.key==='Escape'&&openUid)closeDrawer();});
+
+function renderDrawer(){
+  const p=players.find(x=>x.uid===openUid);if(!p){closeDrawer();return;}
+  const st=p.stats||{},l=p.live||{},own=new Set(p.unlocked||[]),uses=st.legendRuns||{};
+  const scroll=drawer.scrollTop;
+  let h='<div class="dhead"><div><h2>'+esc(p.name||'Unnamed')+'</h2><div class="dsub">'+esc(p.email||'')+' · joined '+ago(ms(p.createdAt))+' · signs in with '+esc(providerName(p.provider))+'</div></div>'
+    +'<button class="btn'+(editing?' primary':'')+'" id="dedit">'+(editing?'Done':'Edit')+'</button>'
+    +'<button class="btn x" id="dx" aria-label="Close">Close</button></div>';
+  if(isLive(p)){
+    h+='<div class="live" style="margin-top:18px">'+liveCard(p)+'</div>';
+  }else h+='<p class="dsub" style="margin-top:14px">Last seen '+ago(ms(p.lastSeen))+'.</p>';
+  const pend=(p.pending||[]).reduce((a,e)=>a+(e.n||0),0);
+  h+='<div class="grid2">'
+    +'<div><span>Ether</span><b class="num ether">'+(p.ether||0)+'</b></div>'
+    +'<div><span>Unclaimed</span><b class="num">'+pend+'</b></div>'
+    +'<div><span>Ether earned</span><b class="num">'+(st.etherEarned||0)+'</b></div>'
+    +'<div><span>Legends</span><b class="num">'+own.size+' / '+TOTAL+'</b></div>'
+    +'<div><span>Escapes</span><b class="num">'+(p.escapes||0)+'</b></div>'
+    +'<div><span>Deaths</span><b class="num">'+(st.deaths||0)+'</b></div>'
+    +'<div><span>Runs</span><b class="num">'+(st.runs||0)+'</b></div>'
+    +'<div><span>Best night</span><b class="num">'+(st.bestTime?clock(st.bestTime):'—')+'</b></div>'
+    +'<div><span>Time played</span><b class="num">'+dur(st.playTime)+'</b></div>'
+    +'<div><span>Embers carried</span><b class="num">'+(st.embers||0)+'</b></div>'
+    +'<div><span>Memories found</span><b class="num">'+(st.memories||0)+'</b></div>'
+    +'<div><span>Haunts as</span><b style="font-size:15px"><span class="dot" style="background:'+legendColour(p.main)+'"></span>'+esc(legendName(p.main))+'</b></div>'
+    +'</div>';
+  if(editing)h+=editPanel(p);
+  const used=Object.keys(uses).sort((a,b)=>uses[b]-uses[a]);
+  if(used.length){
+    const max=uses[used[0]];
+    h+='<h3>Most played legends</h3><div class="uses">'+used.slice(0,8).map(id=>'<span>'+esc(legendName(id))+'</span><div class="bar" style="--c:'+legendColour(id)+'"><i style="width:'+(uses[id]/max*100).toFixed(1)+'%"></i></div><span class="num r" style="text-align:right">'+uses[id]+'</span>').join('')+'</div>';
+  }
+  h+='<h3>Legends <small>'+own.size+' declassified'+(editing?' · click one to grant or seal it':'')+'</small></h3>';
+  [1,2,3,4].forEach(t=>{
+    const list=ROSTER.filter(r=>r[2]===t);
+    h+='<div class="tier">Tier '+['','I','II','III','IV'][t]+' · '+list.filter(r=>own.has(r[0])).length+' of '+list.length+'</div><div class="legends">'
+      +list.map(r=>'<div class="lg'+(own.has(r[0])?' own':'')+(p.main===r[0]?' bound':'')+(editing?' can':'')+'" style="--c:'+r[3]+'"'
+        +(editing?' data-grant="'+esc(r[0])+'" role="button" tabindex="0" title="'+(own.has(r[0])?'Seal':'Grant')+' '+esc(legendName(r[0]))+'"':'')
+        +'>'+esc(legendName(r[0]))+'<small>'+(own.has(r[0])?(p.main===r[0]?'bound · ':'')+(uses[r[0]]||0)+' runs':'sealed')+'</small></div>').join('')+'</div>';
+  });
+  const runs=runsCache[p.uid];
+  h+='<h3>Recent runs</h3>';
+  if(!runs)h+='<p class="empty">Loading…</p>';
+  else if(runs.error)h+='<p class="err">'+esc(runs.error)+'</p>';
+  else if(!runs.length)h+='<p class="empty">'+(st.runs
+      ?plural(st.runs,'run')+' counted in the stats, but none recorded here \u2014 those were played before this account signed in. Only runs finished while signed in get a record.'
+      :'No runs logged yet.')+'</p>';
+  else h+='<ul class="runs">'+runs.map(r=>'<li'+(editing?' class="ed"':'')+'><span class="res '+esc(r.result)+'">'+(r.result==='escape'?'Escaped':'Devoured')+'</span>'
+      +'<span><span class="dot" style="background:'+legendColour(r.legend)+'"></span>'+esc(legendName(r.legend))+'<div class="meta">'
+      +(r.result==='escape'?'Night took '+clock(r.nightTime):'On '+esc(titleCase(r.floor)||'?')+' at '+clock(r.nightTime))+' · '+(r.embers||0)+'/8 embers · +'+(r.ether||0)+' ether'
+      +(r.result==='escape'&&!r.seen?' · never seen':'')+'</div></span><span class="meta">'+ago(ms(r.at))+'</span>'
+      +(editing&&r.id?'<button class="rx" data-run="'+esc(r.id)+'" title="Delete this run" aria-label="Delete this run">×</button>':'')
+      +'</li>').join('')+'</ul>';
+  /* a live snapshot can redraw the drawer mid-typing, so put the caret back */
+  const act=document.activeElement, actId=act&&drawer.contains(act)?act.id:null;
+  let caret=null;try{caret=actId?act.selectionStart:null;}catch(e){}
+  drawer.innerHTML=h;drawer.scrollTop=scroll;
+  if(actId){const el=document.getElementById(actId);
+    if(el){el.focus();if(caret!=null){try{el.setSelectionRange(caret,caret);}catch(e){}}}}
+  document.getElementById('dx').onclick=closeDrawer;
+  document.getElementById('dedit').onclick=()=>{editing=!editing;note='';renderDrawer();};
+  if(!editing)return;
+  const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.onclick=fn;};
+  on('e_save',()=>saveForm(p.uid));
+  on('e_post',()=>postToLeaderboard(p.uid));
+  on('e_grant',()=>grantAll(p.uid));
+  on('e_revoke',()=>revokeAll(p.uid));
+  on('e_pend',()=>clearPending(p.uid));
+  on('e_del',()=>deletePlayer(p.uid));
+  drawer.querySelectorAll('[data-grant]').forEach(el=>{
+    el.onclick=()=>toggleLegend(p.uid,el.dataset.grant);
+    el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleLegend(p.uid,el.dataset.grant);}};});
+  drawer.querySelectorAll('[data-run]').forEach(b=>b.onclick=()=>deleteRun(p.uid,b.dataset.run));
+}
+
+/* the edit form: name, ether, the counters, and the buttons that act at once */
+function editPanel(p){
+  const st=p.stats||{}, own=new Set(p.unlocked||[]);
+  const ownIds=ALL_IDS.filter(id=>own.has(id));
+  const opts=(ownIds.length?ownIds:FREE_IDS).map(id=>'<option value="'+esc(id)+'"'+(p.main===id?' selected':'')+'>'+esc(legendName(id))+'</option>').join('');
+  const field=(id,label,v,extra)=>'<div><label for="'+id+'">'+label+'</label><input id="'+id+'" type="number" min="0" '+(extra||'')+' value="'+v+'"></div>';
+  return '<div class="edits"><h4>Keeper\'s edits</h4>'
+    +'<div class="hint">These write straight to the player\'s record. The legend tiles below are clickable while this is open.</div>'
+    +'<div class="frm">'
+    +'<div style="grid-column:1/-1"><label for="e_name">Name on the leaderboard</label><input id="e_name" type="text" maxlength="40" value="'+esc(p.name||'')+'"></div>'
+    +field('e_ether','Ether',p.ether||0)
+    +field('e_escapes','Escapes',p.escapes||0)
+    +field('e_deaths','Deaths',st.deaths||0)
+    +field('e_runs','Runs',st.runs||0)
+    +field('e_best','Best night (sec)',st.bestTime||'','step="0.1"')
+    +field('e_play','Time played (min)',Math.round((st.playTime||0)/60))
+    +field('e_embers','Embers carried',st.embers||0)
+    +field('e_mem','Memories found',st.memories||0)
+    +field('e_earned','Ether earned',st.etherEarned||0)
+    +'<div style="grid-column:1/-1"><label for="e_main">Haunts as</label><select id="e_main">'+opts+'</select></div>'
+    +'</div>'
+    +'<div class="editbar"><button class="btn primary" id="e_save">Save changes</button>'
+    +'<button class="btn" id="e_post">Post to leaderboard</button>'
+    +'<button class="btn" id="e_grant">Grant all '+TOTAL+' legends</button>'
+    +'<button class="btn" id="e_revoke">Reset legends</button>'
+    +((p.pending||[]).length?'<button class="btn" id="e_pend">Clear unclaimed ether</button>':'')
+    +(note?'<span class="saved">'+esc(note)+'</span>':'')+'</div>'
+    +'<div class="danger"><button class="btn bad" id="e_del">Delete this player\'s record</button></div>'
+    +'</div>';
+}
+</script>
+</body>
+</html>
