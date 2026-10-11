@@ -3,6 +3,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn()    { return request.auth != null; }
+    // A real account (email or Google). Co-op guests are signed in anonymously and do not count.
+    function realUser()    { return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
     function isSelf(uid)   { return signedIn() && request.auth.uid == uid; }
     function isAdmin()     { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
 
@@ -48,6 +50,37 @@ service cloud.firestore {
 
     function banned(uid) { return exists(/databases/$(database)/documents/boardBans/$(uid)); }
 
+    // USERNAMES — usernames/{key}: { uid, name, at }. Every account has exactly one, and no two accounts
+    // can share one. The key is the name lower-cased with everything but letters and digits removed,
+    // so "KP", "kp" and "K.P" are the same name. A document can only be CREATED if it does not
+    // exist yet, which is what makes a name unique. Anyone may check one name (get), only an admin
+    // may list them all.
+    function unameKey(n)   { return n.lower().replace('[^a-z0-9]', ''); }
+    function validUname(n) { return n is string && n.matches('[A-Za-z0-9 _.-]{2,24}') && unameKey(n).size() >= 2; }
+    function ownsName(n) {
+      return validUname(n)
+        && exists(/databases/$(database)/documents/usernames/$(unameKey(n)))
+        && get(/databases/$(database)/documents/usernames/$(unameKey(n))).data.uid == request.auth.uid
+        && get(/databases/$(database)/documents/usernames/$(unameKey(n))).data.name == n;
+    }
+    function validClaim(key) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['uid','name','at'])
+        && d.keys().hasAll(['uid','name','at'])
+        && d.uid == request.auth.uid
+        && validUname(d.name) && unameKey(d.name) == key
+        && d.at == request.time;
+    }
+    match /usernames/{key} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if (realUser() && validClaim(key) && !banned(request.auth.uid)) || isAdmin();
+      // changing the spelling of your own name (kp → KP) keeps the same key
+      allow update: if (realUser() && resource.data.uid == request.auth.uid && validClaim(key)) || isAdmin();
+      // letting go of your old name when you pick a new one
+      allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
     // OLD LEADERBOARD — one entry per player, fastest escape only.
     // No longer shown by the game (escapes/ replaced it); admin.html copies these
     // entries into escapes/ once. Kept so nothing old breaks.
@@ -72,8 +105,11 @@ service cloud.firestore {
 
     // ESCAPES — the leaderboard: one public document for EVERY escape.
     // Anyone can read. A signed-in player (co-op guests are signed in anonymously)
-    // can add an escape under their own uid, never edit one. A co-op night uses a
-    // fixed id, so only the first teammate out creates it; later writes are refused.
+    // can add an escape under their own uid.
+    //  · Solo escape (random id): the name MUST be the player's own claimed username.
+    //  · Co-op team escape (id starts "mp_"): "user1+user2", a fixed id so only the first
+    //    teammate out creates it; later writes are refused.
+    // The only edit a player may make is renaming their own solo escapes after changing username.
     function validEscape() {
       let e = request.resource.data;
       return e.keys().hasOnly(['uid','name','time','legend','deaths','embers','team','at'])
@@ -91,9 +127,16 @@ service cloud.firestore {
       allow read: if true;
       allow create: if (signedIn() && validEscape()
                         && request.resource.data.uid == request.auth.uid
-                        && !banned(request.auth.uid))
+                        && !banned(request.auth.uid)
+                        && ((request.resource.data.team && id.matches('mp_.*'))
+                            || (!request.resource.data.team && !id.matches('mp_.*')
+                                && realUser() && ownsName(request.resource.data.name))))
                     || isAdmin();
-      allow update, delete: if isAdmin();
+      allow update: if (realUser() && resource.data.uid == request.auth.uid && !resource.data.team
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+                        && ownsName(request.resource.data.name))
+                    || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // MOST TIME PLAYED — one public entry per player: { name, seconds, at }.
@@ -105,7 +148,7 @@ service cloud.firestore {
       let d = request.resource.data;
       return d.keys().hasOnly(['name','seconds','at'])
         && d.keys().hasAll(['name','seconds','at'])
-        && d.name is string && d.name.size() >= 1 && d.name.size() <= 40
+        && d.name is string && ownsName(d.name)
         && d.seconds is int && d.seconds >= 0 && d.seconds <= 100000000
         && d.at == request.time;
     }
