@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<!--
+  HOLLOWMERE — CO-OP LOBBY
+  Make a room, share the five-letter code (or the link), and the host begins the night.
+  The manor is built for the size of the party: the more souls, the more floors — and one
+  hunter per soul. Everything here is light; the game itself loads when the night begins.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>HOLLOWMERE — CO-OP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@400;500;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{min-height:100%;background:#04050a;font-family:'IM Fell English',serif;color:#cfc8b8}
+  body{display:flex;align-items:center;justify-content:center;padding:24px 16px;
+    background:radial-gradient(ellipse at 50% 30%,#0d0f18 0%,#04050a 70%)}
+  main{width:min(460px,100%);text-align:center}
+  h1{font-family:'Cormorant SC',serif;font-weight:600;font-size:clamp(34px,9vw,52px);letter-spacing:12px;color:#d9d2bd;
+    text-shadow:0 0 24px rgba(120,150,220,.25);padding-left:12px}
+  h2{font-family:'Cormorant SC',serif;font-weight:400;font-size:14px;letter-spacing:6px;color:#8f8874;margin:6px 0 22px;padding-left:6px}
+  .card{background:#06070c;border:1px solid #3a3630;padding:22px 24px;text-align:left;box-shadow:0 30px 80px rgba(0,0,0,.8)}
+  .note{font-size:15px;line-height:1.55;color:#a89f8a;font-style:italic}
+  .note.small{font-size:13px;margin-top:10px}
+  label{display:block;font-size:12px;letter-spacing:3px;color:#6f6a5c;margin-top:14px;font-family:'Cormorant SC',serif}
+  input{display:block;width:100%;margin-top:6px;padding:10px 12px;background:rgba(15,17,26,.9);border:1px solid #3a3630;color:#e5dcc2;
+    font-family:'IM Fell English',serif;font-size:17px;border-radius:0;outline:none}
+  input:focus{border-color:#9fc4ff}
+  input.code{text-transform:uppercase;letter-spacing:8px;text-align:center;font-size:22px}
+  button{display:block;width:100%;margin-top:12px;padding:11px 12px;border:1px solid #3a3630;background:rgba(15,17,26,.8);color:#e5dcc2;
+    font-family:'IM Fell English',serif;font-size:16px;letter-spacing:1px;cursor:pointer}
+  button:hover:not([disabled]),button:focus-visible{border-color:#8a7f60;color:#fff;outline:none}
+  button.primary{border-color:#8a7f60;background:rgba(40,32,20,.8)}
+  button[disabled]{opacity:.5;cursor:default}
+  .or{margin:18px 0 0;text-align:center;font-size:12px;letter-spacing:3px;color:#5f6c85}
+  .err{min-height:20px;margin-top:12px;font-size:14px;line-height:1.4;color:#ff8f6f}
+  .err.ok{color:#bfead0}
+  .code-big{font-family:'Cormorant SC',serif;font-size:46px;letter-spacing:14px;color:#ffbe6f;text-align:center;padding-left:14px;
+    text-shadow:0 0 18px rgba(255,150,60,.35)}
+  .code-cap{text-align:center;font-size:12px;letter-spacing:4px;color:#6f6a5c;font-family:'Cormorant SC',serif}
+  ul{list-style:none;margin-top:16px;border-top:1px solid rgba(160,150,130,.14)}
+  li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid rgba(160,150,130,.14);font-size:17px}
+  li .dot{width:9px;height:9px;border-radius:50%;background:#9fc4ff;box-shadow:0 0 8px #9fc4ff}
+  li .tag{margin-left:auto;font-size:11px;letter-spacing:2px;color:#ffbe6f;font-family:'Cormorant SC',serif}
+  .size{margin-top:16px;padding:12px;border:1px solid #2a2620;background:rgba(15,17,26,.5);text-align:center;font-size:15px;color:#a89f8a}
+  .size b{color:#ffbe6f;font-weight:normal}
+  .back{display:inline-block;margin-top:18px;font-size:13px;color:#6f6a5c;letter-spacing:2px;text-decoration:none;font-family:'Cormorant SC',serif}
+  .back:hover{color:#cfc8b8}
+  .row{display:flex;gap:10px}
+  .row button{margin-top:12px}
+</style>
+</head>
+<body>
+<main>
+  <h1>HOLLOWMERE</h1>
+  <h2>CO-OP · THE HEART HUNGERS FOR MORE</h2>
+  <div class="card" id="card"><p class="note">Reaching the house…</p></div>
+  <a class="back" href="index.html">‹ BACK TO THE TITLE</a>
+</main>
+<script type="module">
+import * as mp from './multiplayer.js';
+
+const card = document.getElementById('card');
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const qs = new URLSearchParams(location.search);
+let code = '', room = null, unsub = null, msg = '', msgOk = false, busy = false, leaving = false, launched = false;
+
+function shell(html) { card.innerHTML = html; }
+function setMsg(t, ok) { msg = t || ''; msgOk = !!ok; const e = document.getElementById('msg'); if (e) { e.textContent = msg; e.classList.toggle('ok', msgOk); } }
+
+/* ---------------- views ---------------- */
+function viewMenu() {
+  shell(`
+    <p class="note">Friends share one manor. The house grows a floor for every soul that joins, and each soul brings a hunter of its own.</p>
+    <label>YOUR NAME</label>
+    <input id="name" maxlength="24" autocomplete="nickname" value="${esc(mp.me.name)}">
+    <button class="primary" id="create">Make a room</button>
+    <div class="or">— OR —</div>
+    <label>ROOM CODE</label>
+    <input id="code" class="code" maxlength="5" autocomplete="off" spellcheck="false" placeholder="•••••" value="${esc(mp.normCode(qs.get('join')))}">
+    <button id="join">Join</button>
+    <div class="err" id="msg"></div>`);
+  const name = document.getElementById('name'), codeIn = document.getElementById('code');
+  const useName = () => { const n = name.value.trim(); if (n) mp.saveName(n); return mp.me.name; };
+  document.getElementById('create').onclick = () => go(async () => { useName(); code = await mp.createRoom(); enterLobby(); });
+  document.getElementById('join').onclick = () => go(async () => { useName(); code = await mp.joinRoom(codeIn.value); enterLobby(); });
+  codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('join').click(); });
+  codeIn.addEventListener('input', () => { codeIn.value = mp.normCode(codeIn.value); });
+  setMsg(msg, msgOk);
+  if (qs.get('join')) setTimeout(() => codeIn.focus(), 50);
+}
+
+async function go(fn) {
+  if (busy) return; busy = true;
+  card.querySelectorAll('button').forEach(b => b.disabled = true);
+  setMsg('');
+  try { await fn(); }
+  catch (e) { console.warn(e); busy = false; viewMenu(); setMsg(mp.friendlyError(e)); return; }
+  busy = false;
+}
+
+function viewLobby() {
+  if (!room || !room.meta) return;
+  const players = Object.entries(room.players || {}).map(([uid, p]) => ({ uid, name: p.name || 'Ghost', t: p.joinedAt || 0 }))
+    .sort((a, b) => a.t - b.t || (a.uid < b.uid ? -1 : 1));
+  const n = Math.max(1, players.length), amHost = room.meta.host === mp.me.uid;
+  const link = location.origin + location.pathname + '?join=' + code;
+  shell(`
+    <div class="code-cap">ROOM CODE</div>
+    <div class="code-big" id="bigcode">${esc(code)}</div>
+    <button id="copy">Copy invite link</button>
+    <ul>${players.map(p => `<li><i class="dot"></i><span>${esc(p.name)}${p.uid === mp.me.uid ? ' (you)' : ''}</span>${p.uid === room.meta.host ? '<span class="tag">HOST</span>' : ''}</li>`).join('')}</ul>
+    <div class="size"><b>${n}</b> ${n === 1 ? 'soul' : 'souls'} → a manor of <b>${mp.floorsFor(n)}</b> floors, <b>${n}</b> ${n === 1 ? 'hunter' : 'hunters'}, <b>${mp.floorsFor(n) * 2}</b> embers to gather.<br>
+      <span style="font-size:13px;color:#6f6a5c">Up to ${mp.MAX_PLAYERS} players. Late arrivals can't join once the night begins.</span></div>
+    ${amHost ? '<button class="primary" id="start">Begin the night</button>' : '<p class="note small" style="text-align:center">Waiting for the host to begin…</p>'}
+    <button id="leave">Leave room</button>
+    <div class="err" id="msg"></div>`);
+  document.getElementById('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(link); setMsg('Link copied — send it to your friends.', true); }
+    catch (e) { setMsg(link, true); }
+  };
+  document.getElementById('leave').onclick = leave;
+  const st = document.getElementById('start');
+  if (st) st.onclick = async () => {
+    st.disabled = true; setMsg('');
+    try { await mp.startRoom(code); } catch (e) { console.warn(e); st.disabled = false; setMsg(mp.friendlyError(e)); }
+  };
+  setMsg(msg, msgOk);
+}
+
+function enterLobby() {
+  if (unsub) unsub();
+  history.replaceState(null, '', location.pathname + '?join=' + code);
+  unsub = mp.watchRoom(code, async r => {
+    if (leaving || launched) return;
+    room = r;
+    if (!r || !r.meta) { room = null; code = ''; if (unsub) unsub(); viewMenu(); setMsg('That room has closed.'); return; }
+    if (!r.players || !r.players[mp.me.uid]) {          /* removed (or never added) */
+      if (r.meta.status !== 'lobby') { viewMenu(); setMsg('That night has already begun.'); return; }
+      try { await mp.joinRoom(code); } catch (e) { viewMenu(); setMsg(mp.friendlyError(e)); }
+      return;
+    }
+    if (r.meta.status !== 'lobby' && r.meta.config && (r.meta.config.order || []).includes(mp.me.uid)) { launch(); return; }
+    viewLobby();
+  });
+}
+
+async function launch() {
+  if (launched) return; launched = true;
+  shell('<p class="note" style="text-align:center">The night begins. The house is being built for you…</p>');
+  await mp.keepPresence(code);
+  location.replace('index.html?room=' + code + (qs.get('debug') === '1' ? '&debug=1' : ''));
+}
+
+async function leave() {
+  leaving = true; if (unsub) unsub();
+  try { await mp.leaveRoom(code); } catch (e) { console.warn(e); }
+  leaving = false; code = ''; room = null; history.replaceState(null, '', location.pathname);
+  qs.delete('join'); viewMenu();
+}
+
+/* ---------------- boot ---------------- */
+(async () => {
+  if (!mp.configured) { shell('<p class="note">Co-op is not switched on for this copy of the game yet.</p><p class="note small">Owner: add the Realtime Database URL to firebase-config.js and publish database.rules.json (see MULTIPLAYER.md).</p>'); return; }
+  try { await mp.init(); }
+  catch (e) { console.warn(e); shell('<p class="note">' + esc(mp.friendlyError(e)) + '</p>'); return; }
+  /* arriving by an invite link for a night this player is already part of drops straight back in */
+  const j = mp.normCode(qs.get('join'));
+  if (j) {
+    try {
+      const r = await mp.fetchRoom(j);
+      if (r && r.meta && r.meta.status !== 'lobby' && r.meta.config && (r.meta.config.order || []).includes(mp.me.uid)) { code = j; launched = false; launch(); return; }
+    } catch (e) { console.warn(e); }
+  }
+  viewMenu();
+})();
+addEventListener('pagehide', () => { /* the database drops this player from a lobby when the tab closes */ });
+</script>
+</body>
+</html>

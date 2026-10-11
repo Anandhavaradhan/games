@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn()    { return request.auth != null; }
+    function isSelf(uid)   { return signedIn() && request.auth.uid == uid; }
+    function isAdmin()     { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    function validPlayer() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name','email','provider','ether','unlocked','main','escapes','pending',
+                               'music','lastDay','v','stats','live','lastSeen','createdAt'])
+        && d.name is string && d.name.size() <= 60
+        && d.ether is int && d.ether >= 0 && d.ether <= 10000000
+        && d.unlocked is list && d.unlocked.size() <= 40
+        && d.main is string && d.main.size() <= 40
+        && d.escapes is int && d.escapes >= 0
+        && d.pending is list && d.pending.size() <= 20
+        && d.stats is map && d.live is map
+        && d.lastSeen == request.time;
+    }
+
+    function validRun() {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['result','nightTime','legend','embers','memories','ether',
+                               'deathsTonight','seen','floor','at'])
+        && r.result in ['escape','death']
+        && r.nightTime is number && r.nightTime >= 0
+        && r.at == request.time;
+    }
+
+    // A player reads and writes only their own record. An admin can read every
+    // record and may edit or delete any of them from admin.html — granting
+    // legends, correcting ether, removing a run, deleting an account outright.
+    // Admin writes skip validPlayer() deliberately: the shape check exists to
+    // stop players writing junk into their own record, and the keeper is trusted.
+    match /players/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create, update: if (isSelf(uid) && validPlayer()) || isAdmin();
+      allow delete: if isAdmin();
+
+      match /runs/{runId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if (isSelf(uid) && validRun()) || isAdmin();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    function banned(uid) { return exists(/databases/$(database)/documents/boardBans/$(uid)); }
+
+    // OLD LEADERBOARD — one entry per player, fastest escape only.
+    // No longer shown by the game (escapes/ replaced it); admin.html copies these
+    // entries into escapes/ once. Kept so nothing old breaks.
+    function validEntry() {
+      let e = request.resource.data;
+      return e.keys().hasOnly(['name','bestTime','legend','deaths','embers','at'])
+        && e.name is string && e.name.size() >= 1 && e.name.size() <= 40
+        && e.bestTime is number && e.bestTime >= 20 && e.bestTime <= 86400
+        && e.legend is string && e.legend.size() <= 40
+        && e.deaths is int && e.deaths >= 0 && e.deaths <= 100000
+        && e.embers is int && e.embers >= 0 && e.embers <= 8
+        && e.at == request.time;
+    }
+    match /leaderboard/{uid} {
+      allow read: if true;
+      allow create: if (isSelf(uid) && validEntry() && !banned(uid)) || isAdmin();
+      allow update: if (isSelf(uid) && validEntry() && !banned(uid)
+                        && request.resource.data.bestTime <= resource.data.bestTime)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ESCAPES — the leaderboard: one public document for EVERY escape.
+    // Anyone can read. A signed-in player (co-op guests are signed in anonymously)
+    // can add an escape under their own uid, never edit one. A co-op night uses a
+    // fixed id, so only the first teammate out creates it; later writes are refused.
+    function validEscape() {
+      let e = request.resource.data;
+      return e.keys().hasOnly(['uid','name','time','legend','deaths','embers','team','at'])
+        && e.keys().hasAll(['uid','name','time','legend','deaths','embers','team','at'])
+        && e.uid is string
+        && e.name is string && e.name.size() >= 1 && e.name.size() <= 40
+        && e.time is number && e.time >= 20 && e.time <= 86400
+        && e.legend is string && e.legend.size() <= 40
+        && e.deaths is int && e.deaths >= 0 && e.deaths <= 100000
+        && e.embers is int && e.embers >= 0 && e.embers <= 40
+        && e.team is bool
+        && e.at == request.time;
+    }
+    match /escapes/{id} {
+      allow read: if true;
+      allow create: if (signedIn() && validEscape()
+                        && request.resource.data.uid == request.auth.uid
+                        && !banned(request.auth.uid))
+                    || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // MOST TIME PLAYED — one public entry per player: { name, seconds, at }.
+    // The game only counts ACTIVE seconds. On top of that, these rules make the
+    // total impossible to inflate: an update may never add more seconds than real
+    // time has passed since the previous write (plus 10 s for network delay), and
+    // the total can never go down. A brand-new entry starts at 2 minutes or less.
+    function validPlaytime() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name','seconds','at'])
+        && d.keys().hasAll(['name','seconds','at'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 40
+        && d.seconds is int && d.seconds >= 0 && d.seconds <= 100000000
+        && d.at == request.time;
+    }
+    match /playtime/{uid} {
+      allow read: if true;
+      allow create: if (isSelf(uid) && validPlaytime() && !banned(uid)
+                        && request.resource.data.seconds <= 120)
+                    || isAdmin();
+      allow update: if (isSelf(uid) && validPlaytime() && !banned(uid)
+                        && request.resource.data.seconds >= resource.data.seconds
+                        && request.resource.data.seconds - resource.data.seconds
+                           <= (request.time.toMillis() - resource.data.at.toMillis()) / 1000 + 10)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Players an admin has blocked from the leaderboards (set from admin.html).
+    match /boardBans/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Admins are added by hand in the Firebase console; nobody can write this from the site.
+    match /admins/{uid} {
+      allow read: if isSelf(uid);
+      allow write: if false;
+    }
+  }
+}
