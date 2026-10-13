@@ -3810,7 +3810,7 @@ function endRun(win){
   refreshClaims();
   if(SOLO_RANKED){cloudLogRun(win);
   if(win)boardAfterEscape(Math.round(elapsed*10)/10,newBest);}
-  else if(MP&&win)boardAfterTeamEscape(Math.round(elapsed*10)/10);
+  /* co-op: the team's leaderboard entry waits until the last soul is out (mpTeamCheck) */
   if(win&&!cloudUser){GUEST.esc++;guestFlush(true);}   /* a guest's escape counts in the guest total only */
 }
 
@@ -4956,12 +4956,39 @@ function doDeath(){state='dead';deaths++;catcher=null;
   if(MP&&deaths===3)setTimeout(()=>subtitle('The house feels hungrier now.',4.5),1200);
   showOv(deathOv);
   applyPendingUser();}
-function doWin(){state='win';endRun(true);setScreenState();try{document.exitPointerLock();}catch(e){}SFX.win();
+function doWin(){state='win';
+  if(MP){TEAM.myOut=Math.round(mpElapsed()*10)/10;TEAM.done=false;}
+  endRun(true);setScreenState();try{document.exitPointerLock();}catch(e){}SFX.win();
   RUN.title=RUN.title||runTitle();
+  if(MP){
+    /* co-op: the night is not over until every soul is out — watch the others until then */
+    $('winStats').innerHTML='<span style="'+RUN_TITLE_CSS+'">'+escHTML(RUN.title)+'</span>'
+      +escHTML(`YOU GOT OUT AT ${fmtTime(TEAM.myOut)} \u00b7 THE CLOCK RUNS UNTIL YOUR WHOLE TEAM IS OUT`);
+    $('winPulse').textContent='WAITING FOR YOUR TEAM\u2026';
+    $('winRank').textContent='';
+  }else
   $('winStats').innerHTML='<span style="'+RUN_TITLE_CSS+'">'+escHTML(RUN.title)+'</span>'
     +escHTML(`TIME ${fmtTime(elapsed)} \u00b7 SOULS LOST ${deaths} \u00b7 EMBERS ${got}/${TOTAL_EMBERS} \u00b7 MEMORIES ${shardsFound}/${NF}`);
   showOv(winOv);
   applyPendingUser();}
+/* ---- co-op: the team's night ends when the LAST soul is out. Each player publishes the moment they got
+   out (state .et); the team's time is the latest of them, so every client works out the same time. */
+const TEAM={myOut:0,done:false,time:0};
+function mpTeamCheck(){
+  if(!MP||TEAM.done||state!=='win')return;
+  const others=Array.from(REMOTE.values());
+  /* anyone still in the house (alive, caught or waiting to rise) keeps the night going */
+  if(others.some(r=>r.ph===1||r.ph===2))return;
+  TEAM.done=true;
+  TEAM.time=Math.max(TEAM.myOut,...others.filter(r=>r.ph===3).map(r=>r.et||0));
+  specStop();
+  $('winStats').innerHTML='<span style="'+RUN_TITLE_CSS+'">'+escHTML(RUN.title)+'</span>'
+    +escHTML(`TEAM TIME ${fmtTime(TEAM.time)} \u00b7 YOU GOT OUT AT ${fmtTime(TEAM.myOut)} \u00b7 SOULS LOST ${deaths} \u00b7 EMBERS ${got}/${TOTAL_EMBERS}`);
+  $('winPulse').textContent='TAP OR ENTER TO RETURN TO THE LOBBY';
+  showOv(winOv);
+  toast('EVERY SOUL IS OUT \u2014 THE TEAM ESCAPED IN '+fmtTime(TEAM.time),4.5);
+  boardAfterTeamEscape(TEAM.time);
+}
 function advance(){
   if(vaultOpen)return;
   if(lbOpen){closeBoard();return;}
@@ -4969,7 +4996,7 @@ function advance(){
   if(settingsOpen){closeSettings();return;}
   if(state==='title'){if(MP)mpReadyClick();else startGame();}
   else if(state==='dead')riseOrRestart();
-  else if(state==='win'){if(MP)location.href='lobby.html';else fullReset();}
+  else if(state==='win'){if(MP){if(TEAM.done)location.href='lobby.html';}else fullReset();}
   else if(state==='play'&&!pauseOv.classList.contains('hidden')){showOv(null);lockMouse();}}
 document.addEventListener('click',()=>{try{advance();}catch(e){fatal('Click error: '+e.message);}});
 [deathOv,winOv,pauseOv,titleOv].forEach(ov=>ov.addEventListener('click',e=>{e.stopPropagation();try{advance();}catch(err){}}));
@@ -6096,7 +6123,7 @@ function mpApplyStateRaw(uid,v){
   const r=mpRemote(uid),prev=r.ph,fl=v.fl|0;
   r.tx=+v.x||0;r.ty=+v.y||0;r.tz=+v.z||0;r.yaw=+v.r||0;r.ent.floor=v.f|0;
   r.ent.hiding=!!(fl&1);r.ent.veiling=!!(fl&2);r.ent.dashing=!!(fl&4);r.ent.moving=!!(fl&8);r.ent.invis=!!(fl&16);
-  r.ent.noiseR=+v.nz||0;r.ph=v.ph|0;r.alive=r.ph===1;
+  r.ent.noiseR=+v.nz||0;r.ph=v.ph|0;r.alive=r.ph===1;r.et=+v.et||0;
   if(!r.seen||Math.hypot(r.tx-r.ent.x,r.tz-r.ent.z)>6||Math.abs(r.ty-r.ent.y)>4){r.seen=true;r.ent.x=r.tx;r.ent.y=r.ty;r.ent.z=r.tz;r.gy=r.yaw;}
   if(v.lg&&v.lg!==r.lg){
     r.lg=v.lg;if(r.gh){disposeLegend(r.gh);r.gh=null;}
@@ -6193,7 +6220,9 @@ function mpPublish(){
   const ph=state==='play'?1:(state==='caught'||state==='dead')?2:state==='win'?3:0;
   const fl=(P.hiding?1:0)|(P.veiling?2:0)|(P.dashing?4:0)|(P.moving?8:0)|(AB.invisT>0?16:0)|(AB.silentT>0?32:0);
   const nr=ph===1&&!(P.veiling||AB.invisT>0||AB.silentT>0)?((P.dashing&&P.moving)?PS.noiseB:(P.moving?PS.noise:0))*(AB.loudT>0?1.7:1):0;
-  MP.net.publishState(MP.code,{x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:save.main}).catch(()=>{});
+  const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:save.main};
+  if(ph===3)so.et=TEAM.myOut;   /* when I got out: the team's time is the latest of these */
+  MP.net.publishState(MP.code,so).catch(()=>{});
   const st={patrol:0,investigate:1,search:2,chase:3}[M.state]||0;
   const tg=M.state==='chase'&&M.tgt?(M.tgt===P?MP.uid:(M.tgt.uid||'')):'';
   MP.net.publishMon(MP.code,{x:r2(M.x),y:r2(M.y),z:r2(M.z),f:M.floor,r:r2(M.yaw),s:st,g:M.goneT>0?1:0,st:M.stunT>0?1:0,tg}).catch(()=>{});}
@@ -6270,7 +6299,7 @@ function mpWatchAllDead(dt){
   mpResetNight(go);}
 function mpResetNight(go){
   if(!(go>mpGO))return;
-  mpGO=go;mpAllDeadT=0;
+  mpGO=go;mpAllDeadT=0;TEAM.done=false;TEAM.myOut=0;TEAM.time=0;
   /* the shared night from zero: every ember back, the seal re-formed, every hunter home */
   embers.forEach(e=>{e.taken=false;e.grp.visible=true;});
   resetProgress();randomizeShards();
@@ -6299,6 +6328,7 @@ function mpFrame(dt,t){
       if(m.goneT>0||m.stunT>0||m.floor!==P.floor)continue;
       if(Math.hypot(P.x-m.x,P.z-m.z)<1.15){caughtBy(p);break;}}}
   mpWatchAllDead(dt);
+  mpTeamCheck();
   voiceTick(performance.now());
   {const nowMs=performance.now();if(nowMs-mpAcc>=100){mpAcc=nowMs;mpPublish();}}
   if((mpHudT-=dt)<=0){mpHudT=0.5;mpTeamHud();}}
@@ -6347,21 +6377,30 @@ function specNext(d){
   const list=specTargets();if(!list.length){specStop();return;}
   let i=list.findIndex(r=>r.uid===SPEC.uid);i=(i+d+list.length)%list.length;
   SPEC.r=list[i];SPEC.uid=list[i].uid;SPEC.cam=null;specText();}
+/* 'dead': taken, waiting to rise · 'out': got out of the house before the rest of the team */
+const specMode=()=>state==='dead'?'dead':(state==='win'&&MP&&!TEAM.done)?'out':'';
 function specText(){
   if(!SPEC.r)return;
   $('specName').textContent='WATCHING '+String(SPEC.r.name).toUpperCase();
-  const ready=canRise(),s=Math.max(0,Math.ceil((reviveAt-performance.now())/1000));
-  $('specSub').textContent=(FLOOR_NAMES[SPEC.r.ent.floor]||'')+' · '+(ready?'TAP OR PRESS R TO RISE':'YOU RISE IN '+s+'s')
-    +(specTargets().length>1?' · ◀ ▶ TO SWITCH':'');}
+  let what;
+  if(specMode()==='out'){
+    const inside=Array.from(REMOTE.values()).filter(r=>r.ph===1||r.ph===2).length;
+    what='YOU ARE OUT \u00b7 '+inside+' STILL INSIDE \u00b7 '+fmtTime(mpElapsed());}
+  else{const ready=canRise(),s=Math.max(0,Math.ceil((reviveAt-performance.now())/1000));
+    what=ready?'TAP OR PRESS R TO RISE':'YOU RISE IN '+s+'s';}
+  $('specSub').textContent=(FLOOR_NAMES[SPEC.r.ent.floor]||'')+' \u00b7 '+what
+    +(specTargets().length>1?' \u00b7 \u25c0 \u25b6 TO SWITCH':'');}
 function specTick(now){
-  if(state!=='dead'){if(SPEC.on)specStop();SPEC.deadAt=0;return;}
+  const mode=specMode();
+  if(!mode){if(SPEC.on)specStop();SPEC.deadAt=0;return;}
   if(!SPEC.deadAt)SPEC.deadAt=now;
+  const back=()=>showOv(mode==='out'?winOv:deathOv);
   if(!SPEC.on){
-    /* a moment on the death screen first, then watch whoever is still in the house */
-    if(now-SPEC.deadAt>3000&&!vaultOpen){const list=specTargets();if(list.length)specStart(list[0]);}
+    /* a moment on the death (or escape) screen first, then watch whoever is still in the house */
+    if(now-SPEC.deadAt>(mode==='out'?2500:3000)&&!vaultOpen&&!lbOpen){const list=specTargets();if(list.length)specStart(list[0]);}
     return;}
   if(!SPEC.r||SPEC.r.ph!==1||!REMOTE.has(SPEC.uid)){
-    const list=specTargets();if(list.length)specStart(list[0]);else{specStop();showOv(deathOv);}return;}
+    const list=specTargets();if(list.length)specStart(list[0]);else{specStop();back();}return;}
   if((specTick.t=(specTick.t||0)+1)%10===0)specText();
 }
 /* third person, behind the one you watch, kept out of the walls */
