@@ -1,0 +1,70 @@
+{
+  "rules": {
+    "rooms": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && !newData.exists() && data.child('meta/host').val() === auth.uid",
+        "meta": {
+          ".write": "auth != null"
+        },
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        }
+      }
+    },
+    "live": {
+      "$code": {
+        ".read": "auth != null",
+        "state": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "mon": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "embers": {
+          ".write": "auth != null && !newData.exists()",
+          "$i": {
+            ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
+          }
+        },
+        "ev": {
+          "$id": {
+            ".write": "auth != null"
+          }
+        },
+        "rtc": {
+          "$to": {
+            ".write": "auth != null && auth.uid === $to && !newData.exists()",
+            "$id": {
+              ".write": "auth != null && ((!data.exists() && newData.child('from').val() === auth.uid) || (auth.uid === $to && !newData.exists()))"
+            }
+          }
+        }
+      }
+    },
+    "friendsOf": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('friendsOf').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
+      }
+    },
+    "watch": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('friendsOf').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
+      }
+    }
+  }
+}

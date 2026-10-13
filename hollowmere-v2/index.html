@@ -84,6 +84,14 @@
   #gearBtn{position:absolute;top:52px;right:18px;z-index:15;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
     border:1px solid #3a3630;background:rgba(8,9,14,.55);color:#9a927e;font-size:19px;cursor:pointer;pointer-events:auto}
   #gearBtn:hover{color:#d8cfb6;border-color:#6a5a42}
+  #micBtn{display:none;position:absolute;top:100px;right:12px;z-index:15;min-width:52px;height:34px;padding:0 8px;align-items:center;justify-content:center;
+    font-family:'Cormorant SC',serif;font-size:11px;letter-spacing:2px;color:#8f8874;border:1px solid rgba(160,150,130,.35);background:rgba(10,10,14,.55);
+    cursor:pointer;pointer-events:auto;user-select:none}
+  #micBtn.on{color:#9fd18a;border-color:rgba(159,209,138,.6)}
+  #micBtn.on.talk{box-shadow:0 0 12px rgba(159,209,138,.7)}
+  body.watching #micBtn{display:none!important}
+  #team .tm.talk b{color:#9fd18a}
+  #team .tm.talk i{background:#9fd18a;box-shadow:0 0 10px #9fd18a}
   body.title #gearBtn{animation:pulse 2.1s ease-in-out infinite}
   #setPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:26;width:min(380px,90vw);
     max-height:88vh;overflow-y:auto;background:rgba(6,7,12,.95);border:1px solid #3a3630;padding:22px 26px;text-align:left;display:none}
@@ -112,6 +120,32 @@
   #mpBanner b{font-weight:normal;color:#ffbe6f;letter-spacing:3px}
   body.mp #titleCoop,body.mp #titleBoard{display:none}
   /* ===== ACCOUNT PANEL ===== */
+  #frPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:27;width:min(460px,94vw);
+    max-height:88vh;overflow-y:auto;display:none;background:rgba(10,10,14,.96);border:1px solid rgba(160,150,130,.25);padding:22px 20px 16px}
+  #frPanel h3{font-family:'Cormorant SC',serif;letter-spacing:4px;font-size:17px;color:#d8cfb6;margin-bottom:14px;text-align:center}
+  #frClose{margin-top:14px;text-align:center;cursor:pointer;font-family:'Cormorant SC',serif;letter-spacing:3px;color:#8f8874;font-size:13px}
+  .frsec{font-family:'Cormorant SC',serif;font-size:12px;letter-spacing:3px;color:#8f8874;margin:16px 0 6px;border-bottom:1px solid rgba(160,150,130,.14);padding-bottom:4px}
+  .frrow{display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid rgba(160,150,130,.08)}
+  .frrow .who{flex:1;min-width:0}
+  .frrow .who b{display:block;color:#e5dcc2;font-weight:normal;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frrow .who span{display:block;font-size:12px;color:#6f6a5c}
+  .frrow .who span.on{color:#9fd18a}.frrow .who span.night{color:#ffbe6f}
+  .frbtn{cursor:pointer;font-family:'Cormorant SC',serif;font-size:12px;letter-spacing:2px;padding:6px 10px;border:1px solid rgba(160,150,130,.3);color:#cfc8b8;background:rgba(20,20,26,.6)}
+  .frbtn.go{color:#ffbe6f;border-color:rgba(255,190,111,.55)}
+  .frbtn.no{color:#a07a70}
+  .fradd{display:flex;gap:8px;align-items:center}.fradd input{flex:1;min-width:0}
+  .frnote{font-size:13px;color:#7d7663;font-style:italic;margin-top:8px}
+  .frmsg{font-size:13px;margin-top:8px;color:#d98b7a}.frmsg.ok{color:#9fd18a}
+  #specBar,#watchBar{display:none;position:absolute;left:50%;transform:translateX(-50%);z-index:20;align-items:center;gap:10px;
+    background:rgba(8,8,12,.78);border:1px solid rgba(160,150,130,.25);padding:8px 12px;max-width:94vw}
+  #specBar{bottom:22px}#watchBar{top:14px}
+  body.spec #specBar,body.watching #watchBar{display:flex}
+  #specBar .stext,#watchBar .stext{text-align:center;min-width:0}
+  #specBar b,#watchBar b{display:block;font-family:'Cormorant SC',serif;letter-spacing:3px;color:#e5dcc2;font-weight:normal;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #specBar span#specSub,#watchBar span#watchSub{display:block;font-size:12px;color:#a89f8a;font-family:'Cormorant SC',serif;letter-spacing:2px}
+  .sbtn{cursor:pointer;pointer-events:auto;font-size:15px;color:#ffbe6f;padding:8px 12px;border:1px solid rgba(255,190,111,.4);user-select:none}
+  .sbtn.wide{font-family:'Cormorant SC',serif;font-size:12px;letter-spacing:2px}
+  body.spec #hud,body.spec #touchUI,body.watching #hud,body.watching #touchUI,body.watching #team,body.watching #gearBtn,body.watching #abhud{display:none!important}
   #acctPanel,#lbPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:27;width:min(400px,92vw);
     max-height:90vh;overflow-y:auto;background:#06070c;border:1px solid #3a3630;padding:22px 26px;text-align:left;display:none;
     box-shadow:0 30px 80px rgba(0,0,0,.8)}
@@ -147,6 +181,17 @@
   .acctline b{font-weight:normal;color:#ffbe6f;font-style:normal}
   /* ===== LEADERBOARD PANEL (fastest escapes) ===== */
   #lbPanel{width:min(480px,94vw)}
+  .diffRow{margin:12px auto 4px;text-align:center;max-width:94vw}
+  .diffRow .dcap{font-family:'Cormorant SC',serif;font-size:12px;letter-spacing:3px;color:#8f8874;margin-bottom:6px}
+  .diffRow .dbtns{display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+  .diffRow .dbtn{cursor:pointer;font-family:'Cormorant SC',serif;font-size:13px;letter-spacing:2px;color:#a89f8a;padding:7px 12px;
+    border:1px solid rgba(160,150,130,.25);background:rgba(10,10,14,.4);pointer-events:auto}
+  .diffRow .dbtn.on{color:#ffbe6f;border-color:rgba(255,190,111,.6);background:rgba(255,190,111,.08)}
+  .diffRow .dbtn.nm.on{color:#ff7b6b;border-color:rgba(255,110,90,.6);background:rgba(255,90,70,.08)}
+  .diffRow .ddesc{font-size:13px;color:#7d7663;font-style:italic;margin-top:6px}
+  body.mp .diffRow{display:none}
+  .lbtabs.sub{margin-top:-6px}
+  .lbtabs.sub span{font-size:11px;padding:4px 9px}
   .lbtabs{display:flex;justify-content:center;gap:6px;margin:-2px 0 12px}
   .lbtabs span{cursor:pointer;font-family:'Cormorant SC',serif;font-size:13px;letter-spacing:2px;color:#8f8874;padding:6px 12px;border:1px solid rgba(160,150,130,.18)}
   .lbtabs span.on{color:#ffbe6f;border-color:rgba(255,190,111,.5);background:rgba(255,190,111,.06)}
@@ -588,16 +633,26 @@
   <div id="team"></div>
   <div id="mpCount"></div>
   <div id="gearBtn">⚙</div>
+  <div id="micBtn">MIC OFF</div>
   <div id="acctScrim"></div>
   <!-- LEADERBOARD: every escape (Firestore escapes/{id}) and most active time played (playtime/{uid}) -->
   <div id="actNote"></div>
   <div id="lbPanel" role="dialog" aria-label="Leaderboard">
     <h3>LEADERBOARD</h3>
     <div class="lbtabs"><span data-lbtab="esc" class="on">FASTEST ESCAPES</span><span data-lbtab="time">MOST TIME PLAYED</span></div>
+    <div class="lbtabs sub" id="lbDiffTabs"><span data-lbdiff="easy">EASY</span><span data-lbdiff="normal" class="on">NORMAL</span><span data-lbdiff="hard">HARD</span><span data-lbdiff="nightmare">NIGHTMARE</span></div>
     <p class="lbsub" id="lbSub"></p>
     <div id="lbBody"></div>
     <div id="lbClose">CLOSE</div>
   </div>
+  <div id="frPanel" role="dialog" aria-label="Friends">
+    <h3>FRIENDS</h3>
+    <div id="frBody"></div>
+    <div id="frClose">CLOSE</div>
+  </div>
+  <!-- spectating: a teammate after you are taken (co-op), or a friend (index.html?watch=UID) -->
+  <div id="specBar"><span class="sbtn" id="specPrev">&#9664;</span><div class="stext"><b id="specName"></b><span id="specSub"></span></div><span class="sbtn" id="specNext">&#9654;</span></div>
+  <div id="watchBar"><div class="stext"><b id="watchName"></b><span id="watchSub"></span></div><span class="sbtn wide" id="watchLeave">LEAVE</span></div>
   <div id="acctPanel" role="dialog" aria-label="Account">
     <h3>ACCOUNT</h3>
     <div id="acctBody"></div>
@@ -608,6 +663,10 @@
     <div class="srow">
       <div class="slab"><span>VOLUME</span><span class="sv" id="volVal"></span></div>
       <input type="range" id="volRange" min="0" max="1" step="0.05">
+    </div>
+    <div class="srow" id="voiceRow">
+      <div class="slab"><span>VOICE CHAT VOLUME</span><span class="sv" id="voiceVal"></span></div>
+      <input type="range" id="voiceRange" min="0" max="1" step="0.05">
     </div>
     <div class="srow">
       <div class="slab"><span>LOOK SENSITIVITY</span><span class="sv" id="sensVal"></span></div>
@@ -668,8 +727,10 @@
     <button id="btnVault" class="ovbtn">THE VAULT — 40 LEGENDS</button>
     <button id="titleAccount" class="ovbtn">ACCOUNT</button>
     <button id="titleBoard" class="ovbtn">LEADERBOARD</button>
+    <button id="titleFriends" class="ovbtn">FRIENDS</button>
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
     <button id="titleCoop" class="ovbtn">CO-OP — PLAY WITH FRIENDS</button>
+    <div class="diffRow" data-where="title"></div>
     <div id="mpBanner" style="display:none"></div>
     <div id="acctLine" class="acctline">Playing as a guest</div>
     <div class="pulse">TAP OR PRESS ENTER TO WAKE &nbsp;·&nbsp; HEADPHONES, LIGHTS OFF</div>
@@ -681,6 +742,7 @@
     <div class="stat" id="deathTime"></div>
     <div class="stat" id="runSum"></div>
     <button id="btnVaultD" class="ovbtn">THE VAULT — SPEND YOUR ETHER</button>
+    <div class="diffRow" data-where="death"></div>
     <div class="pulse" id="risePrompt">TAP OR PRESS R TO BEGIN A NEW NIGHT</div>
   </div>
   <div id="winOv" class="overlay hidden">
@@ -691,6 +753,7 @@
     <div class="stat" id="winRank"></div>
     <button id="btnVaultW" class="ovbtn">THE VAULT — SPEND YOUR ETHER</button>
     <button id="btnBoardW" class="ovbtn">LEADERBOARD</button>
+    <div class="diffRow" data-where="win"></div>
     <div class="pulse" id="winPulse">TAP OR ENTER TO HAUNT AGAIN</div>
   </div>
   <div id="pauseOv" class="overlay hidden">
@@ -797,7 +860,23 @@ if(!THREE){fatal('Could not load three.js from any CDN. An internet connection i
 
 const isTouch=(window.matchMedia&&matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
-const settings={sens:isTouch?1.3:1.0, invertY:false, vol:0.8, reduceFlash:false, view:'fp', gamma:1.0, quality:isTouch?'medium':'high'};
+const settings={sens:isTouch?1.3:1.0, invertY:false, vol:0.8, reduceFlash:false, view:'fp', gamma:1.0, quality:isTouch?'medium':'high', diff:'normal', voiceVol:1};
+/* ================= DIFFICULTY =================
+   speed   the thing's walking / hunting speed          sight  how far it sees you
+   hear    how far your footsteps carry                 notice how long it takes to be sure it saw you (lower = faster)
+   cap     chase speed never passes this share of your burst, so you can always pull away (0 = no cap)
+   scare   jumpscares: 0 none · 1 the face only · 2 the TELEPORTING jumpscare (it appears in front of you and hunts)
+   every   how often a scare comes (× the usual gap; lower = more often)
+   Each difficulty has its own fastest-escapes leaderboard. Co-op uses the host's choice (and never has jumpscares). */
+const DIFFS={
+  easy:     {n:'EASY',     speed:0.85,sight:0.8, hear:0.75,notice:1.4, cap:0.85,scare:0,every:1,  d:'A slower, half-blind thing. No jumpscares.'},
+  normal:   {n:'NORMAL',   speed:1,   sight:1,   hear:1,   notice:1,   cap:0,   scare:1,every:1,  d:'The house as it was meant to be. The face, but it stays where it is.'},
+  hard:     {n:'HARD',     speed:1.12,sight:1.15,hear:1.25,notice:0.75,cap:0.97,scare:1,every:0.8,d:'Quicker, sharper ears, and the face comes more often.'},
+  nightmare:{n:'NIGHTMARE',speed:1.2, sight:1.25,hear:1.4, notice:0.6, cap:0.97,scare:2,every:0.7,d:'The thing teleports in front of you when it scares you \u2014 and then it hunts.'}
+};
+const DIFF_ORDER=['easy','normal','hard','nightmare'];
+/* spectating a teammate after you are taken (co-op) — see SPECTATING A TEAMMATE */
+const SPEC={on:false,uid:'',r:null,deadAt:0,fogF:-1,cam:null};
 const SET_KEY='hollowmere_settings_v1';
 try{const ss=JSON.parse(localStorage.getItem(SET_KEY)||'null');
   if(ss){
@@ -808,6 +887,8 @@ try{const ss=JSON.parse(localStorage.getItem(SET_KEY)||'null');
     if(ss.view==='fp'||ss.view==='tp')settings.view=ss.view;
     if(typeof ss.gamma==='number'&&isFinite(ss.gamma))settings.gamma=Math.max(0.6,Math.min(1.8,ss.gamma));
     if(['high','medium','low'].indexOf(ss.quality)>=0)settings.quality=ss.quality;
+    if(DIFFS[ss.diff])settings.diff=ss.diff;
+    if(typeof ss.voiceVol==='number'&&isFinite(ss.voiceVol))settings.voiceVol=Math.max(0,Math.min(1,ss.voiceVol));
   }}catch(e){}
 function saveSettings(){try{localStorage.setItem(SET_KEY,JSON.stringify(settings));}catch(e){}}
 
@@ -821,6 +902,8 @@ const DEBUG=QS.get('debug')==='1';
 /* (tests only) a slow machine normally runs the house in slow motion; this lets a headless test keep real time */
 const DT_CAP=DEBUG?(+QS.get('dtcap')||+(function(){try{return localStorage.getItem('hm_dtcap');}catch(e){return 0;}})()||0.05):0.05;
 const ROOM=(QS.get('room')||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+/* index.html?watch=UID&floors=N — spectating a friend's night (see WATCH below) */
+const WATCH=ROOM?'':(QS.get('watch')||'').replace(/[^A-Za-z0-9]/g,'').slice(0,128);
 let MP=null,MPERR='';
 if(ROOM){
   try{
@@ -832,9 +915,13 @@ if(ROOM){
         slot:Math.max(0,cfg.order.indexOf(net.me.uid)),n:cfg.order.length};
   }catch(e){console.warn('Co-op unavailable:',e);MPERR=(e&&e.message)||'unknown error';}
 }
-const NF_WANT=MP?Math.max(4,Math.min(11,MP.cfg.floors|0)):(DEBUG&&(+QS.get('floors')>=4)?Math.min(11,+QS.get('floors')|0):4);
+const NF_WANT=MP?Math.max(4,Math.min(11,MP.cfg.floors|0)):((DEBUG||WATCH)&&(+QS.get('floors')>=4)?Math.min(11,+QS.get('floors')|0):4);
 /* every client builds the same house: the room's seed drives anything that is random on purpose */
 const mpRnd=MP?mulberry32(MP.cfg.seed):Math.random;
+/* the difficulty of THIS night. Solo: picked on the title / death / win screens, applied when a night
+   begins. Co-op: the host's choice from the lobby. */
+let runDiff=MP?(DIFFS[MP.cfg.diff]?MP.cfg.diff:'normal'):settings.diff;
+const DF=()=>DIFFS[runDiff]||DIFFS.normal;
 /* only the standard solo house counts for the personal best and the leaderboard */
 const SOLO_RANKED=!MP&&NF_WANT===4;
 
@@ -1153,10 +1240,34 @@ const LS_KEY='hollowmere_vault_v1';
 const SAVE_V=2;
 let saveKey=LS_KEY;
 let cloud=null,cloudUser=null,cloudTimer=null;
+/* GUEST ACCOUNTS: what a guest plays (time in the house, active time, escapes) waiting to be added to
+   the single guest total (guestStats/total) the admin page shows as "Guest accounts". */
+const GUEST={secs:0,act:0,esc:0};let guestBusy=false;
+async function guestFlush(force){
+  if(!cloud||guestBusy||cloudUser)return;
+  const s=Math.min(120,Math.floor(GUEST.secs)),a=Math.min(120,Math.floor(GUEST.act)),e=Math.min(1,GUEST.esc);
+  if(!e&&s<(force?1:30))return;
+  guestBusy=true;
+  try{await cloud.addGuestStats(s,a,e);GUEST.secs-=s;GUEST.act-=a;GUEST.esc-=e;}
+  catch(err){console.warn('Guest total not saved:',err);}
+  finally{guestBusy=false;}
+  /* the rules take at most 120 s and 1 escape per write; send any rest straight after */
+  if(GUEST.esc>0||GUEST.secs>=120)setTimeout(()=>guestFlush(true),1500);
+}
+setInterval(()=>guestFlush(false),60000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)guestFlush(true);});
+addEventListener('pagehide',()=>guestFlush(true));
 const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned'];
 function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,legendRuns:{}};}
 function freshSave(){return {ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
-function readLocal(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch(e){return null;}}
+/* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
+   while the game is open and is gone when the tab or browser closes. Signing in moves it into the
+   new account. A signed-in account's local copy (LS_KEY:uid) stays in localStorage as before. */
+const store=key=>key===LS_KEY?sessionStorage:localStorage;
+/* a guest save left from before this change becomes this session's, then leaves permanent storage */
+try{const old=localStorage.getItem(LS_KEY);
+  if(old!==null){if(sessionStorage.getItem(LS_KEY)===null)sessionStorage.setItem(LS_KEY,old);localStorage.removeItem(LS_KEY);}}catch(e){}
+function readLocal(key){try{return JSON.parse(store(key).getItem(key)||'null');}catch(e){return null;}}
 function cleanSave(raw,isLocal){
   const src=(raw&&typeof raw==='object')?raw:{};
   const out=freshSave();
@@ -1183,7 +1294,7 @@ function cleanSave(raw,isLocal){
   return out;
 }
 let save=cleanSave(readLocal(LS_KEY),true);
-function saveNow(){try{localStorage.setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
+function saveNow(){try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
 saveNow();
 const isUnlocked=id=>save.unlocked.indexOf(id)>=0;
 const curLegend=()=>BYID[save.main]||ROSTER[0];
@@ -3151,9 +3262,30 @@ function triggerJumpscare(){
   const nv=Math.max(0.35,PS.shake);
   jumpscareEl.classList.remove('go');void jumpscareEl.offsetWidth;jumpscareEl.classList.add('go');
   SFX.jumpscare();flash=(settings.reduceFlash?0.6:1.4)*nv;scareShakeT=0.5*nv;
-  /* only a scare now: the face, the sound and the flash. The thing is NOT moved in front of you
-     and does not start hunting you; it stays wherever it really is. */
-}
+  /* Easy has none; Normal and Hard: only the face, the sound and the flash, and the thing stays
+     wherever it really is. NIGHTMARE: the teleporting jumpscare — it appears in front of you and hunts. */
+  if(DF().scare<2)return;
+  const fx=Math.sin(camYaw),fz=Math.cos(camYaw);
+  let cx=null,cz=null;
+  for(let dist=4.6;dist>=3.2;dist-=0.3){
+    const[tcx,tcz]=cellOf(P.x+fx*dist,P.z+fz*dist);
+    if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break;}}
+  if(cx===null)for(let dist=2.8;dist>=1.6;dist-=0.3){
+    const[tcx,tcz]=cellOf(P.x+fx*dist,P.z+fz*dist);
+    if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break;}}
+  if(cx===null){
+    const dirs=[[fz,-fx],[-fz,fx],[-fx,-fz]];
+    outer: for(const dist of [3.4,2.6,2.0]){
+      for(const[dxn,dzn] of dirs){
+        const[tcx,tcz]=cellOf(P.x+dxn*dist,P.z+dzn*dist);
+        if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break outer;}}}}
+  if(cx===null)[cx,cz]=cellOf(P.x,P.z);
+  M.floor=P.floor;M.x=(cx+.5)*CS;M.z=(cz+.5)*CS;M.y=P.floor*FH;
+  M.nodeKey=nk(P.floor,cx,cz);M.path=null;M.pathI=0;M.repathT=0;M.stepPhase=0;
+  M.yaw=camYaw+Math.PI;M.state='chase';M.losLostT=0;M.lastSeen={x:P.x,z:P.z,f:P.floor};scareSpeedT=3;
+  /* scripted: RUN.spotted is only set if it then actually sees you */
+  graceT=Math.max(graceT,(PS.nerve-1)*0.9);
+  seenEl.classList.remove('on');void seenEl.offsetWidth;seenEl.classList.add('on');}
 let settingsOpen=false,suppressPause=false;
 
 function cellOf(x,z){return[Math.floor(x/CS),Math.floor(z/CS)];}
@@ -3503,6 +3635,8 @@ const WHISPERS=["\u2026it drags something heavy upstairs\u2026","\u2026the walls
 function syncSetUI(){
   volRange.value=settings.vol;
   volVal.textContent=Math.round(settings.vol*100)+'%';
+  $('voiceRange').value=settings.voiceVol;$('voiceVal').textContent=Math.round(settings.voiceVol*100)+'%';
+  $('voiceRow').style.display=MP?'':'none';
   sensRange.value=settings.sens;
   sensVal.textContent=settings.sens.toFixed(2);
   invertBtn.textContent=settings.invertY?'INVERTED \u2014 UP LOOKS DOWN':'NORMAL \u2014 UP LOOKS UP';
@@ -3516,6 +3650,9 @@ function syncSetUI(){
 volRange.addEventListener('input',()=>{settings.vol=parseFloat(volRange.value);volVal.textContent=Math.round(settings.vol*100)+'%';
   if(master)master.gain.value=settings.vol;saveSettings();});
 volRange.addEventListener('pointerdown',e=>e.stopPropagation());
+$('voiceRange').addEventListener('input',()=>{settings.voiceVol=parseFloat($('voiceRange').value);$('voiceVal').textContent=Math.round(settings.voiceVol*100)+'%';
+  VOICE.peers.forEach(p=>{if(p.audio)p.audio.volume=settings.voiceVol;});saveSettings();});
+$('voiceRange').addEventListener('pointerdown',e=>e.stopPropagation());
 sensRange.addEventListener('input',()=>{settings.sens=parseFloat(sensRange.value);sensVal.textContent=settings.sens.toFixed(2);saveSettings();});
 sensRange.addEventListener('pointerdown',e=>e.stopPropagation());
 invertBtn.addEventListener('click',e=>{e.stopPropagation();settings.invertY=!settings.invertY;saveSettings();syncSetUI();});
@@ -3619,7 +3756,7 @@ for(let i=0;i<15;i++){const s=glowSprite(0xffffff,1.0);
   s.material.depthTest=false;s.renderOrder=990;s.visible=false;scene.add(s);revealPool.push(s);}
 
 /* --- how far the thing can see right now --- */
-function sightRange(){return DARK.t>0?4.2:14+2.5*heat();}
+function sightRange(){return DARK.t>0?4.2*DF().sight:(14+2.5*heat())*DF().sight;}
 
 /* --- run scoring: ether is earned by playing, not by menus --- */
 const RUN={ether:0,spotted:false,floors:{},done:false,tally:{}};
@@ -3674,6 +3811,7 @@ function endRun(win){
   if(SOLO_RANKED){cloudLogRun(win);
   if(win)boardAfterEscape(Math.round(elapsed*10)/10,newBest);}
   else if(MP&&win)boardAfterTeamEscape(Math.round(elapsed*10)/10);
+  if(win&&!cloudUser){GUEST.esc++;guestFlush(true);}   /* a guest's escape counts in the guest total only */
 }
 
 /* --- primitives ------------------------------------------------ */
@@ -4683,12 +4821,30 @@ function pvRender(dt,t){
 }
 
 /* ================= GAME FLOW ================= */
+/* ---- the difficulty picker (title, death and win screens; solo only) ---- */
+function renderDiffRows(){
+  document.querySelectorAll('.diffRow').forEach(el=>{
+    const where=el.getAttribute('data-where');
+    const cap=where==='title'?'DIFFICULTY':'NEXT NIGHT\u2019S DIFFICULTY';
+    el.innerHTML='<div class="dcap">'+cap+'</div><div class="dbtns">'+DIFF_ORDER.map(k=>
+      '<span class="dbtn'+(k==='nightmare'?' nm':'')+(settings.diff===k?' on':'')+'" data-diff="'+k+'">'+DIFFS[k].n+'</span>').join('')
+      +'</div><div class="ddesc">'+escHTML(DIFFS[settings.diff].d)+'</div>';});
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest&&e.target.closest('.diffRow .dbtn');if(!b)return;
+  e.stopPropagation();e.preventDefault();
+  if(MP)return;
+  settings.diff=b.getAttribute('data-diff');saveSettings();renderDiffRows();
+},true);
+['touchstart','touchend'].forEach(t=>document.addEventListener(t,e=>{if(e.target.closest&&e.target.closest('.diffRow'))e.stopPropagation();},{capture:true,passive:true}));
+
 function startGame(){ if(state!=='title')return;
+  if(!MP)runDiff=settings.diff;
   try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){console.warn(e);}
   closeSettings();
   state='play';showOv(null);setScreenState();lockMouse();elapsed=0;nextScareAt=20+Math.random()*20;fpPitch=0;
   resetRun();refreshLegendHUD();
-  skipFloorToast=true;toast('THE HEART OF HOLLOWMERE',3.5);
+  skipFloorToast=true;toast('THE HEART OF HOLLOWMERE \u00b7 '+DF().n,3.5);
   cloudPush();
   setTimeout(()=>subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor, never where they were before.'),3800);
   setTimeout(()=>subtitle('Something else walks these floors. Listen to its steps.'),8200);
@@ -4698,7 +4854,7 @@ function resetProgress(){
   if(doorOpen){doorOpen=false;sealDoorCell();setDoorSealed(true);}
   setObjective(OBJ_TEXT());}
 function respawn(){
-  catcher=null;
+  catcher=null;specStop();
   /* co-op: the team's embers and the seal belong to everyone, so a death does not undo them */
   if(!MP)resetProgress();
   closeSettings();
@@ -4712,7 +4868,7 @@ function respawn(){
   ghost.g.scale.setScalar(0.92);ghost.g.visible=true;ghost.mat.opacity=0;
   redEl.style.opacity=0;state='play';showOv(null);setScreenState();fpPitch=0;
   skipFloorToast=true;toast('THE HEART PULLS YOU BACK',3);lockMouse();cloudPush();}
-function fullReset(){deaths=0;respawn();elapsed=0;nextScareAt=20+Math.random()*20;heatNote();}
+function fullReset(){if(!MP)runDiff=settings.diff;deaths=0;respawn();elapsed=0;nextScareAt=20+Math.random()*20;heatNote();}
 /* R / HEART: teleports ONLY the player — embers, door and monster untouched */
 function heartShift(){
   const keepEss=P.ess;
@@ -4856,7 +5012,7 @@ function monsterSees(c){
   if(d>3.5&&(dx*fx+dz*fz)/d<0.55-0.1*heat()){M.noticeT=-1;return false;}
   if(!losClear(M.floor,M.x,M.z,c.x,c.z)){M.noticeT=-1;return false;}
   /* first sight: it notices you before it commits — a short tell */
-  if(M.state!=='chase'&&M.noticeT<0){M.noticeT=(0.55+Math.random()*0.35)*(1-0.35*heat());if(isMe)SFX.click();}
+  if(M.state!=='chase'&&M.noticeT<0){M.noticeT=(0.55+Math.random()*0.35)*(1-0.35*heat())*DF().notice;if(isMe)SFX.click();}
   return true;}
 function updateMonster(dt,t){
   graceT-=dt;if(scareSpeedT>0)scareSpeedT-=dt;
@@ -4933,8 +5089,8 @@ function updateMonster(dt,t){
     for(const c of cand){
       const ce=c===P;
       const nr=ce?((P.veiling||AB.invisT>0||AB.silentT>0)?0:
-        ((P.dashing&&P.moving)?PS.noiseB:(P.moving?PS.noise:0))*(AB.loudT>0?1.7:1)*(1+0.25*heat()))
-        :(c.noiseR||0)*(1+0.25*heat());
+        ((P.dashing&&P.moving)?PS.noiseB:(P.moving?PS.noise:0))*(AB.loudT>0?1.7:1)*(1+0.25*heat())*DF().hear)
+        :(c.noiseR||0)*(1+0.25*heat())*DF().hear;
       if(nr>0&&M.floor===c.floor&&Math.hypot(c.x-M.x,c.z-M.z)<nr&&M.state!=='investigate'){
         M.state='investigate';setTargetCell(cellOf(c.x,c.z)[0],cellOf(c.x,c.z)[1],c.floor);break;}}}
   let speed=2.0;
@@ -4957,10 +5113,12 @@ function updateMonster(dt,t){
         M.wpIdx=(M.wpIdx+jump)%PATROL.length;
         wp=PATROL[M.wpIdx];setTargetCell(wp[0],wp[1],wp[2]);}
       if(!repathTo(wp[0],wp[1],wp[2]))M.wpIdx=(M.wpIdx+1)%PATROL.length;}}
-  speed*=(scareSpeedT>0?1:diffMult())*(M.slowT>0?M.slowMul:1);
+  speed*=(scareSpeedT>0?1:diffMult()*DF().speed)*(M.slowT>0?M.slowMul:1);
   /* escapes make it quicker too — but never enough that your burst can't pull away */
   if(scareSpeedT<=0&&!(M.slowT>0)){const hs=speed*(1+0.12*heat());
     speed=M.state==='chase'?Math.min(hs,Math.max(speed,PS.burst*0.9)):hs;}
+  /* the difficulty's own ceiling on a hunt, always under your burst */
+  if(DF().cap&&M.state==='chase'&&scareSpeedT<=0)speed=Math.min(speed,PS.burst*DF().cap);
   if(M.path&&M.pathI<M.path.length){
     const n=nodes.get(M.path[M.pathI]);
     if(!n)M.path=null;
@@ -5050,7 +5208,7 @@ function updatePlayer(dt,t){
 let ghostYaw=Math.PI;
 
 /* ================= SEQUENCES & FX ================= */
-const FP=()=>settings.view!=='tp';
+const FP=()=>!WATCH&&!SPEC.on&&settings.view!=='tp';
 function updateCaught(dt){caughtT+=dt;
   if(caughtT>8){doDeath();return;}
   const head=new THREE.Vector3(M.x,M.y+2.3,M.z);
@@ -5146,6 +5304,7 @@ function updateFX(dt,t){
 let bobPh=0,bobAmt=0,eyeH=1.62,camRoll=0,lastStepN=0,fpPitchS=0;
 const _cp=new THREE.Vector3(),_ld=new THREE.Vector3(),_hd=new THREE.Vector3();
 function updateCamera(dt,t){
+  if(SPEC.on&&SPEC.r&&!vaultOpen){specCamera(dt,t);return;}
   if(state==='title'||vaultOpen){const a=t*0.05;const c=HEART;
     camera.position.set(c[0]+Math.sin(a)*3.6,1.5+Math.sin(t*.23)*.15,c[1]+Math.cos(a)*3.6);
     camera.lookAt(c[0],0.9,c[1]);camera.fov+=(62-camera.fov)*Math.min(1,dt*3);camera.updateProjectionMatrix();
@@ -5264,19 +5423,22 @@ function loop(now){requestAnimationFrame(loop);
   const dt=Math.min(DT_CAP,(now-last)/1000);last=now;const t=now/1000;
   /* the night does not wait for anyone in co-op, so a menu never freezes the house */
   const paused=(settingsOpen||vaultOpen)&&!MP;
-  if(state==='play'){if(!paused){elapsed=MP?mpElapsed():elapsed+dt;save.stats.playTime+=dt;updatePlayer(dt,t);updateAbilities(dt,t);updateMonster(dt,t);
-    if(!MP&&elapsed>nextScareAt&&graceT<=0&&M.state!=='chase'&&!doorOpen&&!P.hiding&&M.floor===P.floor
+  if(state==='play'){if(!paused){elapsed=MP?mpElapsed():elapsed+dt;save.stats.playTime+=dt;if(!cloudUser)GUEST.secs+=dt;updatePlayer(dt,t);updateAbilities(dt,t);updateMonster(dt,t);
+    if(!MP&&DF().scare>0&&elapsed>nextScareAt&&graceT<=0&&M.state!=='chase'&&!doorOpen&&!P.hiding&&M.floor===P.floor
        &&AB.foreT<=0&&AB.invisT<=0&&M.goneT<=0&&M.stunT<=0){
-      triggerJumpscare();nextScareAt=elapsed+(45+Math.random()*45)*(1-0.3*heat());}}}
+      triggerJumpscare();nextScareAt=elapsed+(45+Math.random()*45)*(1-0.3*heat())*DF().every;}}}
   else if(state==='caught'){if(MP)elapsed=mpElapsed();runAsFocus(()=>updateCaught(dt));if(!paused)updateMonster(dt,t);}
   else if(MP&&(state==='dead'||state==='win')&&mpRunning){elapsed=mpElapsed();updateMonster(dt,t);}
   else if(state==='title'){mon.g.position.set(M.x,M.y,M.z);mon.g.rotation.y=t*0.2;}
+  else if(state==='watch')watchFrame(dt,t);
+  if(MP)specTick(now);
+  socialTick(now);
   actTick(now);
   if(state==='title'||vaultOpen)previewGhost(t);
   if(vaultOpen)pvRender(dt,t);
   abhudEl.style.opacity=(state==='play'&&!vaultOpen)?1:0;
   uiMusicTick();
-  if(state==='dead'&&!vaultOpen&&deathOv.classList.contains('hidden'))showOv(deathOv);
+  if(state==='dead'&&!vaultOpen&&!SPEC.on&&deathOv.classList.contains('hidden'))showOv(deathOv);
   if(MP)mpFrame(dt,t);
   runAsFocus(()=>{updateFX(dt,t);updateCamera(dt,t);});
   if(state!=='title')updateHUD();
@@ -5306,7 +5468,7 @@ const escHTML=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 function liveNow(){
   const inNight=state==='play'||state==='caught'||state==='dead';
   return {active:inNight&&!document.hidden,state,floor:FLOOR_NAMES[P.floor]||'',embers:got,memories:shardsFound,
-    nightTime:Math.round(elapsed*10)/10,legend:save.main,deathsTonight:deaths,runEther:RUN.ether,
+    nightTime:Math.round(elapsed*10)/10,legend:save.main,deathsTonight:deaths,runEther:RUN.ether,diff:runDiff,
     essence:Math.round(P.ess),hunted:state==='play'&&M.state==='chase'&&M.goneT<=0};
 }
 function cloudPush(create){
@@ -5325,7 +5487,7 @@ function cloudPush(create){
 function cloudSaveSoon(){if(!cloud||!cloudUser||cloudTimer)return;cloudTimer=setTimeout(()=>cloudPush(),2500);}
 function cloudLogRun(win){
   if(!cloud||!cloudUser)return;
-  cloud.logRun(cloudUser.uid,{result:win?'escape':'death',nightTime:Math.round(elapsed*10)/10,legend:save.main,
+  cloud.logRun(cloudUser.uid,{result:win?'escape':'death',diff:runDiff,nightTime:Math.round(elapsed*10)/10,legend:save.main,
     embers:got,memories:shardsFound,ether:RUN.ether,deathsTonight:deaths,seen:!!RUN.spotted,floor:FLOOR_NAMES[P.floor]||''})
     .catch(e=>console.warn('Run log failed:',e));
   cloudPush();
@@ -5347,6 +5509,7 @@ function replaceSave(next){
   UIM.want=null;uiMusicTick();
 }
 function onCloudUser(u){
+  if(u&&u.anon)u=null;   /* a co-op guest's temporary id is not an account */
   authUser=u;
   /* never swap saves in the middle of a run; it happens when the run ends */
   if(state==='play'||state==='caught'){pendingUser={u};return;}
@@ -5355,12 +5518,13 @@ function onCloudUser(u){
 function applyPendingUser(){if(pendingUser){const pu=pendingUser;pendingUser=null;applyUser(pu.u);}}
 async function applyUser(u){
   clearTimeout(retryT);
+  if(u&&!cloudUser)guestFlush(true);   /* a guest signing in: their guest time so far goes to the guest total */
   if(u&&cloudUser&&u.uid===cloudUser.uid){cloudUser=Object.assign(cloudUser,{email:u.email,provider:u.provider});renderAcct();return;}
   if(!u){
     loadFailed=false;
     if(cloudUser){
       clearTimeout(cloudTimer);cloudTimer=null;
-      cloudUser=null;saveKey=LS_KEY;ptReset();
+      socialStop();cloudUser=null;saveKey=LS_KEY;ptReset();
       replaceSave(cleanSave(readLocal(LS_KEY),true));
       toast('SIGNED OUT \u2014 PLAYING AS A GUEST',2.6);
     }
@@ -5384,13 +5548,14 @@ async function applyUser(u){
   if(wantName&&wantName.uid===u.uid)u.name=wantName.name;
   else if(data&&data.name)u.name=String(data.name).slice(0,40);
   /* progress moves, it is not copied: the guest slot in this browser starts fresh */
-  if(isNew){const g=freshSave();g.music=next.music;try{localStorage.setItem(LS_KEY,JSON.stringify(g));}catch(e){}}
+  if(isNew){const g=freshSave();g.music=next.music;try{sessionStorage.setItem(LS_KEY,JSON.stringify(g));}catch(e){}}
   cloudUser=u;saveKey=LS_KEY+':'+u.uid;
   replaceSave(next);
   try{localStorage.setItem(saveKey,JSON.stringify(save));}catch(e){}
   await cloudPush(isNew);
   await ensureUsername();   /* every account has one unique username before it can post anywhere */
   ptLoad();      /* this player's entry on the most-time-played board */
+  socialStart(); /* friends, and what they can see of you */
   toast((isNew?'ACCOUNT CREATED \u2014 ':'WELCOME BACK \u2014 ')+u.name.toUpperCase(),2.8);
   renderAcct();
 }
@@ -5410,17 +5575,21 @@ function syncText(){
    The username is the name shown on both leaderboards and in co-op. Until an account has one it
    cannot post to the leaderboards (cloudUser.unameOk).
    ========================================================= */
+/* why the last check did not give this account its username: 'taken' (another account has it),
+   'invalid' (not an allowed name), 'failed' (the database could not be reached or refused) */
+let unameWhy='',unameErr='',unameTries=0,unameRetryT=null;
 async function ensureUsername(){
   if(!cloud||!cloudUser||cloudUser.anon)return;
   const u=cloudUser,cur=String(u.name||'');
-  let failed=false;
+  let failed=false,owner=null;
+  clearTimeout(unameRetryT);
   try{
     const own=await cloud.usernameOwner(cur);
-    if(own&&own.uid===u.uid&&own.name===cur&&!cloud.usernameProblem(cur)){u.unameOk=true;return;}
+    if(own&&own.uid===u.uid&&own.name===cur&&!cloud.usernameProblem(cur)){u.unameOk=true;unameWhy='';unameTries=0;updateAcctLine();renderAcct();return;}
     /* an older name (a Google full name, say) is tidied into a valid one and claimed if it is free */
     const want=cloud.cleanUsername(cur);
     if(!cloud.usernameProblem(want)){
-      const o2=await cloud.usernameOwner(want);
+      const o2=await cloud.usernameOwner(want);owner=o2;
       if(!o2||o2.uid===u.uid){
         await cloud.claimUsername(u.uid,want,null);
         u.unameOk=true;
@@ -5428,11 +5597,23 @@ async function ensureUsername(){
           u.name=want;await cloudPush();
           cloud.renameEscapes(u.uid,want).catch(e=>console.warn('Escape rename failed:',e));
           setTimeout(()=>toast('YOUR USERNAME IS '+want.toUpperCase(),3.5),3000);}
+        unameWhy='';unameTries=0;updateAcctLine();
         return;}}
-  }catch(e){console.warn('Username check failed:',e);failed=true;}
+  }catch(e){console.warn('Username check failed:',e);failed=true;unameErr=(e&&e.code)||(e&&e.message)||'unknown';}
+  if(cloudUser!==u)return;
   u.unameOk=false;
-  askUsername(failed?'Could not check your username just now. Try saving it again.'
-    :'Someone already has the name "'+cur+'" (or it is not allowed). Choose a username of your own \u2014 it is shown on the leaderboards.',!failed);
+  if(failed){
+    /* the database could not be reached or refused: not this player's fault, so try again by itself */
+    unameWhy='failed';updateAcctLine();
+    askUsername('Your username could not be checked ('+unameErr+'). The game will keep trying. '
+      +(String(unameErr).indexOf('permission')>=0?'Owner: the latest firestore.rules has not been published in the Firebase console.':'Check your connection.'),false);
+    if(unameTries<6){unameTries++;unameRetryT=setTimeout(()=>{if(cloudUser===u&&!u.unameOk)ensureUsername();},Math.min(60000,5000*unameTries));}
+    return;}
+  if(owner&&owner.uid!==u.uid){unameWhy='taken';
+    askUsername('The username "'+owner.name+'" already belongs to another account (an older one). Choose a different username for this account \u2014 you only need to do this once.',true);}
+  else{unameWhy='invalid';
+    askUsername('"'+cur+'" cannot be a username. Choose one with 2\u201324 letters, numbers, spaces, dots, dashes or underscores \u2014 you only need to do this once.',true);}
+  updateAcctLine();
 }
 function askUsername(msg,open){
   acctRenaming=true;
@@ -5444,11 +5625,12 @@ function askUsername(msg,open){
 function updateAcctLine(){
   /* players never see the account button on a copy of the game without accounts switched on */
   const tb=$('titleAccount');if(tb)tb.style.display=cloudState==='off'?'none':'';
-  ['titleBoard','btnBoardW'].forEach(id=>{const b=$(id);if(b)b.style.display=cloudState==='off'?'none':'';});
+  ['titleBoard','btnBoardW','titleFriends'].forEach(id=>{const b=$(id);if(b)b.style.display=cloudState==='off'?'none':'';});
   const el=$('acctLine');if(!el)return;
   if(cloudState==='off'){el.textContent='';return;}
-  el.innerHTML=cloudUser?'Signed in as <b>'+escHTML(cloudUser.name)+'</b>':
-    (authUser&&loadFailed?'Signed in \u2014 reconnecting\u2026':'Playing as a guest');
+  el.innerHTML=cloudUser?'Signed in as <b>'+escHTML(cloudUser.name)+'</b>'
+    +(cloudUser.unameOk===false?(unameWhy==='failed'?' \u2014 checking your username\u2026':' \u2014 <b style="color:#ffbe6f">choose a username in ACCOUNT</b>'):''):
+    (authUser&&loadFailed?'Signed in \u2014 reconnecting\u2026':'Playing as a guest \u2014 progress lasts until you close the game');
 }
 function updateAcctLive(){
   updateAcctLine();
@@ -5494,7 +5676,8 @@ function renderAcct(){
      +'<button class="acbtn primary" data-act="retry">Try again</button><button class="acbtn" data-act="signout">Sign out</button>'+msg;
   }else{
     const up=acctTab==='signup';
-    h='<p class="acnote">Sign in to keep your ether and legends on any device. The first time you sign in, the progress in this browser moves into your new account.</p>'
+    h='<p class="acnote">You are playing as a <b>guest</b>. Guest progress is temporary: it lasts only until you close the game, and guests never appear on the leaderboards.</p>'
+     +'<p class="acnote">Sign in to keep your ether and legends on any device and to get your own username. The first time you sign in, this session\u2019s progress moves into your new account.</p>'
      +'<button class="acbtn primary" data-act="google">Continue with Google</button>'
      +'<div class="acor">or with email</div>'
      +'<div class="actabs"><div class="actab'+(up?'':' on')+'" data-tab="signin">Sign in</div><div class="actab'+(up?' on':'')+'" data-tab="signup">Create account</div></div>'
@@ -5508,7 +5691,8 @@ function renderAcct(){
   updateAcctLive();
 }
 function setAcctMsg(t,ok){acctMsg=t||'';acctMsgOk=!!ok;const el=$('acMsg');if(el){el.textContent=acctMsg;el.classList.toggle('ok',acctMsgOk);}}
-function openAcct(){if(acctOpen)return;if(settingsOpen)closeSettings();acctOpen=true;acctMsg='';acctPanel.style.display='block';$('acctScrim').style.display='block';renderAcct();}
+function openAcct(){if(acctOpen)return;
+  if(cloudUser&&cloudUser.unameOk===false&&unameWhy==='failed'){unameTries=0;ensureUsername();}if(settingsOpen)closeSettings();acctOpen=true;acctMsg='';acctPanel.style.display='block';$('acctScrim').style.display='block';renderAcct();}
 function closeAcct(){if(!acctOpen)return;acctOpen=false;acctRenaming=false;acctPanel.style.display='none';$('acctScrim').style.display='none';acctMsg='';}
 $('acctScrim').addEventListener('click',e=>{e.stopPropagation();closeAcct();closeBoard();});
 async function acctAction(act,btn){
@@ -5548,10 +5732,12 @@ async function acctAction(act,btn){
       if(own&&own.uid!==cloudUser.uid){setAcctMsg('That username is already taken. Try another.');return;}
       /* claim the new name and let go of the old one in a single write */
       await cloud.claimUsername(cloudUser.uid,nm,cloudUser.unameOk?cloudUser.name:null);
-      cloudUser.name=nm;cloudUser.unameOk=true;acctRenaming=false;
+      cloudUser.name=nm;cloudUser.unameOk=true;acctRenaming=false;unameWhy='';
       await cloudPush();                                  /* players/{uid}.name */
       if(ptLoaded)await ptRename();else await ptLoad();   /* their time-played entry */
       cloud.renameEscapes(cloudUser.uid,nm).catch(e=>console.warn('Escape rename failed:',e));   /* and their past escapes */
+      if(SOC.friends.length)cloud.renameInFriends(cloudUser.uid,nm,SOC.friends.map(f=>f.uid));    /* and in each friend's list */
+      if(SOC.net)socialPresence(true);else socialStart();
       renderAcct();setAcctMsg('Username saved.',true);
     }
     else if(act==='retry'){if(authUser)applyUser(authUser);}
@@ -5586,7 +5772,7 @@ setInterval(()=>{if(acctOpen&&cloudUser)updateAcctLive();},5000);
    ========================================================= */
 const BOARD_SIZE=300;         /* rows shown in the panel (it scrolls) */
 const BOARD_MIN_TIME=20;      /* seconds; faster is impossible, so it is rejected (also in firestore.rules) */
-let lbOpen=false,lbData=null,lbErr='',lbMine=null,lbTab='esc';
+let lbOpen=false,lbData=null,lbErr='',lbMine=null,lbTab='esc',lbDiff='normal';
 const titleCase=t=>String(t).toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase());
 const canPost=()=>!!(cloud&&cloudUser&&!cloudUser.anon&&cloudUser.unameOk);
 const needsUname=()=>!!(cloud&&cloudUser&&!cloudUser.anon&&!cloudUser.unameOk);
@@ -5599,18 +5785,27 @@ async function boardAfterEscape(nt,newBest){
   if(!canPost()){el.textContent=needsUname()?'CHOOSE A USERNAME IN YOUR ACCOUNT TO POST YOUR ESCAPES':'SIGN IN TO PUT YOUR ESCAPES ON THE LEADERBOARD';return;}
   if(nt<BOARD_MIN_TIME)return;
   /* build the entry now, before any await, while deaths/got still describe this night */
-  const entry={name:cloudUser.name,time:nt,legend:save.main,deaths:deaths,embers:got,team:false};
-  el.textContent='POSTING YOUR ESCAPE TO THE LEADERBOARD…';
+  const dk=runDiff,dn=DIFFS[dk].n;
+  const entry={name:cloudUser.name,time:nt,legend:save.main,deaths:deaths,embers:got,team:false,diff:dk};
+  el.textContent='POSTING YOUR ESCAPE TO THE '+dn+' LEADERBOARD\u2026';
   try{
     await cloud.addEscape(cloudUser.uid,entry);
-    let rank=0;try{rank=await cloud.escapeRank(nt);}catch(e){}
-    el.textContent=(newBest?'NEW PERSONAL BEST · ':'')+fmtTime(nt)+(rank?' · #'+rank+' ON THE LEADERBOARD':' · ON THE LEADERBOARD');
-  }catch(e){console.warn('Escape post failed:',e);el.textContent=newBest?'NEW PERSONAL BEST':'';}
+    /* rank and personal best are counted within this difficulty only */
+    let rank=0,best=false;
+    try{const list=await cloud.loadEscapes(BOARD_SIZE,dk);
+      rank=list.filter(r=>r.time<nt).length+1;
+      best=!list.some(r=>r.uid===cloudUser.uid&&!r.team&&r.time<nt);}catch(e){}
+    el.textContent=(best?'NEW '+dn+' PERSONAL BEST \u00b7 ':'')+fmtTime(nt)+(rank?' \u00b7 #'+rank+' ON THE '+dn+' LEADERBOARD':' \u00b7 ON THE '+dn+' LEADERBOARD');
+  }catch(e){console.warn('Escape post failed:',e);el.textContent='';}
 }
 
 /* co-op: the whole party goes up as one name, e.g. "user1+user2" */
-function teamBoardName(){
-  const names=((MP&&MP.cfg.order)||[]).map(u=>String(mpName(u)).replace(/\+/g,' ').trim()||'Ghost');
+async function teamBoardName(){
+  const names=[];
+  for(const u of ((MP&&MP.cfg.order)||[])){
+    if(u===MP.uid){names.push(cloudUser.name);continue;}
+    const nm=String(mpName(u));
+    if(await MP.net.isRegistered(u,nm))names.push(nm);}   /* guests are left out */
   let t=names.join('+');
   if(t.length>40){const each=Math.max(3,Math.floor((40-(names.length-1))/names.length));
     t=names.map(n=>n.slice(0,each)).join('+').slice(0,40);}
@@ -5618,34 +5813,41 @@ function teamBoardName(){
 async function boardAfterTeamEscape(nt){
   const el=$('winRank');if(!el)return;
   el.textContent='';
-  const uid=cloud&&cloud.authUid&&cloud.authUid();
-  if(!cloud||!uid||nt<BOARD_MIN_TIME)return;
-  const team=teamBoardName(),id='mp_'+MP.code+'_'+mpGO;
-  const entry={name:team,time:nt,legend:save.main,deaths:deaths,embers:got,team:true};
+  if(!cloud||nt<BOARD_MIN_TIME)return;
+  /* guests are never on the leaderboard: only a signed-in player with a username posts the team,
+     and the team's name lists only the registered players in it */
+  if(!canPost()){el.textContent=needsUname()?'CHOOSE A USERNAME IN YOUR ACCOUNT TO PUT YOUR TEAM ON THE LEADERBOARD':'GUESTS ARE NOT SHOWN ON THE LEADERBOARD \u2014 SIGN IN TO APPEAR';return;}
+  const uid=cloudUser.uid;
+  const team=await teamBoardName(),id='mp_'+MP.code+'_'+mpGO;
+  const entry={name:team,time:nt,legend:save.main,deaths:deaths,embers:got,team:true,diff:runDiff};
   try{
     let ex=null;try{ex=await cloud.loadEscape(id);}catch(e){}
     if(!ex){el.textContent=team.toUpperCase()+' — POSTING TO THE LEADERBOARD…';
       try{await cloud.addEscape(uid,entry,id);ex=entry;}
       catch(e){ex=await cloud.loadEscape(id).catch(()=>null);if(!ex)throw e;}}   /* a teammate got there first */
-    let rank=0;try{rank=await cloud.escapeRank(ex.time);}catch(e){}
-    el.textContent=team.toUpperCase()+' ARE ON THE LEADERBOARD · '+fmtTime(ex.time)+(rank?' · #'+rank:'');
+    let rank=0;try{const list=await cloud.loadEscapes(BOARD_SIZE,runDiff);rank=list.filter(r=>r.time<ex.time).length+1;}catch(e){}
+    el.textContent=team.toUpperCase()+' ARE ON THE '+DF().n+' LEADERBOARD \u00b7 '+fmtTime(ex.time)+(rank?' \u00b7 #'+rank:'');
   }catch(e){console.warn('Team escape post failed:',e);el.textContent='TEAM TIME '+fmtTime(nt);}
 }
 
 /* ---- the panel ---- */
-const LB_SUB={esc:'Every escape from Hollowmere, fastest first. The clock runs from waking to the front door.',
+const LB_SUB={esc:'Every escape from Hollowmere, fastest first, on its own board for each difficulty. The clock runs from waking to the front door.',
   time:'Time spent actually playing. Standing still, hiding too long, idling or repeating the same moves does not count.'};
 function openBoard(){
   if(lbOpen)return;
   if(acctOpen)closeAcct();
   if(settingsOpen)closeSettings();
   lbOpen=true;
+  /* from a finished night (or in co-op) open on that night's difficulty, otherwise the one selected */
+  lbDiff=(MP||state==='win'||state==='dead')?runDiff:settings.diff;
   $('lbPanel').style.display='block';$('acctScrim').style.display='block';
   setBoardTab(lbTab);
 }
 function setBoardTab(t){
   lbTab=t;lbData=null;lbErr='';lbMine=null;
   document.querySelectorAll('#lbPanel [data-lbtab]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-lbtab')===t));
+  document.querySelectorAll('#lbPanel [data-lbdiff]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-lbdiff')===lbDiff));
+  $('lbDiffTabs').style.display=t==='esc'?'flex':'none';
   $('lbSub').textContent=LB_SUB[t];
   renderBoard();loadBoard();
 }
@@ -5656,16 +5858,18 @@ function closeBoard(){
   if(!acctOpen)$('acctScrim').style.display='none';
 }
 async function loadBoard(){
-  const tab=lbTab;
+  const tab=lbTab,dk=lbDiff;
   if(!cloud){lbErr='off';renderBoard();return;}
   let data=null,err='',mine=null;
-  try{data=tab==='esc'?await cloud.loadEscapes(BOARD_SIZE):await cloud.loadPlaytimeBoard(BOARD_SIZE);}
+  try{data=tab==='esc'?await cloud.loadEscapes(BOARD_SIZE,dk):await cloud.loadPlaytimeBoard(BOARD_SIZE);}
   catch(e){console.warn('Leaderboard read failed:',e);err='read';}
-  if(tab==='esc'&&canPost()&&save.stats.bestTime>=BOARD_MIN_TIME){
-    mine={v:save.stats.bestTime,rank:0};try{mine.rank=await cloud.escapeRank(save.stats.bestTime);}catch(e){}}
+  /* your own best solo escape on this difficulty, straight from the board */
+  if(tab==='esc'&&canPost()&&data){
+    const i=data.findIndex(r=>r.uid===cloudUser.uid&&!r.team);
+    if(i>=0)mine={v:data[i].time,rank:i+1};}
   if(tab==='time'&&canPost()&&ptBase!==null){
     const v=ptBase;mine={v,rank:0};try{mine.rank=await cloud.playtimeRank(v);}catch(e){}}
-  if(!lbOpen||tab!==lbTab)return;
+  if(!lbOpen||tab!==lbTab||dk!==lbDiff)return;
   lbData=data;lbErr=err;lbMine=mine;renderBoard();
 }
 function renderBoard(){
@@ -5673,7 +5877,7 @@ function renderBoard(){
   if(lbErr==='off')h='<p class="acnote">The leaderboard needs accounts switched on for this copy of the game.</p>';
   else if(lbErr)h='<p class="acnote">The leaderboard could not be reached. Check your connection, then open it again.</p>';
   else if(!lbData)h='<p class="acnote" style="text-align:center">Reading the board…</p>';
-  else if(!lbData.length)h='<p class="acnote" style="text-align:center">'+(lbTab==='esc'?'No one has escaped yet. The first name here could be yours.':'No time recorded yet. Play, and yours will be the first.')+'</p>';
+  else if(!lbData.length)h='<p class="acnote" style="text-align:center">'+(lbTab==='esc'?'No one has escaped on '+titleCase(DIFFS[lbDiff].n)+' yet. The first name here could be yours.':'No time recorded yet. Play, and yours will be the first.')+'</p>';
   else h='<div id="lbList">'+lbData.map((r,i)=>{
     const me=!!(cloudUser&&r.uid===cloudUser.uid&&!r.team);
     let meta,val;
@@ -5693,15 +5897,16 @@ function renderBoard(){
     if(needsUname())foot='Choose a username in your account to appear on the boards.';
     else if(!canPost())foot=lbTab==='esc'?'Sign in, then escape, to put your name on the board.':'Sign in, then play, to put your time on the board.';
     else if(lbTab==='esc'){
-      if(!(save.stats.bestTime>=BOARD_MIN_TIME))foot='Escape the house to set your first time.';
-      else if(lbMine)foot='Your best solo: '+fmtTime(lbMine.v)+(lbMine.rank?' · #'+lbMine.rank:'');}
+      if(lbMine)foot='Your best solo on '+titleCase(DIFFS[lbDiff].n)+': '+fmtTime(lbMine.v)+' \u00b7 #'+lbMine.rank;
+      else foot='Escape on '+titleCase(DIFFS[lbDiff].n)+' to set your first time here.';}
     else if(lbMine)foot='Your active time: '+fmtDur(lbMine.v)+(lbMine.rank?' · #'+lbMine.rank:'');
   }
   $('lbBody').innerHTML=h+(foot?'<div class="lbmine">'+escHTML(foot)+'</div>':'');
 }
 ['titleBoard','btnBoardW'].forEach(id=>$(id).addEventListener('click',e=>{e.stopPropagation();openBoard();}));
 $('lbPanel').addEventListener('click',e=>{e.stopPropagation();
-  const t=e.target.closest('[data-lbtab]');if(t&&t.getAttribute('data-lbtab')!==lbTab)setBoardTab(t.getAttribute('data-lbtab'));});
+  const t=e.target.closest('[data-lbtab]');if(t&&t.getAttribute('data-lbtab')!==lbTab)setBoardTab(t.getAttribute('data-lbtab'));
+  const d=e.target.closest('[data-lbdiff]');if(d&&d.getAttribute('data-lbdiff')!==lbDiff){lbDiff=d.getAttribute('data-lbdiff');setBoardTab(lbTab);}});
 $('lbClose').addEventListener('click',e=>{e.stopPropagation();closeBoard();});
 
 /* =========================================================
@@ -5771,6 +5976,7 @@ function actTick(now){
   ACT.counting=!why;ACT.why=why;
   if(ACT.counting){
     save.stats.activeTime=(save.stats.activeTime||0)+rdt;
+    if(!cloudUser)GUEST.act+=rdt;
     if(canPost()&&ptLoaded)ACT.pend+=rdt;}
   actNote();
 }
@@ -5884,6 +6090,8 @@ function mpDropRemote(r){
   if(r.label){scene.remove(r.label);r.label.material.map.dispose();r.label.material.dispose();}}
 function mpApplyState(uid,v){
   if(!MP||uid===MP.uid)return;
+  mpApplyStateRaw(uid,v);}
+function mpApplyStateRaw(uid,v){
   if(!v){const r=REMOTE.get(uid);if(r){mpDropRemote(r);REMOTE.delete(uid);if(!mpSyncing)toast(r.name.toUpperCase()+' HAS LEFT THE HOUSE',3);}return;}
   const r=mpRemote(uid),prev=r.ph,fl=v.fl|0;
   r.tx=+v.x||0;r.ty=+v.y||0;r.tz=+v.z||0;r.yaw=+v.r||0;r.ent.floor=v.f|0;
@@ -5998,7 +6206,7 @@ function mpTeamHud(){
     const r=REMOTE.get(uid);
     const cls=!r?'wait':r.ph===2?'dead':r.ph===3?'out':r.ph===1?'':'wait';
     const where=!r?'NOT HERE':r.ph===1?(FLOOR_NAMES[r.ent.floor]||''):r.ph===2?'TAKEN':r.ph===3?'ESCAPED':'WAKING';
-    h+=`<div class="tm ${cls}"><i></i><b>${escHTML(p.name)}</b><span>${escHTML(where)}</span></div>`;}
+    h+=`<div class="tm ${cls}" data-uid="${escHTML(uid)}"><i></i><b>${escHTML(p.name)}</b><span>${escHTML(where)}</span></div>`;}
   if(teamEl.innerHTML!==h)teamEl.innerHTML=h;}
 
 /* ---- the waiting room: everyone clicks in, then the night begins for all at once ---- */
@@ -6008,7 +6216,7 @@ function mpBanner(){
   const readyN=present.filter(u=>pl[u].ready).length;
   const names=present.map(u=>`${pl[u].ready?'◆':'◇'} ${escHTML(pl[u].name)}`).join(' &nbsp;&nbsp; ');
   const leader=present[0]===MP.uid;
-  let h=`<b>ROOM ${MP.code}</b><br>${MP.n} ${MP.n===1?'soul':'souls'} · ${NF} floors · ${MP.n} ${MP.n===1?'hunter':'hunters'} · ${TOTAL_EMBERS} embers<br>${names}`;
+  let h=`<b>ROOM ${MP.code}</b><br>${DF().n} · ${MP.n} ${MP.n===1?'soul':'souls'} · ${NF} floors · ${MP.n} ${MP.n===1?'hunter':'hunters'} · ${TOTAL_EMBERS} embers<br>${names}`;
   if(mpReady&&!mpGO&&leader&&readyN<present.length&&Date.now()-mpReadyAt>25000)
     h+=`<br><button id="mpForce" class="ovbtn" style="margin-top:12px">BEGIN WITHOUT THE OTHERS</button>`;
   el.innerHTML=h;el.style.display='block';
@@ -6091,6 +6299,7 @@ function mpFrame(dt,t){
       if(m.goneT>0||m.stunT>0||m.floor!==P.floor)continue;
       if(Math.hypot(P.x-m.x,P.z-m.z)<1.15){caughtBy(p);break;}}}
   mpWatchAllDead(dt);
+  voiceTick(performance.now());
   {const nowMs=performance.now();if(nowMs-mpAcc>=100){mpAcc=nowMs;mpPublish();}}
   if((mpHudT-=dt)<=0){mpHudT=0.5;mpTeamHud();}}
 
@@ -6116,7 +6325,445 @@ function mpInit(){
   /* a returning player (the night is already running) must still click once: sound and mouse capture need a gesture */
   addEventListener('pagehide',()=>{try{n.leaveGame(c);}catch(e){}});}
 $('titleCoop').addEventListener('click',e=>{e.stopPropagation();location.href='lobby.html';});
+renderDiffRows();
 mpInit();
+
+/* =========================================================
+   SPECTATING A TEAMMATE (co-op)
+   Once you are taken, the death screen shows for a moment and then the camera follows a teammate
+   who is still in the house while the Heart rekindles you. ◀ ▶ on screen, or ← → / Q E, switch
+   who you watch. Tap / R rises again when the 20 seconds are up.
+   ========================================================= */
+function specTargets(){return Array.from(REMOTE.values()).filter(r=>r.ph===1&&r.gh);}
+function specStart(r){
+  SPEC.on=true;SPEC.r=r;SPEC.uid=r.uid;SPEC.fogF=-1;SPEC.cam=null;
+  document.body.classList.add('spec');showOv(null);specText();}
+function specStop(){
+  if(!SPEC.on)return;
+  SPEC.on=false;SPEC.r=null;SPEC.uid='';document.body.classList.remove('spec');
+  lastFloor=-1;   /* the fog goes back to your own floor */
+}
+function specNext(d){
+  const list=specTargets();if(!list.length){specStop();return;}
+  let i=list.findIndex(r=>r.uid===SPEC.uid);i=(i+d+list.length)%list.length;
+  SPEC.r=list[i];SPEC.uid=list[i].uid;SPEC.cam=null;specText();}
+function specText(){
+  if(!SPEC.r)return;
+  $('specName').textContent='WATCHING '+String(SPEC.r.name).toUpperCase();
+  const ready=canRise(),s=Math.max(0,Math.ceil((reviveAt-performance.now())/1000));
+  $('specSub').textContent=(FLOOR_NAMES[SPEC.r.ent.floor]||'')+' · '+(ready?'TAP OR PRESS R TO RISE':'YOU RISE IN '+s+'s')
+    +(specTargets().length>1?' · ◀ ▶ TO SWITCH':'');}
+function specTick(now){
+  if(state!=='dead'){if(SPEC.on)specStop();SPEC.deadAt=0;return;}
+  if(!SPEC.deadAt)SPEC.deadAt=now;
+  if(!SPEC.on){
+    /* a moment on the death screen first, then watch whoever is still in the house */
+    if(now-SPEC.deadAt>3000&&!vaultOpen){const list=specTargets();if(list.length)specStart(list[0]);}
+    return;}
+  if(!SPEC.r||SPEC.r.ph!==1||!REMOTE.has(SPEC.uid)){
+    const list=specTargets();if(list.length)specStart(list[0]);else{specStop();showOv(deathOv);}return;}
+  if((specTick.t=(specTick.t||0)+1)%10===0)specText();
+}
+/* third person, behind the one you watch, kept out of the walls */
+function specCamera(dt,t){
+  const r=SPEC.r,e=r.ent,f=e.floor;
+  if(SPEC.fogF!==f){SPEC.fogF=f;scene.fog.color.setHex(FLOOR_FOG[f]);scene.background.setHex(FLOOR_FOG[f]);}
+  const tgt=new THREE.Vector3(e.x,e.y+1.3,e.z);
+  const fwd=new THREE.Vector3(Math.sin(r.gy),0,Math.cos(r.gy));
+  const dist=4.2,pitch=0.34;
+  let cp=tgt.clone().addScaledVector(fwd,-dist*Math.cos(pitch));cp.y=tgt.y+dist*Math.sin(pitch);
+  let best=1;
+  for(let i=1;i<=14;i++){const k=i/14;
+    const px=tgt.x+(cp.x-tgt.x)*k,py=tgt.y+(cp.y-tgt.y)*k,pz=tgt.z+(cp.z-tgt.z)*k;
+    if(blocksSight(f,Math.floor(px/CS),Math.floor(pz/CS))||(py>f*FH+LINTEL-0.1&&DOORSET.has(nk(f,Math.floor(px/CS),Math.floor(pz/CS))))){best=(i-1)/14*0.92;break;}}
+  cp=tgt.clone().lerp(cp,best);
+  if(!SPEC.cam){SPEC.cam=true;camera.position.copy(cp);}
+  camera.position.lerp(cp,Math.min(1,dt*8));
+  const look=tgt.clone().addScaledVector(fwd,1.4);look.y+=0.05;
+  camera.lookAt(look);
+  camera.fov+=(62-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();
+  updateFlashlight(dt,t);
+}
+['specPrev','specNext'].forEach((id,i)=>{const el=$(id);
+  el.addEventListener('click',e=>{e.stopPropagation();specNext(i?1:-1);});
+  el.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});});
+addEventListener('keydown',e=>{if(!SPEC.on)return;
+  if(e.code==='ArrowLeft'||e.code==='KeyQ'){e.preventDefault();specNext(-1);}
+  else if(e.code==='ArrowRight'||e.code==='KeyE'){e.preventDefault();specNext(1);}});
+
+/* =========================================================
+   FRIENDS
+   Signed-in players with a username add each other by username; the other player accepts or
+   declines. The list (Firestore friends/{uid}/list) is mirrored into the Realtime Database
+   (friendsOf/{uid}) so the database can let ONLY friends see where you are (presence/{uid}) and
+   watch your nights (watch/{uid}). Guests have no friends list.
+   ========================================================= */
+const SOC={uid:'',net:null,unsub:null,friends:[],inc:[],out:[],pres:{},presUnsub:{},msg:'',msgOk:false,
+  lastPres:'',lastPresAt:0,lastWatch:0,epSig:'',open:false,busy:false};
+async function socialStart(){
+  if(!canPost()||WATCH&&false)return;
+  const uid=cloudUser.uid;
+  if(SOC.uid===uid)return;
+  socialStop();
+  SOC.uid=uid;
+  try{
+    const net=MP?MP.net:await import('./multiplayer.js');
+    await net.initSocial();
+    if(net.authUidNow()!==uid||SOC.uid!==uid){SOC.uid='';return;}
+    SOC.net=net;
+  }catch(e){console.warn('Friends unavailable:',e);SOC.uid='';return;}
+  SOC.unsub=cloud.watchFriends(uid,
+    fr=>{SOC.friends=fr.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+      SOC.net.setFriendsMirror(uid,fr.map(f=>f.uid)).catch(e=>console.warn('Friend mirror:',e));
+      /* follow each friend's presence */
+      const want=new Set(fr.map(f=>f.uid));
+      Object.keys(SOC.presUnsub).forEach(u=>{if(!want.has(u)){SOC.presUnsub[u]();delete SOC.presUnsub[u];delete SOC.pres[u];}});
+      fr.forEach(f=>{if(!SOC.presUnsub[f.uid])SOC.presUnsub[f.uid]=SOC.net.onPresence(f.uid,v=>{SOC.pres[f.uid]=v;renderFriends();});});
+      SOC.lastPres='';renderFriends();},
+    inc=>{SOC.inc=inc;renderFriends();},
+    out=>{SOC.out=out;renderFriends();});
+  socialPresence(true);
+}
+function socialStop(){
+  if(SOC.unsub){SOC.unsub();SOC.unsub=null;}
+  Object.values(SOC.presUnsub).forEach(u=>{try{u();}catch(e){}});
+  if(SOC.net&&SOC.uid)SOC.net.clearPresence(SOC.uid);
+  SOC.presUnsub={};SOC.pres={};SOC.friends=[];SOC.inc=[];SOC.out=[];SOC.uid='';SOC.net=null;SOC.lastPres='';
+  renderFriends();
+}
+const inNightState=()=>state==='play'||state==='caught'||state==='dead'||state==='win';
+/* what friends see next to your name */
+function socialPresence(force){
+  if(!SOC.net||!SOC.uid||WATCH)return;
+  const o={n:cloudUser.name,st:inNightState()?'night':'title',mp:MP?MP.code:'',d:runDiff,nf:NF};
+  const sig=JSON.stringify(o);
+  if(!force&&sig===SOC.lastPres&&Date.now()-SOC.lastPresAt<120000)return;
+  SOC.lastPres=sig;SOC.lastPresAt=Date.now();
+  SOC.net.setPresence(SOC.uid,o).catch(e=>console.warn('Presence:',e));
+}
+/* the live view your friends can watch: about 4 times a second while you are in a night */
+function socialTick(now){
+  if(!SOC.net||!SOC.uid||WATCH)return;
+  socialPresence(false);
+  if(!SOC.friends.length||!inNightState()){if(SOC.lastWatch){SOC.lastWatch=0;SOC.epSig='';SOC.net.clearWatch(SOC.uid);}return;}
+  if(now-SOC.lastWatch<250)return;
+  SOC.lastWatch=now;
+  const q=v=>Math.round(v*100)/100;
+  const ep=embers.map(e=>[e.f,q(e.x),q(e.z)]),sig=JSON.stringify(ep);
+  if(sig!==SOC.epSig){SOC.epSig=sig;SOC.net.publishWatchEmbers(SOC.uid,ep).catch(()=>{});}
+  const fl=(P.hiding?1:0)|(P.veiling?2:0)|(P.dashing?4:0)|(P.moving?8:0);
+  const monRow=m=>[q(m.x),q(m.y),q(m.z),m.floor,q(m.yaw||0),{patrol:0,investigate:1,search:2,chase:3}[m.state]||0,m.goneT>0?1:0];
+  const mates=[];
+  REMOTE.forEach(r=>{if(r.ph===1&&r.lg)mates.push([q(r.ent.x),q(r.ent.y),q(r.ent.z),r.ent.floor,q(r.gy||r.yaw||0),r.lg,String(r.name).slice(0,24),
+    (r.ent.hiding?1:0)|(r.ent.veiling?2:0)|(r.ent.dashing?4:0)|(r.ent.moving?8:0)]);});
+  SOC.net.publishWatch(SOC.uid,{
+    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,mp:MP?MP.code:'',lg:save.main,n:cloudUser.name,
+    p:[q(P.x),q(P.y),q(P.z),P.floor,q(ghostYaw),fl],
+    m:[monRow(M)].concat(PUP.map(p=>monRow(p.M))),
+    o:mates,
+    e:embers.map(e=>e.taken?'1':'0').join(''),door:doorOpen?1:0,got,tot:TOTAL_EMBERS
+  }).catch(()=>{});
+}
+
+/* ---- the panel ---- */
+function openFriends(){
+  if(SOC.open)return;
+  if(acctOpen)closeAcct();if(lbOpen)closeBoard();if(settingsOpen)closeSettings();
+  SOC.open=true;SOC.msg='';$('frPanel').style.display='block';$('acctScrim').style.display='block';renderFriends();}
+function closeFriends(){if(!SOC.open)return;SOC.open=false;$('frPanel').style.display='none';
+  if(!acctOpen&&!lbOpen)$('acctScrim').style.display='none';}
+function frStatus(uid){
+  const v=SOC.pres[uid];
+  if(!v)return['Offline',''];
+  if(v.st==='night')return[(v.mp?'In a co-op night':'Playing solo')+' · '+((DIFFS[v.d]||DIFFS.normal).n),'night'];
+  return['Online — on the title screen','on'];}
+function renderFriends(){
+  if(!SOC.open)return;
+  const el=$('frBody');let h='';
+  if(!cloud)h='<p class="acnote">Friends need accounts switched on for this copy of the game.</p>';
+  else if(!cloudUser)h='<p class="acnote">Sign in (the ACCOUNT button) to add friends. Guests are temporary and cannot have friends.</p>';
+  else if(!cloudUser.unameOk)h='<p class="acnote">Choose a username in your account first — friends find you by it.</p>';
+  else if(!SOC.net)h='<p class="acnote">Reaching your friends…</p>';
+  else{
+    h+='<div class="frsec">ADD A FRIEND</div>'
+      +'<div class="fradd"><input class="acin" id="frName" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Their username"><span class="frbtn go" data-fr="send">SEND</span></div>'
+      +'<div class="frmsg'+(SOC.msgOk?' ok':'')+'" id="frMsg">'+escHTML(SOC.msg)+'</div>';
+    if(SOC.inc.length)h+='<div class="frsec">WANT TO BE YOUR FRIEND</div>'+SOC.inc.map(r=>
+      '<div class="frrow"><div class="who"><b>'+escHTML(r.fromName)+'</b></div>'
+      +'<span class="frbtn go" data-fr="accept" data-u="'+escHTML(r.from)+'">ACCEPT</span><span class="frbtn no" data-fr="decline" data-u="'+escHTML(r.from)+'">DECLINE</span></div>').join('');
+    if(SOC.out.length)h+='<div class="frsec">WAITING FOR AN ANSWER</div>'+SOC.out.map(r=>
+      '<div class="frrow"><div class="who"><b>'+escHTML(r.toName)+'</b><span>Request sent</span></div>'
+      +'<span class="frbtn no" data-fr="cancel" data-u="'+escHTML(r.to)+'">CANCEL</span></div>').join('');
+    h+='<div class="frsec">YOUR FRIENDS · '+SOC.friends.length+'</div>';
+    h+=SOC.friends.length?SOC.friends.map(f=>{const [txt,cls]=frStatus(f.uid),v=SOC.pres[f.uid];
+      return '<div class="frrow"><div class="who"><b>'+escHTML(f.name)+'</b><span class="'+cls+'">'+escHTML(txt)+'</span></div>'
+        +(v&&v.st==='night'?'<span class="frbtn go" data-fr="watch" data-u="'+escHTML(f.uid)+'">WATCH</span>':'')
+        +'<span class="frbtn no" data-fr="remove" data-u="'+escHTML(f.uid)+'">REMOVE</span></div>';}).join('')
+      :'<p class="frnote">No friends yet. Add someone by their username above.</p>';
+    h+='<p class="frnote">Friends can see when you are online and watch your nights live. Only your friends can.</p>';
+  }
+  const keep=$('frName')?$('frName').value:'';
+  el.innerHTML=h;
+  const inp=$('frName');if(inp&&keep)inp.value=keep;
+}
+function frMsg(t,ok){SOC.msg=t||'';SOC.msgOk=!!ok;const m=$('frMsg');if(m){m.textContent=SOC.msg;m.classList.toggle('ok',SOC.msgOk);}}
+async function frAction(act,u){
+  if(!SOC.net||SOC.busy)return;
+  const me=cloudUser.uid,my=cloudUser.name;
+  SOC.busy=true;
+  try{
+    if(act==='send'){
+      const nm=($('frName').value||'').replace(/\s+/g,' ').trim();
+      if(!nm){frMsg('Type their username.');return;}
+      const own=await cloud.usernameOwner(nm);
+      if(!own){frMsg('No player has the username "'+nm+'".');return;}
+      if(own.uid===me){frMsg('That is you.');return;}
+      if(SOC.friends.some(f=>f.uid===own.uid)){frMsg(own.name+' is already your friend.');return;}
+      if(SOC.out.some(r=>r.to===own.uid)){frMsg('You already asked '+own.name+'.');return;}
+      const theirs=SOC.inc.find(r=>r.from===own.uid);
+      if(theirs){await cloud.answerFriendRequest(me,my,theirs,true);frMsg('You and '+own.name+' are now friends.',true);}
+      else{await cloud.sendFriendRequest(me,my,own.uid,own.name);frMsg('Request sent to '+own.name+'.',true);}
+      $('frName').value='';
+    }else if(act==='accept'||act==='decline'){
+      const r=SOC.inc.find(x=>x.from===u);if(!r)return;
+      await cloud.answerFriendRequest(me,my,r,act==='accept');
+      frMsg(act==='accept'?'You and '+r.fromName+' are now friends.':'Request declined.',act==='accept');
+    }else if(act==='cancel'){await cloud.cancelFriendRequest(u,me);frMsg('Request cancelled.',true);}
+    else if(act==='remove'){
+      const f=SOC.friends.find(x=>x.uid===u);if(!f)return;
+      if(!confirm('Remove '+f.name+' from your friends?'))return;
+      await cloud.removeFriend(me,u);frMsg(f.name+' is no longer your friend.',true);
+    }else if(act==='watch'){
+      const v=SOC.pres[u];if(!v)return;
+      if(state==='play'||state==='caught'){frMsg('Finish or leave your own night first.');return;}
+      location.href='index.html?watch='+encodeURIComponent(u)+'&floors='+Math.max(4,Math.min(11,v.nf|0||4));
+    }
+  }catch(e){console.warn('Friends:',e);frMsg(cloud.friendlyError(e));}
+  finally{SOC.busy=false;}
+}
+$('frPanel').addEventListener('click',e=>{e.stopPropagation();
+  const b=e.target.closest('[data-fr]');if(b)frAction(b.getAttribute('data-fr'),b.getAttribute('data-u'));});
+$('frPanel').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&e.target.id==='frName'){e.preventDefault();frAction('send');}});
+$('frClose').addEventListener('click',e=>{e.stopPropagation();closeFriends();});
+$('titleFriends').addEventListener('click',e=>{e.stopPropagation();openFriends();});
+$('acctScrim').addEventListener('click',()=>closeFriends());
+
+/* =========================================================
+   WATCH — index.html?watch=UID&floors=N : spectating a friend's night, live.
+   The friend's game publishes watch/{uid} about 4 times a second (where they are, every hunter
+   they can see, their teammates, which embers are gone, the door). This page builds a house of the
+   same size and shows it from behind them. Nothing here is played or saved. Only friends can read
+   watch/{uid} (database.rules.json).
+   ========================================================= */
+const WV={s:null,ep:null,at:0,net:null,unsub:null,name:'',reloading:false,mates:new Set(),pups:[],ok:false,err:''};
+async function watchInit(){
+  document.body.classList.add('watching');
+  state='watch';showOv(null);setScreenState();
+  shards.forEach(s=>{s.grp.visible=false;});
+  $('watchLeave').addEventListener('click',e=>{e.stopPropagation();location.href='index.html';});
+  watchBar('REACHING YOUR FRIEND…','');
+  try{
+    const net=await import('./multiplayer.js');
+    await net.initSocial();WV.net=net;
+    if(!net.me||!net.me.signedIn){watchBar('SIGN IN TO WATCH FRIENDS','Open the title screen, sign in, then use FRIENDS');return;}
+    WV.unsub=net.onWatch(WATCH,s=>{WV.s=s;WV.at=performance.now();},ep=>{WV.ep=ep;watchEmbers();});
+    WV.ok=true;
+  }catch(e){console.warn('Watch:',e);watchBar('COULD NOT REACH YOUR FRIEND',String(e.message||e));}
+}
+function watchBar(a,b){$('watchName').textContent=a;$('watchSub').textContent=b;}
+function watchEmbers(){
+  const ep=WV.ep;if(!Array.isArray(ep))return;
+  ep.forEach((p,i)=>{const e=embers[i];if(!e||!p)return;
+    e.f=p[0];e.x=p[1];e.z=p[2];e.grp.position.set(e.x,e.f*FH+1.15,e.z);});}
+/* the friend's legend look, without touching this player's own choice */
+function watchLook(id){
+  if(!BYID[id]||(ghost&&ghost.legend&&ghost.legend.id===id))return;
+  disposeLegend(ghost);ghost=buildLegend(BYID[id]);ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;}
+function watchFrame(dt,t){
+  const s=WV.s;
+  if(!WV.ok)return;
+  if(!s){watchBar('WAITING FOR YOUR FRIEND','They are not in a night right now — this page will follow them when they start one');return;}
+  if(performance.now()-WV.at>10000){watchBar(String(s.n||'YOUR FRIEND').toUpperCase()+' HAS GONE QUIET','Waiting for their night to come back…');}
+  /* a different house size (co-op ↔ solo): rebuild for it */
+  if(s.nf&&s.nf!==NF&&!WV.reloading){WV.reloading=true;location.replace('index.html?watch='+encodeURIComponent(WATCH)+'&floors='+s.nf);return;}
+  const k=Math.min(1,dt*8),p=s.p||[0,0,0,0,0,0];
+  if(Math.hypot(p[0]-P.x,p[2]-P.z)>6||p[3]!==P.floor){P.x=p[0];P.y=p[1];P.z=p[2];}
+  else{P.x+=(p[0]-P.x)*k;P.y+=(p[1]-P.y)*k;P.z+=(p[2]-P.z)*k;}
+  P.floor=p[3];P.nodeKey=nk(P.floor,Math.floor(P.x/CS),Math.floor(P.z/CS));
+  P.hiding=!!(p[5]&1);P.veiling=!!(p[5]&2);P.dashing=!!(p[5]&4);P.moving=!!(p[5]&8);
+  let dy=p[4]-ghostYaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;ghostYaw+=dy*Math.min(1,dt*10);
+  let cy=ghostYaw-camYaw;while(cy>Math.PI)cy-=2*Math.PI;while(cy<-Math.PI)cy+=2*Math.PI;camYaw+=cy*Math.min(1,dt*3);
+  /* their ghost */
+  watchLook(s.lg);
+  ghost.g.visible=s.st==='play'||s.st==='caught';
+  ghost.g.position.set(P.x,P.y+0.22+Math.sin(t*2.1)*0.07,P.z);ghost.g.rotation.y=ghostYaw;
+  ghost.mat.opacity+=((P.hiding?0.04:P.veiling?0.16:0.85)-ghost.mat.opacity)*Math.min(1,dt*8);
+  ghost.coreMat.opacity+=((P.hiding?0.02:P.veiling?0.1:0.5)-ghost.coreMat.opacity)*Math.min(1,dt*8);
+  animateLegend(ghost,dt,t,{move:P.moving?(P.dashing?1:(P.veiling?0.3:0.68)):0,dash:P.dashing&&P.moving,veil:P.veiling,hide:P.hiding});
+  ghost.light.position.set(P.x,P.y+1.1,P.z);
+  ghost.light.intensity+=((P.hiding?0.3:P.veiling?2.5:7)-ghost.light.intensity)*Math.min(1,dt*6);
+  /* the hunters: their own one is ours to draw, the rest are puppets */
+  const ms=s.m||[],ST=['patrol','investigate','search','chase'];
+  const apply=(m,row,snap)=>{
+    if(snap||Math.hypot(row[0]-m.x,row[2]-m.z)>6||row[3]!==m.floor){m.x=row[0];m.y=row[1];m.z=row[2];}
+    else{m.x+=(row[0]-m.x)*k;m.y+=(row[1]-m.y)*k;m.z+=(row[2]-m.z)*k;}
+    m.floor=row[3];let d=row[4]-(m.yaw||0);while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;m.yaw=(m.yaw||0)+d*Math.min(1,dt*8);
+    m.state=ST[row[5]]||'patrol';m.goneT=row[6]?1:0;m.nodeKey=nk(m.floor,Math.floor(m.x/CS),Math.floor(m.z/CS));};
+  if(ms[0])apply(M,ms[0]);
+  mon.g.visible=!!ms[0]&&M.goneT<=0;
+  while(PUP.length<ms.length-1){const pp={uid:'w'+PUP.length,M:Object.assign(entAt(0,0,0),{state:'patrol',stunT:0,goneT:0,slowT:0,yaw:0,noticeT:-1,tg:''}),mon:buildMonster(),tx:0,ty:0,tz:0,yt:0,seen:true};
+    pp.mon.mute=true;PUP.push(pp);apply(pp.M,ms[PUP.length],true);}
+  while(PUP.length>Math.max(0,ms.length-1)){const pp=PUP.pop();scene.remove(pp.mon.g);}
+  PUP.forEach((pp,i)=>{apply(pp.M,ms[i+1]);pp.mon.g.visible=pp.M.goneT<=0;});
+  animateAllMonsters(dt,t);
+  /* their teammates */
+  const seen=new Set();
+  (s.o||[]).forEach(o=>{const id='w_'+o[6];seen.add(id);
+    const had=REMOTE.has(id);
+    mpApplyStateRaw(id,{x:o[0],y:o[1],z:o[2],f:o[3],r:o[4],fl:o[7]|0,nz:0,ph:1,lg:o[5]});
+    const r=REMOTE.get(id);
+    if(r&&r.name!==o[6]){r.name=o[6];const old=r.label;r.label=makeLabel(o[6]);scene.remove(old);old.material.map.dispose();old.material.dispose();}
+    if(!had&&r)r.seen=false;});
+  Array.from(REMOTE.keys()).forEach(id=>{if(!seen.has(id))mpApplyStateRaw(id,null);});
+  REMOTE.forEach(r=>mpUpdateRemote(r,dt,t));
+  /* embers and the door */
+  const e=String(s.e||'');
+  embers.forEach((em,i)=>{const tk=e[i]==='1';em.taken=tk;em.grp.visible=!tk;});
+  got=s.got|0;
+  if(s.door&&!doorOpen){doorOpen=true;setDoorSealed(false);}else if(!s.door&&doorOpen){doorOpen=false;setDoorSealed(true);}
+  /* what is happening */
+  if(performance.now()-WV.at<=10000){
+    const who=String(s.n||'YOUR FRIEND').toUpperCase();
+    const what=s.st==='caught'?'THE THING HAS '+who:s.st==='dead'?who+' WAS TAKEN':s.st==='win'?who+' ESCAPED THE HOUSE':'WATCHING '+who;
+    watchBar(what,(s.mp?'CO-OP':'SOLO')+' · '+((DIFFS[s.d]||DIFFS.normal).n)+' · '+fmtTime(s.el||0)+' · EMBERS '+(s.got|0)+'/'+(s.tot|0)+' · '+(FLOOR_NAMES[P.floor]||''));}
+}
+
+/* =========================================================
+   VOICE CHAT (co-op)
+   Every player in the night is connected to every other one, so you hear your friends as soon as the
+   night begins even with your own mic off. MIC (the button under ⚙, or the M key) turns your mic on
+   and off; the first time, the browser asks for permission. Voices go straight between browsers
+   (WebRTC); the Realtime Database only carries the short connection messages (live/{code}/rtc).
+   A name in the team list turns green while that person is talking. The volume is in SETTINGS.
+   ========================================================= */
+const VOICE={peers:new Map(),sid:Math.random().toString(36).slice(2,10),mic:null,on:false,busy:false,started:false,
+  speak:{},lastTick:0,lastLvl:0,meLvl:null,unsub:null};
+const ICE={iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:stun2.l.google.com:19302']}]};
+const voiceOk=()=>!!(window.RTCPeerConnection&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
+function voiceStart(){
+  if(!MP||VOICE.started||!voiceOk())return;
+  VOICE.started=true;
+  MP.net.clearRtc(MP.code).then(()=>{VOICE.unsub=MP.net.onRtc(MP.code,m=>{voiceMsg(m).catch(e=>console.warn('Voice:',e));});});
+  micUI();
+}
+function voicePeer(uid,initiator){
+  const pc=new RTCPeerConnection(ICE);
+  const p={uid,pc,initiator,remoteSid:'',pend:[],tr:null,audio:null,an:null,buf:null,badAt:0};
+  VOICE.peers.set(uid,p);
+  pc.onicecandidate=e=>{if(e.candidate)MP.net.sendRtc(MP.code,uid,{sid:VOICE.sid,t:'ice',d:JSON.stringify(e.candidate)});};
+  pc.ontrack=e=>voiceAttach(p,(e.streams&&e.streams[0])||new MediaStream([e.track]));
+  pc.onconnectionstatechange=()=>{const s=pc.connectionState;
+    if(s==='connected')p.badAt=0;
+    else if((s==='failed'||s==='disconnected')&&!p.badAt)p.badAt=performance.now();};
+  return p;
+}
+function voiceClose(uid){
+  const p=VOICE.peers.get(uid);if(!p)return;
+  VOICE.peers.delete(uid);
+  try{p.pc.close();}catch(e){}
+  if(p.audio){p.audio.srcObject=null;p.audio.remove();}
+  delete VOICE.speak[uid];
+}
+const micTrack=()=>VOICE.on&&VOICE.mic?VOICE.mic.getAudioTracks()[0]||null:null;
+/* the lower uid of each pair calls, the other answers */
+async function voiceCall(uid){
+  const p=voicePeer(uid,true);
+  p.tr=p.pc.addTransceiver('audio',{direction:'sendrecv'});
+  await p.tr.sender.replaceTrack(micTrack());
+  await p.pc.setLocalDescription(await p.pc.createOffer());
+  MP.net.sendRtc(MP.code,uid,{sid:VOICE.sid,t:'offer',d:p.pc.localDescription.sdp});
+}
+async function voiceMsg(m){
+  if(!MP||!REMOTE.has(m.from)&&m.t!=='offer')return;
+  if(m.t==='offer'){
+    voiceClose(m.from);
+    const p=voicePeer(m.from,false);p.remoteSid=m.sid;
+    await p.pc.setRemoteDescription({type:'offer',sdp:m.d});
+    p.tr=p.pc.getTransceivers()[0];
+    if(p.tr){p.tr.direction='sendrecv';await p.tr.sender.replaceTrack(micTrack());}
+    await p.pc.setLocalDescription(await p.pc.createAnswer());
+    MP.net.sendRtc(MP.code,m.from,{sid:VOICE.sid,t:'answer',d:p.pc.localDescription.sdp});
+    for(const c of p.pend.splice(0))await p.pc.addIceCandidate(c).catch(()=>{});
+    return;}
+  const p=VOICE.peers.get(m.from);if(!p)return;
+  if(m.t==='answer'){
+    if(!p.initiator||p.pc.signalingState!=='have-local-offer')return;
+    p.remoteSid=m.sid;
+    await p.pc.setRemoteDescription({type:'answer',sdp:m.d});
+    for(const c of p.pend.splice(0))await p.pc.addIceCandidate(c).catch(()=>{});
+  }else if(m.t==='ice'){
+    if(p.remoteSid&&m.sid!==p.remoteSid)return;          /* from an earlier connection */
+    let c;try{c=JSON.parse(m.d);}catch(e){return;}
+    if(!p.pc.remoteDescription)p.pend.push(c);else await p.pc.addIceCandidate(c).catch(()=>{});
+  }
+}
+function voiceAttach(p,stream){
+  if(!p.audio){p.audio=document.createElement('audio');p.audio.autoplay=true;p.audio.style.display='none';document.body.appendChild(p.audio);}
+  p.audio.srcObject=stream;p.audio.volume=settings.voiceVol;
+  p.audio.play().catch(()=>{});
+  /* how loud they are right now, for the "talking" light */
+  try{if(AC){const src=AC.createMediaStreamSource(stream);p.an=AC.createAnalyser();p.an.fftSize=512;src.connect(p.an);p.buf=new Uint8Array(p.an.fftSize);}}catch(e){p.an=null;}
+}
+function rms(an,buf){an.getByteTimeDomainData(buf);let s=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;s+=v*v;}return Math.sqrt(s/buf.length);}
+/* once a second: call whoever is new, drop whoever left, retry a broken line. 10 times a second: who is talking */
+function voiceTick(now){
+  if(!mpStarted)return;
+  if(!VOICE.started){voiceStart();if(!VOICE.started)return;}
+  if(now-VOICE.lastTick>1000){VOICE.lastTick=now;
+    REMOTE.forEach((r,uid)=>{
+      const p=VOICE.peers.get(uid);
+      if(!p){if(MP.uid<uid)voiceCall(uid).catch(e=>{console.warn('Voice call:',e);voiceClose(uid);});}
+      else if(p.badAt&&now-p.badAt>6000){voiceClose(uid);}});   /* the caller tries again on the next tick */
+    Array.from(VOICE.peers.keys()).forEach(uid=>{if(!REMOTE.has(uid))voiceClose(uid);});}
+  if(now-VOICE.lastLvl>100){VOICE.lastLvl=now;
+    VOICE.peers.forEach(p=>{if(p.an&&rms(p.an,p.buf)>0.04)VOICE.speak[p.uid]=now;});
+    const meTalk=VOICE.on&&VOICE.meLvl&&rms(VOICE.meLvl.an,VOICE.meLvl.buf)>0.04;
+    document.querySelectorAll('#team .tm[data-uid]').forEach(el=>{
+      el.classList.toggle('talk',now-(VOICE.speak[el.getAttribute('data-uid')]||0)<350);});
+    const mb=$('micBtn');if(mb)mb.classList.toggle('talk',!!meTalk);}
+}
+async function voiceToggle(){
+  if(!MP||VOICE.busy)return;
+  if(!voiceOk()){toast('VOICE CHAT IS NOT SUPPORTED IN THIS BROWSER',3);return;}
+  VOICE.busy=true;
+  try{
+    if(!VOICE.on){
+      try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){}
+      try{VOICE.mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});}
+      catch(e){toast('THE MIC COULD NOT BE OPENED \u2014 ALLOW IT IN YOUR BROWSER',3.5);return;}
+      try{if(AC){const src=AC.createMediaStreamSource(VOICE.mic),an=AC.createAnalyser();an.fftSize=512;src.connect(an);VOICE.meLvl={an,buf:new Uint8Array(512)};}}catch(e){}
+      VOICE.on=true;toast('MIC ON \u2014 YOUR FRIENDS CAN HEAR YOU',2);
+    }else{
+      VOICE.on=false;
+      if(VOICE.mic)VOICE.mic.getTracks().forEach(t=>t.stop());
+      VOICE.mic=null;VOICE.meLvl=null;toast('MIC OFF',1.6);
+    }
+    const tk=micTrack();
+    for(const p of VOICE.peers.values())if(p.tr)await p.tr.sender.replaceTrack(tk).catch(()=>{});
+  }finally{VOICE.busy=false;micUI();}
+}
+function micUI(){const b=$('micBtn');if(!b)return;
+  b.style.display=MP&&VOICE.started?'flex':'none';
+  b.classList.toggle('on',VOICE.on);b.textContent=VOICE.on?'MIC ON':'MIC OFF';}
+/* browsers only play sound after a tap or key: retry any voice that is waiting */
+function voiceUnlock(){VOICE.peers.forEach(p=>{if(p.audio&&p.audio.paused&&p.audio.srcObject)p.audio.play().catch(()=>{});});}
+['click','keydown','touchend'].forEach(ev=>addEventListener(ev,voiceUnlock,true));
+$('micBtn').addEventListener('click',e=>{e.stopPropagation();voiceToggle();});
+$('micBtn').addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});
+addEventListener('keydown',e=>{if(e.code==='KeyM'&&!e.repeat&&MP&&!(e.target&&e.target.closest&&e.target.closest('input,textarea'))){e.preventDefault();voiceToggle();}});
+addEventListener('pagehide',()=>{Array.from(VOICE.peers.keys()).forEach(voiceClose);if(VOICE.mic)VOICE.mic.getTracks().forEach(t=>t.stop());});
+
+if(WATCH)watchInit();
 
 /* ?debug=1 — a handle for automated tests */
 if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return state;},get got(){return got;},get doorOpen(){return doorOpen;},

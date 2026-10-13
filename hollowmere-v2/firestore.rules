@@ -24,7 +24,7 @@ service cloud.firestore {
 
     function validRun() {
       let r = request.resource.data;
-      return r.keys().hasOnly(['result','nightTime','legend','embers','memories','ether',
+      return r.keys().hasOnly(['result','diff','nightTime','legend','embers','memories','ether',
                                'deathsTonight','seen','floor','at'])
         && r.result in ['escape','death']
         && r.nightTime is number && r.nightTime >= 0
@@ -107,13 +107,16 @@ service cloud.firestore {
     // Anyone can read. A signed-in player (co-op guests are signed in anonymously)
     // can add an escape under their own uid.
     //  · Solo escape (random id): the name MUST be the player's own claimed username.
-    //  · Co-op team escape (id starts "mp_"): "user1+user2", a fixed id so only the first
-    //    teammate out creates it; later writes are refused.
+    //  · Co-op team escape (id starts "mp_"): "user1+user2" — registered players only, guests are
+    //    never named — posted by the first signed-in teammate out (a fixed id, so later writes are refused).
     // The only edit a player may make is renaming their own solo escapes after changing username.
+    // Each escape records its difficulty (easy / normal / hard / nightmare): one board per difficulty.
+    // Entries from before difficulty levels have none and count as Normal.
     function validEscape() {
       let e = request.resource.data;
-      return e.keys().hasOnly(['uid','name','time','legend','deaths','embers','team','at'])
-        && e.keys().hasAll(['uid','name','time','legend','deaths','embers','team','at'])
+      return e.keys().hasOnly(['uid','name','time','legend','deaths','embers','team','diff','at'])
+        && e.keys().hasAll(['uid','name','time','legend','deaths','embers','team','diff','at'])
+        && e.diff in ['easy','normal','hard','nightmare']
         && e.uid is string
         && e.name is string && e.name.size() >= 1 && e.name.size() <= 40
         && e.time is number && e.time >= 20 && e.time <= 86400
@@ -128,7 +131,7 @@ service cloud.firestore {
       allow create: if (signedIn() && validEscape()
                         && request.resource.data.uid == request.auth.uid
                         && !banned(request.auth.uid)
-                        && ((request.resource.data.team && id.matches('mp_.*'))
+                        && ((request.resource.data.team && id.matches('mp_.*') && realUser())
                             || (!request.resource.data.team && !id.matches('mp_.*')
                                 && realUser() && ownsName(request.resource.data.name))))
                     || isAdmin();
@@ -161,6 +164,69 @@ service cloud.firestore {
                         && request.resource.data.seconds >= resource.data.seconds
                         && request.resource.data.seconds - resource.data.seconds
                            <= (request.time.toMillis() - resource.data.at.toMillis()) / 1000 + 10)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // FRIENDS — between signed-in players with a username.
+    //   friendReqs/{to}_{from} { from, fromName, to, toName, at }  a request waiting for an answer
+    //   friends/{uid}/list/{fid} { name, since }                   each side keeps its own list
+    // A list entry can only be made while a matching request exists (accepting writes both lists
+    // and removes the request in one batch). Either friend can end it. Lists are private.
+    match /friendReqs/{id} {
+      allow read: if signedIn() && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+      allow create: if realUser()
+                    && request.resource.data.keys().hasOnly(['from','fromName','to','toName','at'])
+                    && request.resource.data.keys().hasAll(['from','fromName','to','toName','at'])
+                    && request.resource.data.from == request.auth.uid
+                    && request.resource.data.to is string && request.resource.data.to != request.auth.uid
+                    && id == request.resource.data.to + '_' + request.auth.uid
+                    && ownsName(request.resource.data.fromName)
+                    && request.resource.data.toName is string && request.resource.data.toName.size() <= 40
+                    && request.resource.data.at == request.time;
+      allow delete: if signedIn() && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+    }
+    match /friends/{uid}/list/{fid} {
+      allow read: if isSelf(uid);
+      // I accept fid's request (friendReqs/{me}_{fid}) — I may write my own entry and theirs
+      allow create: if realUser()
+                    && request.resource.data.keys().hasOnly(['name','since'])
+                    && request.resource.data.name is string && request.resource.data.name.size() <= 40
+                    && request.resource.data.since == request.time
+                    && ((request.auth.uid == uid && exists(/databases/$(database)/documents/friendReqs/$(uid + '_' + fid)))
+                        || (request.auth.uid == fid && exists(/databases/$(database)/documents/friendReqs/$(fid + '_' + uid))));
+      // after a username change a friend updates their own name in my list
+      allow update: if signedIn() && request.auth.uid == fid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+                    && ownsName(request.resource.data.name);
+      allow delete: if signedIn() && (request.auth.uid == uid || request.auth.uid == fid);
+    }
+
+    // GUEST ACCOUNTS — guests are temporary: they never get a record of their own and never appear
+    // on a leaderboard. Everything they play is added to ONE running total, readable only by an admin:
+    // guestStats/total { seconds, active, escapes, at }. Anyone (even signed out) may add to it, but
+    // only a little at a time: up to 120 seconds and 1 escape per write, and it can never go down.
+    function validGuestStats() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['seconds','active','escapes','at'])
+        && d.keys().hasAll(['seconds','active','escapes','at'])
+        && d.seconds is int && d.active is int && d.escapes is int
+        && d.at == request.time;
+    }
+    match /guestStats/{doc} {
+      allow read: if isAdmin();
+      allow create: if (doc == 'total' && validGuestStats()
+                        && request.resource.data.seconds >= 0 && request.resource.data.seconds <= 120
+                        && request.resource.data.active >= 0 && request.resource.data.active <= 120
+                        && request.resource.data.escapes >= 0 && request.resource.data.escapes <= 1)
+                    || isAdmin();
+      allow update: if (doc == 'total' && validGuestStats()
+                        && request.resource.data.seconds >= resource.data.seconds
+                        && request.resource.data.seconds - resource.data.seconds <= 120
+                        && request.resource.data.active >= resource.data.active
+                        && request.resource.data.active - resource.data.active <= 120
+                        && request.resource.data.escapes >= resource.data.escapes
+                        && request.resource.data.escapes - resource.data.escapes <= 1)
                     || isAdmin();
       allow delete: if isAdmin();
     }

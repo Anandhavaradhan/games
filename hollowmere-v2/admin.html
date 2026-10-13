@@ -220,6 +220,11 @@ try{
 
 /* players: every players/{uid} doc (live); board: top of escapes/{id} (live); ptBoard: top of playtime/{uid} (live) */
 let board=[], unsubBoard=null, playersLoaded=false, ptBoard=[], unsubPT=null;
+/* GUEST ACCOUNTS: guests are temporary and have no record of their own; guestStats/total holds
+   everything all guests have played. oldGuests = guest records left from before that (a co-op
+   guest's id used to get a players/{uid} record) — they have no email; "Merge" folds them in. */
+let guestTotal={seconds:0,active:0,escapes:0}, unsubGS=null, oldGuests=[];
+const isGuestDoc=p=>!p.email;
 
 /* Entries the board should always hold. Written once (fixed ids) the first time an admin opens this page. */
 const SEED_ESCAPES=[
@@ -236,6 +241,7 @@ async function seedPlaytime(){
     let made=0,raised=0;
     for(const d of ps.docs){
       const p=d.data(),st=p.stats||{};
+      if(isGuestDoc(p))continue;   /* guests are never on the board */
       const secs=Math.floor(st.activeTime>0?st.activeTime:(st.playTime||0));
       if(!(secs>0))continue;
       const nm=String(p.name||'Ghost').replace(/\s+/g,' ').trim().slice(0,40)||'Ghost';
@@ -245,6 +251,31 @@ async function seedPlaytime(){
     }
     return made+raised;
   }catch(e){console.warn('Playtime seeding:',e);notice('Playtime import failed: '+e.message);return 0;}
+}
+
+/* Fold every old guest record into the one Guest accounts total, then delete it with everything
+   it left behind (run history, any board entries or time-played entry). Cannot be undone. */
+async function mergeOldGuests(){
+  const list=oldGuests.slice();if(!list.length)return;
+  if(!confirm('Merge '+plural(list.length,'old guest record')+' into Guest accounts?\n\nTheir time and escapes are added to the guest total, then the records are deleted. This cannot be undone.'))return;
+  let done=0;
+  try{
+    for(const p of list){
+      const st=p.stats||{},uid=p.uid;
+      await F.setDoc(F.doc(db,'guestStats','total'),{seconds:F.increment(Math.floor(st.playTime||0)),
+        active:F.increment(Math.floor(st.activeTime||0)),escapes:F.increment(Math.floor(p.escapes||0)),at:F.serverTimestamp()},{merge:true});
+      for(;;){const r=await F.getDocs(F.query(F.collection(db,'players',uid,'runs'),F.limit(300)));
+        if(r.empty)break;const b=F.writeBatch(db);r.docs.forEach(d=>b.delete(d.ref));await b.commit();if(r.size<300)break;}
+      const es=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('uid','==',uid),F.where('team','==',false)));
+      for(const d of es.docs)await F.deleteDoc(d.ref);
+      try{await F.deleteDoc(F.doc(db,'playtime',uid));}catch(e){}
+      try{await F.deleteDoc(F.doc(db,'leaderboard',uid));}catch(e){}
+      try{const k=unameKey(p.name),r=F.doc(db,'usernames',k),d=await F.getDoc(r);if(k&&d.exists()&&d.data().uid===uid)await F.deleteDoc(r);}catch(e){}
+      await F.deleteDoc(F.doc(db,'players',uid));
+      done++;
+    }
+    notice('Merged '+plural(done,'guest record')+' into Guest accounts');
+  }catch(e){notice('Stopped after '+done+': '+e.message);}
 }
 
 /* Usernames: one per account, unique (usernames/{key} = {uid, name}; key = lower-case letters and digits only).
@@ -260,6 +291,7 @@ async function seedUsernames(){
     const snap=await F.getDocs(F.query(F.collection(db,'players'),F.orderBy('createdAt'),F.limit(1000)));
     let made=0;
     for(const d of snap.docs){
+      if(isGuestDoc(d.data()))continue;
       const nm=String(d.data().name||'').replace(/\s+/g,' ').trim();
       if(!unameOk(nm))continue;
       const ref=F.doc(db,'usernames',unameKey(nm));
@@ -277,12 +309,16 @@ async function seedUsernames(){
    Nothing is added twice: an escape is skipped when that player already has an entry with the
    same time (to a tenth of a second). Runs once per browser; "Re-import past escapes" runs it again. */
 const IMPORT_FLAG='hm_board_import_v3';
+/* difficulty levels: each has its own board. Entries from before they existed count as Normal. */
+const DIFF_KEYS=['easy','normal','hard','nightmare'],DIFF_NAME={easy:'Easy',normal:'Normal',hard:'Hard',nightmare:'Nightmare'};
+const diffOf=r=>DIFF_KEYS.indexOf(r&&r.diff)>=0?r.diff:'normal';
+let boardDiff='all';
 async function migrateBoard(adminUid,force){
   try{
     for(const e of SEED_ESCAPES){
       const ref=F.doc(db,'escapes',e.id);
       if(!(await F.getDoc(ref)).exists())
-        await F.setDoc(ref,{uid:adminUid,name:e.name,time:e.time,legend:e.legend,deaths:e.deaths,embers:e.embers,team:e.team,at:F.serverTimestamp()});
+        await F.setDoc(ref,{uid:adminUid,name:e.name,time:e.time,legend:e.legend,deaths:e.deaths,embers:e.embers,team:e.team,diff:'normal',at:F.serverTimestamp()});
     }
     if(!force&&localStorage.getItem(IMPORT_FLAG))return;
     const t10=v=>Math.round((+v||0)*10);
@@ -290,6 +326,8 @@ async function migrateBoard(adminUid,force){
     const oldBest={};old.docs.forEach(d=>{oldBest[d.id]=d.data();});
     const uids=new Set(ps.docs.map(d=>d.id).concat(Object.keys(oldBest)));
     const pname={};ps.docs.forEach(d=>{pname[d.id]=d.data().name;});
+    /* guests are never on the board */
+    ps.docs.forEach(d=>{if(isGuestDoc(d.data()))uids.delete(d.id);});
     let batch=F.writeBatch(db),n=0,added=0;
     const put=async(ref,data)=>{batch.set(ref,data);n++;added++;if(n>=400){await batch.commit();batch=F.writeBatch(db);n=0;}};
     for(const uid of uids){
@@ -306,7 +344,7 @@ async function migrateBoard(adminUid,force){
           have.add(t10(t));
           await put(F.doc(db,'escapes','run_'+uid+'_'+r.id),{uid,name,time:t,legend:String(x.legend||'').slice(0,40),
             deaths:Math.max(0,Math.floor(x.deathsTonight||0)),embers:Math.max(0,Math.floor(x.embers||0)),
-            team:false,at:x.at||F.serverTimestamp()});
+            team:false,diff:DIFF_KEYS.indexOf(x.diff)>=0?x.diff:'normal',at:x.at||F.serverTimestamp()});
         }
       }
       /* their old best, if it is not one of those */
@@ -319,7 +357,7 @@ async function migrateBoard(adminUid,force){
             have.add(t10(ob.bestTime));
             await put(ref,{uid,name:team?String(ob.name).slice(0,40):name,time:ob.bestTime,legend:String(ob.legend||''),
               deaths:Math.max(0,Math.floor(ob.deaths||0)),embers:Math.max(0,Math.floor(ob.embers||0)),
-              team,at:ob.at||F.serverTimestamp()});}}
+              team,diff:'normal',at:ob.at||F.serverTimestamp()});}}
       }
     }
     if(n)await batch.commit();
@@ -352,6 +390,7 @@ A.onAuthStateChanged(auth,async u=>{
   if(unsub){unsub();unsub=null;}
   if(unsubBoard){unsubBoard();unsubBoard=null;}
   if(unsubPT){unsubPT();unsubPT=null;}
+  if(unsubGS){unsubGS();unsubGS=null;}
   playersLoaded=false;board=[];ptBoard=[];
   closeDrawer();
   if(!u){signInView();return;}
@@ -372,7 +411,8 @@ A.onAuthStateChanged(auth,async u=>{
   }
   app.innerHTML='<div class="state"><p>Reading the ledger…</p></div>';
   unsub=F.onSnapshot(F.query(F.collection(db,'players'),F.orderBy('lastSeen','desc'),F.limit(1000)),snap=>{
-    players=snap.docs.map(d=>Object.assign({uid:d.id},d.data()));
+    const all=snap.docs.map(d=>Object.assign({uid:d.id},d.data()));
+    players=all.filter(p=>!isGuestDoc(p));oldGuests=all.filter(isGuestDoc);
     playersLoaded=true;
     render();
     if(openUid)renderDrawer();
@@ -384,6 +424,12 @@ A.onAuthStateChanged(auth,async u=>{
     board=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>a.time-b.time||ms(a.at)-ms(b.at));
     if(playersLoaded)render();
   },e=>console.warn('Leaderboard read failed:',e));
+  /* all guests together, live */
+  unsubGS=F.onSnapshot(F.doc(db,'guestStats','total'),snap=>{
+    const d=snap.exists()?snap.data():{};
+    guestTotal={seconds:d.seconds||0,active:d.active||0,escapes:d.escapes||0};
+    if(playersLoaded)render();
+  },e=>console.warn('Guest total read failed:',e));
   /* most active time played, live */
   unsubPT=F.onSnapshot(F.query(F.collection(db,'playtime'),F.orderBy('seconds','desc'),F.limit(500)),snap=>{
     ptBoard=snap.docs.map(d=>Object.assign({uid:d.id},d.data()));
@@ -453,15 +499,29 @@ function render(){
     +'<div class="fig"><b class="num">'+dur(sum(p=>(p.stats||{}).playTime))+'</b><span>total time in the house</span></div>'
     +'<div class="fig"><b class="num">'+players.filter(p=>ms(p.createdAt)>week).length+'</b><span>joined this week</span></div>'
     +'</section>';
+  /* ---- guest accounts: one entry for all of them ---- */
+  const og=(f)=>oldGuests.reduce((a,p)=>a+(f(p)||0),0);
+  const gSecs=guestTotal.seconds+og(p=>(p.stats||{}).playTime),gAct=guestTotal.active+og(p=>(p.stats||{}).activeTime),gEsc=guestTotal.escapes+og(p=>p.escapes);
+  h+='<h3>Guest accounts <small>every guest together \u00b7 guests are temporary and never on the leaderboards</small></h3>'
+    +'<section class="summary">'
+    +'<div class="fig"><b class="num">'+dur(gSecs)+'</b><span>total time played</span></div>'
+    +'<div class="fig"><b class="num">'+dur(gAct)+'</b><span>active time</span></div>'
+    +'<div class="fig"><b class="num">'+gEsc+'</b><span>total escapes</span></div>'
+    +'</section>'
+    +(oldGuests.length?'<p class="empty">'+plural(oldGuests.length,'old guest record')+' from before guests became temporary '+(oldGuests.length===1?'is':'are')+' counted above. '
+      +'<button class="mini" id="mergeGuests">Merge into Guest accounts and delete them</button></p>':'');
   h+='<h3><span class="pulse"></span>In the house now <small>'+live.length+' playing</small></h3>';
   h+=live.length?'<div class="live">'+live.map(liveCard).join('')+'</div>'
     :'<p class="empty">No one is in the house right now.</p>';
   /* ---- leaderboard ---- */
-  h+='<h3>Leaderboard <small>every escape, fastest first · '+board.length+' shown</small> <button class="mini" id="reimport">Re-import past escapes</button></h3>';
-  h+=board.length?'<ol class="board">'+board.map((r,i)=>'<li'+(i<3?' class="top"':'')+'>'
+  const shown=board.filter(r=>boardDiff==='all'||diffOf(r)===boardDiff);
+  h+='<h3>Leaderboard <small>every escape, fastest first · '+shown.length+' shown</small> '
+    +'<select id="bdiff" class="mini">'+[['all','All difficulties']].concat(DIFF_KEYS.map(k=>[k,DIFF_NAME[k]])).map(([k,t])=>'<option value="'+k+'"'+(k===boardDiff?' selected':'')+'>'+t+'</option>').join('')+'</select> '
+    +'<button class="mini" id="reimport">Re-import past escapes</button></h3>';
+  h+=shown.length?'<ol class="board">'+shown.map((r,i)=>'<li'+(i<3?' class="top"':'')+'>'
       +'<span class="bk num">'+(i+1)+'</span>'
       +'<button class="bname" data-uid="'+esc(r.uid)+'">'+esc(r.name)+'</button>'
-      +'<span class="bleg">'+(r.team?'Co-op · ':'')+(r.legend?'<i style="background:'+legendColour(r.legend)+'"></i>'+esc(legendName(r.legend)):(r.team?'':'Unknown legend'))+'</span>'
+      +'<span class="bleg">'+DIFF_NAME[diffOf(r)]+' · '+(r.team?'Co-op · ':'')+(r.legend?'<i style="background:'+legendColour(r.legend)+'"></i>'+esc(legendName(r.legend)):(r.team?'':'Unknown legend'))+'</span>'
       +'<span class="bd">'+(r.deaths||0)+(r.deaths===1?' death':' deaths')+'</span>'
       +'<span class="bt num">'+clock(r.time)+'</span>'
       +'<span class="bw">'+esc(ago(ms(r.at)))+'</span>'
@@ -495,6 +555,8 @@ function render(){
   app.querySelectorAll('.board .bname').forEach(b=>b.onclick=()=>{if(players.some(p=>p.uid===b.dataset.uid))openDrawer(b.dataset.uid);});
   app.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>removeFromBoard(b.dataset.rm,false));
   app.querySelectorAll('[data-ban]').forEach(b=>b.onclick=()=>removeFromBoard(b.dataset.ban,true));
+  const bd=document.getElementById('bdiff');if(bd)bd.onchange=()=>{boardDiff=bd.value;render();};
+  const mg=document.getElementById('mergeGuests');if(mg)mg.onclick=mergeOldGuests;
   const ri=document.getElementById('reimport');
   if(ri)ri.onclick=async()=>{ri.disabled=true;ri.textContent='Importing\u2026';await migrateBoard(auth.currentUser.uid,true);const pn=await seedPlaytime();notice(pn?'Added '+pn+' players to Most Time Played':'Most Time Played is up to date');ri.disabled=false;ri.textContent='Re-import past escapes';};
   app.querySelectorAll('[data-ptrm]').forEach(b=>b.onclick=()=>removeFromPT(b.dataset.ptrm,false));
@@ -648,7 +710,7 @@ async function postToLeaderboard(uid){
   if(!st.bestTime){alert('Player has no best time set. Set one in the form and save first.');return;}
   try{
     await F.addDoc(F.collection(db,'escapes'),{
-      uid,
+      uid,diff:'normal',
       name:String(p.name||'Unnamed').slice(0,40),
       time:st.bestTime,
       legend:String(p.main||'').slice(0,40),

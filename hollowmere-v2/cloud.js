@@ -34,7 +34,11 @@ export async function init(onUser) {
   return true;
 }
 
+/* accounts stay signed in on this device. (Co-op guests are signed in for the tab only — see
+   multiplayer.js — so a real sign-in switches this back to "remember me" first.) */
+const keepSignedIn = () => A.setPersistence(auth, A.browserLocalPersistence).catch(() => {});
 export async function signInGoogle() {
+  await keepSignedIn();
   const provider = new A.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   try { await A.signInWithPopup(auth, provider); }
@@ -44,8 +48,9 @@ export async function signInGoogle() {
     throw e;
   }
 }
-export function signInEmail(email, password) { return A.signInWithEmailAndPassword(auth, email, password); }
+export async function signInEmail(email, password) { await keepSignedIn(); return A.signInWithEmailAndPassword(auth, email, password); }
 export async function signUpEmail(name, email, password) {
+  await keepSignedIn();
   const cred = await A.createUserWithEmailAndPassword(auth, email, password);
   if (name) await A.updateProfile(cred.user, { displayName: name.slice(0, 40) });
   return toUser(cred.user);
@@ -105,10 +110,56 @@ export async function findEscape(uid, nightTime) {
   return snap.docs.map(d => d.data()).find(r => r.result === 'escape') || null;
 }
 
+/* ---------- USERNAMES: usernames/{key} { uid, name, at } ----------
+   One per account, unique across all accounts. The key is the name lower-cased with only
+   letters and digits kept, so "KP", "kp" and "K.P" are the same name. firestore.rules only
+   let a key be created once, which is what makes a name unique. */
+export const usernameKey = n => String(n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export const USERNAME_RE = /^[A-Za-z0-9 _.-]{2,24}$/;
+/* '' if the name is acceptable, otherwise what is wrong with it */
+export function usernameProblem(n) {
+  n = String(n || '');
+  if (!USERNAME_RE.test(n)) return 'Use 2\u201324 letters, numbers, spaces, dots, dashes or underscores.';
+  if (usernameKey(n).length < 2) return 'Use at least 2 letters or numbers.';
+  return '';
+}
+/* the best valid username that can be made from any text (never guaranteed to be free) */
+export function cleanUsername(n) {
+  return String(n || '').replace(/[^A-Za-z0-9 _.-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24).trim();
+}
+/* { uid, name } of whoever holds this username, or null if it is free */
+export async function usernameOwner(name) {
+  const key = usernameKey(name);
+  if (!key) return null;
+  const snap = await F.getDoc(F.doc(db, 'usernames', key));
+  return snap.exists() ? snap.data() : null;
+}
+/* claim `name` for uid. oldName (only if it is this uid's own claim) is released in the same write. */
+export function claimUsername(uid, name, oldName) {
+  const key = usernameKey(name), oldKey = usernameKey(oldName);
+  const b = F.writeBatch(db);
+  b.set(F.doc(db, 'usernames', key), { uid, name, at: F.serverTimestamp() });
+  if (oldKey && oldKey !== key) b.delete(F.doc(db, 'usernames', oldKey));
+  return b.commit();
+}
+/* after a username change, the player's own solo escapes carry the new name */
+export async function renameEscapes(uid, name) {
+  const snap = await F.getDocs(F.query(F.collection(db, 'escapes'), F.where('uid', '==', uid), F.where('team', '==', false)));
+  const todo = snap.docs.filter(d => d.data().name !== name);
+  for (let i = 0; i < todo.length; i += 400) {
+    const b = F.writeBatch(db);
+    todo.slice(i, i + 400).forEach(d => b.update(d.ref, { name }));
+    await b.commit();
+  }
+}
+
 /* ---------- ESCAPES: escapes/{id}, one public document for EVERY escape ----------
    { uid, name, time (seconds, 0.1 s), legend, deaths, embers, team, at }
    Solo escapes get a random id. A co-op night uses a fixed id (mp_ROOM_GO) so the
    team appears once: the first teammate out creates it, the rules refuse the rest. */
+export const DIFFS = ['easy', 'normal', 'hard', 'nightmare'];
+/* entries posted before difficulty levels existed were all played at Normal */
+export const diffOf = r => (r && DIFFS.indexOf(r.diff) >= 0) ? r.diff : 'normal';
 export const authUid = () => (auth && auth.currentUser) ? auth.currentUser.uid : null;
 function escapeDoc(uid, e) {
   return {
@@ -119,6 +170,7 @@ function escapeDoc(uid, e) {
     deaths: Math.max(0, Math.floor(e.deaths || 0)),
     embers: Math.max(0, Math.min(40, Math.floor(e.embers || 0))),
     team: !!e.team,
+    diff: DIFFS.indexOf(e.diff) >= 0 ? e.diff : 'normal',
     at: F.serverTimestamp()
   };
 }
@@ -131,11 +183,14 @@ export async function loadEscape(id) {
   const snap = await F.getDoc(F.doc(db, 'escapes', id));
   return snap.exists() ? snap.data() : null;
 }
-export async function loadEscapes(n) {
-  const snap = await F.getDocs(F.query(F.collection(db, 'escapes'), F.orderBy('time'), F.limit(n)));
+/* one difficulty's board (fastest first). Filtered here rather than in the query, so old entries
+   with no difficulty count as Normal and no extra Firestore index is needed. */
+export async function loadEscapes(n, diff) {
+  const snap = await F.getDocs(F.query(F.collection(db, 'escapes'), F.orderBy('time'), F.limit(Math.max(2000, n))));
   const ms = v => (v && typeof v.toMillis === 'function') ? v.toMillis() : 0;
   return snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
-    .sort((a, b) => a.time - b.time || ms(a.at) - ms(b.at));
+    .filter(r => !diff || diffOf(r) === diff)
+    .sort((a, b) => a.time - b.time || ms(a.at) - ms(b.at)).slice(0, n);
 }
 export async function escapeRank(time) {
   const snap = await F.getCountFromServer(F.query(F.collection(db, 'escapes'), F.where('time', '<', time)));
@@ -166,6 +221,60 @@ export async function playtimeRank(seconds) {
   return snap.data().count + 1;
 }
 
+/* ---------- FRIENDS ----------
+   friendReqs/{toUid}_{fromUid}  { from, fromName, to, toName, at }   a request waiting for an answer
+   friends/{uid}/list/{friendUid} { name, since }                     each side keeps its own list
+   Accepting writes BOTH lists and removes the request in one batch; firestore.rules only allow a
+   list entry when a matching request exists. Either friend can end the friendship. */
+const reqId = (to, from) => to + '_' + from;
+export function sendFriendRequest(me, myName, to, toName) {
+  return F.setDoc(F.doc(db, 'friendReqs', reqId(to, me)), { from: me, fromName: myName, to, toName, at: F.serverTimestamp() });
+}
+export function cancelFriendRequest(to, from) { return F.deleteDoc(F.doc(db, 'friendReqs', reqId(to, from))); }
+/* answer a request sent TO me */
+export function answerFriendRequest(me, myName, req, accept) {
+  const b = F.writeBatch(db);
+  if (accept) {
+    b.set(F.doc(db, 'friends', me, 'list', req.from), { name: req.fromName, since: F.serverTimestamp() });
+    b.set(F.doc(db, 'friends', req.from, 'list', me), { name: myName, since: F.serverTimestamp() });
+  }
+  b.delete(F.doc(db, 'friendReqs', reqId(me, req.from)));
+  return b.commit();
+}
+export function removeFriend(me, fid) {
+  const b = F.writeBatch(db);
+  b.delete(F.doc(db, 'friends', me, 'list', fid));
+  b.delete(F.doc(db, 'friends', fid, 'list', me));
+  return b.commit();
+}
+/* after a username change: my name in each friend's list */
+export async function renameInFriends(me, name, fids) {
+  for (const f of fids) { try { await F.updateDoc(F.doc(db, 'friends', f, 'list', me), { name }); } catch (e) {} }
+}
+/* live lists; each callback gets an array. Returns an unsubscribe function. */
+export function watchFriends(me, cbFriends, cbIn, cbOut) {
+  const u1 = F.onSnapshot(F.collection(db, 'friends', me, 'list'),
+    s => cbFriends(s.docs.map(d => Object.assign({ uid: d.id }, d.data()))), e => console.warn('Friends read failed:', e));
+  const u2 = F.onSnapshot(F.query(F.collection(db, 'friendReqs'), F.where('to', '==', me)),
+    s => cbIn(s.docs.map(d => d.data())), e => console.warn('Requests read failed:', e));
+  const u3 = F.onSnapshot(F.query(F.collection(db, 'friendReqs'), F.where('from', '==', me)),
+    s => cbOut(s.docs.map(d => d.data())), e => console.warn('Requests read failed:', e));
+  return () => { u1(); u2(); u3(); };
+}
+
+/* ---------- GUEST ACCOUNTS: guestStats/total { seconds, active, escapes, at } ----------
+   Guests are temporary and never get a record of their own, but everything they play is added to
+   this one running total, which only an admin can read. firestore.rules limit each write to
+   +120 s and +1 escape. */
+export function addGuestStats(seconds, active, escapes) {
+  return F.setDoc(F.doc(db, 'guestStats', 'total'), {
+    seconds: F.increment(Math.max(0, Math.floor(seconds))),
+    active: F.increment(Math.max(0, Math.floor(active))),
+    escapes: F.increment(Math.max(0, Math.floor(escapes))),
+    at: F.serverTimestamp()
+  }, { merge: true });
+}
+
 export function friendlyError(e) {
   const c = (e && e.code) || '';
   const map = {
@@ -182,6 +291,7 @@ export function friendlyError(e) {
     'auth/unauthorized-domain': "This website isn't authorised yet. In Firebase, add it under Authentication → Settings → Authorised domains.",
     'auth/operation-not-allowed': "This sign-in method is switched off. Enable it in Firebase under Authentication → Sign-in method.",
     'permission-denied': 'The database refused the save. Publish firestore.rules in the Firebase console.',
+    'already-exists': 'That username is already taken. Try another.',
     'unavailable': 'No connection to the database. Progress is kept on this device and will sync later.'
   };
   if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return '';

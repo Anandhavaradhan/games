@@ -65,6 +65,7 @@ import * as mp from './multiplayer.js';
 const card = document.getElementById('card');
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const qs = new URLSearchParams(location.search);
+let lobbyDiff = (() => { try { const d = localStorage.getItem('hollowmere_lobby_diff'); return ['easy','normal','hard','nightmare'].indexOf(d) >= 0 ? d : 'normal'; } catch (e) { return 'normal'; } })();
 let code = '', room = null, unsub = null, msg = '', msgOk = false, busy = false, leaving = false, launched = false;
 
 function shell(html) { card.innerHTML = html; }
@@ -74,8 +75,15 @@ function setMsg(t, ok) { msg = t || ''; msgOk = !!ok; const e = document.getElem
 function viewMenu() {
   shell(`
     <p class="note">Friends share one manor. The house grows a floor for every soul that joins, and each soul brings a hunter of its own.</p>
-    <label>YOUR NAME</label>
+    ${mp.me.account
+      ? `<label>YOUR USERNAME</label>
+    <input id="name" maxlength="24" value="${esc(mp.me.name)}" readonly style="opacity:.75">
+    <p class="note small">This is your account username. It is the name on the leaderboard. Change it from the Account button on the title screen.</p>`
+      : `<label>${mp.me.signedIn ? 'GUEST NAME' : 'YOUR NAME (GUEST)'}</label>
     <input id="name" maxlength="24" autocomplete="nickname" value="${esc(mp.me.name)}">
+    <p class="note small">${mp.me.signedIn
+      ? 'You are signed in but have not chosen a username yet. Open Account on the title screen to pick one, so your name appears on the leaderboard.'
+      : 'You are a guest. Guests are temporary \u2014 your name lasts only while this tab is open \u2014 and guests never appear on the leaderboard. Sign in on the title screen to play under your own unique username.'}</p>`}
     <button class="primary" id="create">Make a room</button>
     <div class="or">— OR —</div>
     <label>ROOM CODE</label>
@@ -83,7 +91,7 @@ function viewMenu() {
     <button id="join">Join</button>
     <div class="err" id="msg"></div>`);
   const name = document.getElementById('name'), codeIn = document.getElementById('code');
-  const useName = () => { const n = name.value.trim(); if (n) mp.saveName(n); return mp.me.name; };
+  const useName = () => { if (!mp.me.account) { const n = name.value.trim(); if (n) mp.saveName(n); } return mp.me.name; };
   document.getElementById('create').onclick = () => go(async () => { useName(); code = await mp.createRoom(); enterLobby(); });
   document.getElementById('join').onclick = () => go(async () => { useName(); code = await mp.joinRoom(codeIn.value); enterLobby(); });
   codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('join').click(); });
@@ -114,7 +122,12 @@ function viewLobby() {
     <ul>${players.map(p => `<li><i class="dot"></i><span>${esc(p.name)}${p.uid === mp.me.uid ? ' (you)' : ''}</span>${p.uid === room.meta.host ? '<span class="tag">HOST</span>' : ''}</li>`).join('')}</ul>
     <div class="size"><b>${n}</b> ${n === 1 ? 'soul' : 'souls'} → a manor of <b>${mp.floorsFor(n)}</b> floors, <b>${n}</b> ${n === 1 ? 'hunter' : 'hunters'}, <b>${mp.floorsFor(n) * 2}</b> embers to gather.<br>
       <span style="font-size:13px;color:#6f6a5c">Up to ${mp.MAX_PLAYERS} players. Late arrivals can't join once the night begins.</span></div>
-    ${amHost ? '<button class="primary" id="start">Begin the night</button>' : '<p class="note small" style="text-align:center">Waiting for the host to begin…</p>'}
+    ${amHost ? `<label>DIFFICULTY</label>
+    <select id="diff" style="width:100%;padding:10px;margin-bottom:10px;background:#0d0d12;color:#e5dcc2;border:1px solid rgba(160,150,130,.3);font-size:16px">
+      ${[['easy','Easy — slower, half-blind'],['normal','Normal'],['hard','Hard — quicker, sharper ears'],['nightmare','Nightmare — the fastest, sharpest hunter']].map(([k,t]) => `<option value="${k}"${k === lobbyDiff ? ' selected' : ''}>${t}</option>`).join('')}
+    </select>
+    <p class="note small">Each difficulty has its own leaderboard. Co-op never has jumpscares.</p>
+    <button class="primary" id="start">Begin the night</button>` : '<p class="note small" style="text-align:center">Waiting for the host to choose the difficulty and begin…</p>'}
     <button id="leave">Leave room</button>
     <div class="err" id="msg"></div>`);
   document.getElementById('copy').onclick = async () => {
@@ -122,10 +135,12 @@ function viewLobby() {
     catch (e) { setMsg(link, true); }
   };
   document.getElementById('leave').onclick = leave;
+  const dsel = document.getElementById('diff');
+  if (dsel) dsel.onchange = () => { lobbyDiff = dsel.value; try { localStorage.setItem('hollowmere_lobby_diff', lobbyDiff); } catch (e) {} };
   const st = document.getElementById('start');
   if (st) st.onclick = async () => {
     st.disabled = true; setMsg('');
-    try { await mp.startRoom(code); } catch (e) { console.warn(e); st.disabled = false; setMsg(mp.friendlyError(e)); }
+    try { await mp.startRoom(code, lobbyDiff); } catch (e) { console.warn(e); st.disabled = false; setMsg(mp.friendlyError(e)); }
   };
   setMsg(msg, msgOk);
 }
