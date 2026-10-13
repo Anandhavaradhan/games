@@ -17,6 +17,33 @@
 import { firebaseConfig } from './firebase-config.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0/';
+/* Some phones / browsers block this site's storage ("Access is denied for this document").
+   Firebase normally keeps the sign-in in storage and crashes with auth/internal-error when it
+   can't, so we only hand it the kinds of storage that actually work here, and fall back to
+   keeping the sign-in in memory (it then lasts until the page is closed or reloaded). */
+export function storageOk(name) {
+  try { const s = window[name]; const k = '__hm_t'; s.setItem(k, '1'); s.removeItem(k); return true; }
+  catch (e) { return false; }
+}
+function idbOk() { try { return !!window.indexedDB; } catch (e) { return false; } }
+function makeAuth(A, app) {
+  const p = [];
+  if (idbOk() && storageOk('localStorage')) p.push(A.indexedDBLocalPersistence);
+  if (storageOk('localStorage')) p.push(A.browserLocalPersistence);
+  if (storageOk('sessionStorage')) p.push(A.browserSessionPersistence);
+  p.push(A.inMemoryPersistence);
+  try { return A.initializeAuth(app, { persistence: p, popupRedirectResolver: A.browserPopupRedirectResolver }); }
+  catch (e) { return A.getAuth(app); }   /* already set up by the other module on this page */
+}
+const STORAGE_MSG = 'Your browser is blocking this site from saving data, so sign-in can\u2019t work. ' +
+  'Allow cookies and site data for anandhavaradhan.github.io (Chrome: tap the icon left of the address \u2192 ' +
+  'Cookies and site data / Site settings \u2192 Allow), turn off Incognito or "block all cookies", ' +
+  'or open the game in Chrome itself instead of inside another app. Then reload.';
+function storageBlocked(e) {
+  const m = (e && e.message) || '';
+  return /localStorage|sessionStorage|indexedDB|Access is denied/i.test(m) || (!storageOk('localStorage') && !storageOk('sessionStorage') && (e && e.code) === 'auth/internal-error');
+}
+
 export const MAX_PLAYERS = 8;
 export const configured = !!(firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.databaseURL);
 
@@ -91,14 +118,14 @@ export async function init() {
     import(SDK + 'firebase-app.js'), import(SDK + 'firebase-auth.js'), import(SDK + 'firebase-database.js')]);
   A = authMod; D = dbMod;
   const app = appMod.getApps().length ? appMod.getApp() : appMod.initializeApp(firebaseConfig);
-  auth = A.getAuth(app);
+  auth = makeAuth(A, app);
   db = D.getDatabase(app, firebaseConfig.databaseURL);
   if (auth.authStateReady) await auth.authStateReady();
   /* signed-in players keep their account. Everyone else is a GUEST: a temporary anonymous id that
      lasts only while this tab is open (it survives the move from the lobby to the night, and
      nothing longer). Guests never get a record of their own. */
   if (!auth.currentUser) {
-    try { await A.setPersistence(auth, A.browserSessionPersistence); } catch (e) {}
+    if (storageOk('sessionStorage')) { try { await A.setPersistence(auth, A.browserSessionPersistence); } catch (e) {} }
     await A.signInAnonymously(auth);
   }
   const u = auth.currentUser;
@@ -264,6 +291,7 @@ export async function leaveGame(code) {
 
 export function friendlyError(e) {
   const c = (e && e.code) || '', m = (e && e.message) || '';
+  if (storageBlocked(e)) return STORAGE_MSG;
   if (m === 'NOT_CONFIGURED') return 'Co-op is not switched on yet: add the Realtime Database URL to firebase-config.js (see MULTIPLAYER.md).';
   if (c === 'auth/operation-not-allowed' || c === 'auth/admin-restricted-operation')
     return 'Turn on Anonymous sign-in in Firebase (Authentication → Sign-in method) so friends can join without an account.';

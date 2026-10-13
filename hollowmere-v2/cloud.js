@@ -7,6 +7,33 @@
 import { firebaseConfig } from './firebase-config.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0/';
+/* Some phones / browsers block this site's storage ("Access is denied for this document").
+   Firebase normally keeps the sign-in in storage and crashes with auth/internal-error when it
+   can't, so we only hand it the kinds of storage that actually work here, and fall back to
+   keeping the sign-in in memory (it then lasts until the page is closed or reloaded). */
+export function storageOk(name) {
+  try { const s = window[name]; const k = '__hm_t'; s.setItem(k, '1'); s.removeItem(k); return true; }
+  catch (e) { return false; }
+}
+function idbOk() { try { return !!window.indexedDB; } catch (e) { return false; } }
+function makeAuth(A, app) {
+  const p = [];
+  if (idbOk() && storageOk('localStorage')) p.push(A.indexedDBLocalPersistence);
+  if (storageOk('localStorage')) p.push(A.browserLocalPersistence);
+  if (storageOk('sessionStorage')) p.push(A.browserSessionPersistence);
+  p.push(A.inMemoryPersistence);
+  try { return A.initializeAuth(app, { persistence: p, popupRedirectResolver: A.browserPopupRedirectResolver }); }
+  catch (e) { return A.getAuth(app); }   /* already set up by the other module on this page */
+}
+const STORAGE_MSG = 'Your browser is blocking this site from saving data, so sign-in can\u2019t work. ' +
+  'Allow cookies and site data for anandhavaradhan.github.io (Chrome: tap the icon left of the address \u2192 ' +
+  'Cookies and site data / Site settings \u2192 Allow), turn off Incognito or "block all cookies", ' +
+  'or open the game in Chrome itself instead of inside another app. Then reload.';
+function storageBlocked(e) {
+  const m = (e && e.message) || '';
+  return /localStorage|sessionStorage|indexedDB|Access is denied/i.test(m) || (!storageOk('localStorage') && !storageOk('sessionStorage') && (e && e.code) === 'auth/internal-error');
+}
+
 export const configured = !!(firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId);
 
 let auth = null, db = null, A = null, F = null;
@@ -28,7 +55,7 @@ export async function init(onUser) {
   ]);
   A = authMod; F = fsMod;
   const app = appMod.initializeApp(firebaseConfig);
-  auth = A.getAuth(app);
+  auth = makeAuth(A, app);
   db = F.getFirestore(app);
   A.onAuthStateChanged(auth, u => onUser(toUser(u)));
   return true;
@@ -36,7 +63,10 @@ export async function init(onUser) {
 
 /* accounts stay signed in on this device. (Co-op guests are signed in for the tab only — see
    multiplayer.js — so a real sign-in switches this back to "remember me" first.) */
-const keepSignedIn = () => A.setPersistence(auth, A.browserLocalPersistence).catch(() => {});
+const keepSignedIn = async () => {
+  if (!storageOk('localStorage')) return;   /* blocked: stay with what works (memory / tab) */
+  try { await A.setPersistence(auth, A.browserLocalPersistence); } catch (e) {}
+};
 export async function signInGoogle() {
   await keepSignedIn();
   const provider = new A.GoogleAuthProvider();
@@ -282,6 +312,7 @@ export async function isAdmin(uid) {
 
 export function friendlyError(e) {
   const c = (e && e.code) || '';
+  if (storageBlocked(e)) return STORAGE_MSG;
   const map = {
     'auth/invalid-credential': "That email and password don't match an account.",
     'auth/wrong-password': "That email and password don't match an account.",

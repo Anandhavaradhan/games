@@ -96,6 +96,7 @@ function viewMenu() {
   document.getElementById('join').onclick = () => go(async () => { useName(); code = await mp.joinRoom(codeIn.value); enterLobby(); });
   codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('join').click(); });
   codeIn.addEventListener('input', () => { codeIn.value = mp.normCode(codeIn.value); });
+  if (!msg && !mp.storageOk('sessionStorage')) msg = 'Heads up: this browser is blocking site data, so you may drop out when the night starts. Allow cookies and site data for this site (tap the icon left of the address), then reload.';
   setMsg(msg, msgOk);
   if (qs.get('join')) setTimeout(() => codeIn.focus(), 50);
 }
