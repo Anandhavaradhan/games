@@ -275,6 +275,11 @@ export function addGuestStats(seconds, active, escapes) {
   }, { merge: true });
 }
 
+/* true when this account is listed in admins/{uid} (only the account itself can read that) */
+export async function isAdmin(uid) {
+  try { return (await F.getDoc(F.doc(db, 'admins', uid))).exists(); } catch (e) { return false; }
+}
+
 export function friendlyError(e) {
   const c = (e && e.code) || '';
   const map = {

@@ -1296,8 +1296,23 @@ function cleanSave(raw,isLocal){
 let save=cleanSave(readLocal(LS_KEY),true);
 function saveNow(){try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
 saveNow();
-const isUnlocked=id=>save.unlocked.indexOf(id)>=0;
-const curLegend=()=>BYID[save.main]||ROSTER[0];
+const isUnlocked=id=>id==='god'?GOD.ok:save.unlocked.indexOf(id)>=0;
+const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id);
+/* An account-only legend. It is added to the vault only once the database confirms this account is an
+   admin (admins/{uid}, which only that account can read), so nobody else ever sees it. Choosing it does
+   not change save.main; everyone else — co-op, the watch page, the leaderboards, the run history —
+   sees the legend it is dressed as (pub). */
+const GOD={on:false,ok:false,uid:'',c:null};
+function godBuild(){
+  const b=BYID.bountyhunter,parts=['legionary','bountyhunter','archer','berserker'].map(id=>BYID[id].ab);
+  return {id:'god',n:'GOD',e:'Keeper of the House',c:'ADMIN',tier:4,pw:100,r:b.r,t:b.t,look:b.look,st:[100,100,100,100],pub:b.id,
+    l:'Only the keeper of Hollowmere walks as this.',
+    ab:{n:'EVERY HAND AT ONCE',k:'multi',cd:35,cost:30,parts,
+      p:'Testudo, Dead or Alive, Unerring Arrow and The Red Hours \u2014 all at once.',
+      d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and nine seconds of near-double speed.'}};}
+const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
+/* the legend everyone else sees you as */
+const pubLegend=()=>curLegend().pub||curLegend().id;
 
 /* ---------------- LEAGUE PROGRESSION ----------------
    A tier stays shut until every ghost in the tier before
@@ -1357,6 +1372,7 @@ const ROLES=['CONTROL','ESCAPE','STEALTH','INSIGHT','SUPPORT'];
 function abLasts(a){
   switch(a.k){
     case'ward':  return a.n2+(a.n2>1?' grabs':' grab');
+    case'multi': return a.parts.map(abLasts).filter(x=>x!=='instant').join(' \u00b7 ');
     case'reveal':return a.t<0?'all night':a.t+'s';
     case'stun':  return (a.t+(a.slow||0))+'s';
     case'slow':  return (a.t+(a.stun||0))+'s';
@@ -2833,6 +2849,7 @@ function disposeLegend(gh){
   try{gh.mat.dispose();gh.coreMat.dispose();}catch(e){}
 }
 function setLegend(id){
+  if(id==='god'){setGod(true);return;}
   if(!BYID[id])return;
   save.main=id;saveNow();
   const c=BYID[id];
@@ -2845,6 +2862,40 @@ function setLegend(id){
   computePS(c);
   AB.cd=0;AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
+}
+/* the account-only legend: switch it on or off (remembered on this device for this account) */
+function godSave(){try{if(GOD.uid)localStorage.setItem('hm_gd:'+GOD.uid,GOD.on?'1':'0');}catch(e){}}
+function setGod(on,quiet){
+  if(on&&!GOD.ok)return;
+  GOD.on=!!on;godSave();
+  if(quiet)return;
+  const c=curLegend();
+  const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
+  disposeLegend(ghost);ghost=buildLegend(c);ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
+  ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
+  computePS(c);AB.cd=0;AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));
+  if(typeof refreshLegendHUD==='function')refreshLegendHUD();
+}
+async function godCheck(){
+  if(!cloud||!cloudUser||cloudUser.anon||!cloud.isAdmin)return;
+  const uid=cloudUser.uid;
+  if(!(await cloud.isAdmin(uid))||!cloudUser||cloudUser.uid!==uid)return;
+  GOD.uid=uid;GOD.ok=true;
+  if(!GOD.c)GOD.c=godBuild();
+  if(!BYID.god){ROSTER.push(GOD.c);ORDER.unshift(GOD.c);BYID.god=GOD.c;ORD.god=ROSTER.length;}
+  let was=false;try{was=localStorage.getItem('hm_gd:'+uid)==='1';}catch(e){}
+  if(was&&state!=='play'&&state!=='caught')setGod(true);
+  if(vaultOpen)renderVault();
+}
+function godDisable(){
+  if(!GOD.ok&&!BYID.god)return;
+  const wasOn=GOD.on;
+  GOD.ok=false;GOD.on=false;GOD.uid='';
+  const i=ROSTER.indexOf(GOD.c);if(i>=0)ROSTER.splice(i,1);
+  const j=ORDER.indexOf(GOD.c);if(j>=0)ORDER.splice(j,1);
+  delete BYID.god;delete ORD.god;
+  if(typeof vSel==='number'&&vSel>=ROSTER.length)vSel=0;
+  if(wasOn)setGod(false);
 }
 
 /* ================= ENTITIES ================= */
@@ -4014,6 +4065,12 @@ function tryPower(){
   if(AB.cd>0){toast(a.n+' \u2014 '+Math.ceil(AB.cd)+'S',1.3);return;}
   if(P.ess<a.cost){toast('NOT ENOUGH ESSENCE',1.6);return;}
   if(a.k==='breach'&&!findBreach()){toast('NO WALL WITHIN REACH',2);return;}
+  if(a.k==='multi'){
+    P.ess-=a.cost;AB.cd=AB.cdMax;AB.used++;
+    a.parts.forEach(pa=>{if(pa.k==='pull')pullEmber(pa.scope);else{fireAbility(c,pa);if(MP)mpPower(pa);}});
+    SFX.chime();toast(a.n,2.4);
+    return;
+  }
   if(a.k==='pull'){
     if(!pullEmber(a.scope))return;
     P.ess-=a.cost;AB.cd=AB.cdMax;AB.used++;SFX.chime();toast(a.n,2.2);
@@ -4233,6 +4290,7 @@ function abActive(){
     case'trap':     return TRAP.t;
     case'dark':     return DARK.t;
     case'foresight':return AB.foreT;
+    case'multi':    return Math.max(AB.hasteT,AB.loudT);   /* the speed is the part with a clock */
   }
   return 0;
 }
@@ -4307,7 +4365,7 @@ function openVault(){
   if(vaultOpen)return;
   vaultOpen=true;
   if(settingsOpen)closeSettings();
-  vSel=Math.max(0,ROSTER.findIndex(c=>c.id===save.main));
+  vSel=Math.max(0,ROSTER.findIndex(c=>isBound(c.id)));
   vFilter='ALL';
   $('vaultOv').classList.remove('sheet');
   renderVault();
@@ -4363,14 +4421,14 @@ function renderVault(){
     const i=ROSTER.indexOf(c),un=isUnlocked(c.id),cost=TIER_COST[c.tier],open=tierOpen(c.tier);
     const cls=['vcard'];
     if(i===vSel)cls.push('on');
-    if(save.main===c.id)cls.push('bound');
+    if(isBound(c.id))cls.push('bound');
     if(!un)cls.push('sealed',!open?'locked':(save.ether>=cost?'afford':'poor'));
     return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-i="'+i+'" style="--vt:'+c.t+'">'
-      +'<div class="vc-top"><span>'+pad2(ORD[c.id])+'</span><span class="vc-tier">TIER '+TIER_NAME[c.tier]+'</span></div>'
+      +'<div class="vc-top"><span>'+(c.id==='god'?'\u2726':pad2(ORD[c.id]))+'</span><span class="vc-tier">TIER '+TIER_NAME[c.tier]+'</span></div>'
       +'<div class="vc-name">'+c.n.replace(/^THE /,'')+'</div>'
       +'<div class="vc-role">'+c.r+'</div>'
       +'<div class="vc-foot">'
-        +(un?'<span class="vc-state">'+(save.main===c.id?'BOUND':'READY')+'</span>'
+        +(un?'<span class="vc-state">'+(isBound(c.id)?'BOUND':'READY')+'</span>'
           :!open?'<span class="vc-cost lock">LOCKED</span><span class="vc-state">SEALED</span>'
             :'<span class="vc-cost">'+(cost?EG+' '+cost:'FREE')+'</span>'
              +'<span class="vc-state">SEALED</span>')
@@ -4399,8 +4457,8 @@ function renderVault(){
   });
   let act;
   if(un){
-    act='<button class="vbtn'+(save.main===c.id?' dim':'')+'" id="vSel"'+(save.main===c.id?' disabled':'')+'>'
-      +(save.main===c.id?'YOU HAUNT AS THIS GHOST':'HAUNT AS THIS GHOST')+'</button>';
+    act='<button class="vbtn'+(isBound(c.id)?' dim':'')+'" id="vSel"'+(isBound(c.id)?' disabled':'')+'>'
+      +(isBound(c.id)?'YOU HAUNT AS THIS GHOST':'HAUNT AS THIS GHOST')+'</button>';
   }else if(!tierOpen(c.tier)){
     const prev=tierCount(c.tier-1);
     act='<button class="vbtn dim" disabled>SEALED BY THE ORDER OF TIERS</button>'
@@ -4413,7 +4471,7 @@ function renderVault(){
         +' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   }
   $('vDossBody').innerHTML=
-     '<div class="vd-tag"><span>'+pad2(ORD[c.id])+' / 40</span><span>\u00b7</span>'
+     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':pad2(ORD[c.id]))+' / 40</span><span>\u00b7</span>'
       +'<b>'+c.r+'</b></div>'
     +'<div class="vd-note">'+ROLE_NOTE[c.r]+'</div>'
     +'<div class="vd-name">'+c.n+'</div>'
@@ -4440,7 +4498,8 @@ function renderVault(){
 
   const sel=$('vSel');
   if(sel)sel.addEventListener('click',function(e){e.stopPropagation();
-    setLegend(c.id);renderVault();toast(c.n+' \u2014 BOUND',2.4);});
+    if(c.id==='god')setGod(true);else{if(GOD.on)setGod(false,true);setLegend(c.id);}
+    renderVault();toast(c.n+' \u2014 BOUND',2.4);});
   const unl=$('vUnl');
   if(unl)unl.addEventListener('click',function(e){e.stopPropagation();
     if(!canBuy(c))return;
@@ -5495,7 +5554,7 @@ const escHTML=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 function liveNow(){
   const inNight=state==='play'||state==='caught'||state==='dead';
   return {active:inNight&&!document.hidden,state,floor:FLOOR_NAMES[P.floor]||'',embers:got,memories:shardsFound,
-    nightTime:Math.round(elapsed*10)/10,legend:save.main,deathsTonight:deaths,runEther:RUN.ether,diff:runDiff,
+    nightTime:Math.round(elapsed*10)/10,legend:pubLegend(),deathsTonight:deaths,runEther:RUN.ether,diff:runDiff,
     essence:Math.round(P.ess),hunted:state==='play'&&M.state==='chase'&&M.goneT<=0};
 }
 function cloudPush(create){
@@ -5514,7 +5573,7 @@ function cloudPush(create){
 function cloudSaveSoon(){if(!cloud||!cloudUser||cloudTimer)return;cloudTimer=setTimeout(()=>cloudPush(),2500);}
 function cloudLogRun(win){
   if(!cloud||!cloudUser)return;
-  cloud.logRun(cloudUser.uid,{result:win?'escape':'death',diff:runDiff,nightTime:Math.round(elapsed*10)/10,legend:save.main,
+  cloud.logRun(cloudUser.uid,{result:win?'escape':'death',diff:runDiff,nightTime:Math.round(elapsed*10)/10,legend:pubLegend(),
     embers:got,memories:shardsFound,ether:RUN.ether,deathsTonight:deaths,seen:!!RUN.spotted,floor:FLOOR_NAMES[P.floor]||''})
     .catch(e=>console.warn('Run log failed:',e));
   cloudPush();
@@ -5551,7 +5610,7 @@ async function applyUser(u){
     loadFailed=false;
     if(cloudUser){
       clearTimeout(cloudTimer);cloudTimer=null;
-      socialStop();cloudUser=null;saveKey=LS_KEY;ptReset();
+      socialStop();godDisable();cloudUser=null;saveKey=LS_KEY;ptReset();
       replaceSave(cleanSave(readLocal(LS_KEY),true));
       toast('SIGNED OUT \u2014 PLAYING AS A GUEST',2.6);
     }
@@ -5583,6 +5642,7 @@ async function applyUser(u){
   await ensureUsername();   /* every account has one unique username before it can post anywhere */
   ptLoad();      /* this player's entry on the most-time-played board */
   socialStart(); /* friends, and what they can see of you */
+  godCheck();
   toast((isNew?'ACCOUNT CREATED \u2014 ':'WELCOME BACK \u2014 ')+u.name.toUpperCase(),2.8);
   renderAcct();
 }
@@ -5813,7 +5873,7 @@ async function boardAfterEscape(nt,newBest){
   if(nt<BOARD_MIN_TIME)return;
   /* build the entry now, before any await, while deaths/got still describe this night */
   const dk=runDiff,dn=DIFFS[dk].n;
-  const entry={name:cloudUser.name,time:nt,legend:save.main,deaths:deaths,embers:got,team:false,diff:dk};
+  const entry={name:cloudUser.name,time:nt,legend:pubLegend(),deaths:deaths,embers:got,team:false,diff:dk};
   el.textContent='POSTING YOUR ESCAPE TO THE '+dn+' LEADERBOARD\u2026';
   try{
     await cloud.addEscape(cloudUser.uid,entry);
@@ -5846,7 +5906,7 @@ async function boardAfterTeamEscape(nt){
   if(!canPost()){el.textContent=needsUname()?'CHOOSE A USERNAME IN YOUR ACCOUNT TO PUT YOUR TEAM ON THE LEADERBOARD':'GUESTS ARE NOT SHOWN ON THE LEADERBOARD \u2014 SIGN IN TO APPEAR';return;}
   const uid=cloudUser.uid;
   const team=await teamBoardName(),id='mp_'+MP.code+'_'+mpGO;
-  const entry={name:team,time:nt,legend:save.main,deaths:deaths,embers:got,team:true,diff:runDiff};
+  const entry={name:team,time:nt,legend:pubLegend(),deaths:deaths,embers:got,team:true,diff:runDiff};
   try{
     let ex=null;try{ex=await cloud.loadEscape(id);}catch(e){}
     if(!ex){el.textContent=team.toUpperCase()+' — POSTING TO THE LEADERBOARD…';
@@ -6220,7 +6280,7 @@ function mpPublish(){
   const ph=state==='play'?1:(state==='caught'||state==='dead')?2:state==='win'?3:0;
   const fl=(P.hiding?1:0)|(P.veiling?2:0)|(P.dashing?4:0)|(P.moving?8:0)|(AB.invisT>0?16:0)|(AB.silentT>0?32:0);
   const nr=ph===1&&!(P.veiling||AB.invisT>0||AB.silentT>0)?((P.dashing&&P.moving)?PS.noiseB:(P.moving?PS.noise:0))*(AB.loudT>0?1.7:1):0;
-  const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:save.main};
+  const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:pubLegend()};
   if(ph===3)so.et=TEAM.myOut;   /* when I got out: the team's time is the latest of these */
   MP.net.publishState(MP.code,so).catch(()=>{});
   const st={patrol:0,investigate:1,search:2,chase:3}[M.state]||0;
@@ -6496,7 +6556,7 @@ function socialTick(now){
   REMOTE.forEach(r=>{if(r.ph===1&&r.lg)mates.push([q(r.ent.x),q(r.ent.y),q(r.ent.z),r.ent.floor,q(r.gy||r.yaw||0),r.lg,String(r.name).slice(0,24),
     (r.ent.hiding?1:0)|(r.ent.veiling?2:0)|(r.ent.dashing?4:0)|(r.ent.moving?8:0)]);});
   SOC.net.publishWatch(SOC.uid,{
-    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,mp:MP?MP.code:'',lg:save.main,n:cloudUser.name,
+    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,mp:MP?MP.code:'',lg:pubLegend(),n:cloudUser.name,
     p:[q(P.x),q(P.y),q(P.z),P.floor,q(ghostYaw),fl],
     m:[monRow(M)].concat(PUP.map(p=>monRow(p.M))),
     o:mates,
