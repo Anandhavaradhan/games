@@ -340,6 +340,32 @@ export function onWatch(uid, cbS, cbE) {
 }
 
 /* =========================================================
+   ROOM INVITES — ask a friend into your room without sharing the code.
+     invites/{toUid}/{fromUid}  { c: room code, n: sender's name, t }
+   database.rules.json only lets you invite someone who has YOU on their friend list
+   (friendsOf/{to}/{you}), and only the invited player can read or clear it.
+   An invite is ignored after INVITE_LIFE.
+   ========================================================= */
+export const INVITE_LIFE = 15 * 60 * 1000;
+export function sendInvite(to, code) {
+  return D.set(R('invites/' + to + '/' + me.uid), { c: normCode(code), n: String(me.name || '').slice(0, 40), t: D.serverTimestamp() });
+}
+export const clearInvite = (uid, from) => D.remove(R('invites/' + uid + '/' + from)).catch(() => {});
+/* cb([{ from, c, n, t }]) newest first, stale ones dropped. Returns an unsubscribe function. */
+export function onInvites(uid, cb) {
+  return D.onValue(R('invites/' + uid), s => {
+    const v = s.val() || {}, now = srvNow(), out = [];
+    Object.keys(v).forEach(from => { const x = v[from];
+      if (!x || !x.c) return;
+      if (now - (Number(x.t) || 0) > INVITE_LIFE) { clearInvite(uid, from); return; }
+      out.push({ from, c: x.c, n: x.n || 'A friend', t: Number(x.t) || 0 }); });
+    cb(out.sort((a, b) => b.t - a.t));
+  }, () => cb([]));
+}
+/* this player's friend uids (the mirror the game keeps in friendsOf/{uid}) */
+export function onFriendsOf(uid, cb) { return D.onValue(R('friendsOf/' + uid), s => cb(Object.keys(s.val() || {})), () => cb([])); }
+
+/* =========================================================
    VOICE CHAT signalling — co-op only.
    The voices themselves go straight between players' browsers (WebRTC); the database only carries
    the short "how do I reach you" messages needed to connect:

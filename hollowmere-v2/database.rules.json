@@ -65,6 +65,15 @@
         ".read": "auth != null && (auth.uid === $uid || root.child('friendsOf').child($uid).child(auth.uid).exists())",
         ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
       }
+    },
+    "invites": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": {
+          ".write": "auth != null && ((auth.uid === $from && auth.provider !== 'anonymous' && root.child('friendsOf').child($to).child($from).exists()) || (auth.uid === $to && !newData.exists()))",
+          ".validate": "newData.hasChildren(['c', 'n', 't']) && newData.child('c').isString() && newData.child('c').val().length <= 8 && newData.child('n').isString() && newData.child('n').val().length <= 40 && newData.child('t').val() === now"
+        }
+      }
     }
   }
 }
