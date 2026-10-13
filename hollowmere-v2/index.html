@@ -5129,9 +5129,11 @@ const RUN_TITLE_CSS="display:block;font-family:'Cormorant SC',serif;font-style:n
    A flat 20s every death. If every soul is down at once, the night starts over (mpWatchAllDead).
    SOLO: a death ends the night — the next click begins a brand-new night from zero. */
 let reviveAt=0;
-function reviveDelay(){return 20;}
+/* once any teammate is out of the house, a soul who is taken comes straight back */
+function teamOut(){if(!MP)return false;for(const r of REMOTE.values())if(r.ph===3)return true;return false;}
+function reviveDelay(){return teamOut()?0:20;}
 function riseOrRestart(){if(MP){if(canRise())respawn();}else fullReset();}
-function canRise(){return !MP||performance.now()>=reviveAt;}
+function canRise(){return !MP||teamOut()||performance.now()>=reviveAt;}
 function riseTick(){const el=$('risePrompt');if(!el)return;
   if(state!=='dead'||canRise()){el.textContent=MP?'TAP OR PRESS R TO RISE AGAIN':'TAP OR PRESS R TO BEGIN A NEW NIGHT';el.style.opacity='';return;}
   const s=Math.ceil((reviveAt-performance.now())/1000);
@@ -5139,7 +5141,8 @@ function riseTick(){const el=$('risePrompt');if(!el)return;
 setInterval(riseTick,200);
 function doDeath(){state='dead';deaths++;catcher=null;
   if(MP){reviveAt=performance.now()+reviveDelay()*1000;
-    const dn=$('deathNote');if(dn)dn.textContent='Your team keeps every ember. The Heart is rekindling you in the cellar \u2014 your friends are on their own until you rise.';}
+    const dn=$('deathNote');if(dn)dn.textContent=teamOut()?'A teammate is already out of the house \u2014 the Heart pulls you straight back.'
+      :'Your team keeps every ember. The Heart is rekindling you in the cellar \u2014 your friends are on their own until you rise.';}
   riseTick();
   try{if(document.pointerLockElement)document.exitPointerLock();}catch(e){}
   endRun(false);redEl.style.opacity=0.8;setScreenState();
@@ -6598,6 +6601,9 @@ function specTick(now){
   const mode=specMode();
   if(!mode){if(SPEC.on)specStop();SPEC.deadAt=0;return;}
   if(!SPEC.deadAt)SPEC.deadAt=now;
+  /* a teammate is out: rise by yourself, about a second after being taken */
+  if(mode==='dead'&&teamOut()&&now-SPEC.deadAt>900&&!vaultOpen){
+    SPEC.deadAt=0;respawn();toast('A TEAMMATE IS OUT \u2014 THE HEART PULLS YOU STRAIGHT BACK',2.6);return;}
   const back=()=>showOv(mode==='out'?winOv:deathOv);
   if(!SPEC.on){
     /* a moment on the death (or escape) screen first, then watch whoever is still in the house */
