@@ -87,9 +87,12 @@
   #godhud{display:none;position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:16;gap:8px;pointer-events:none}
   body.godp #godhud.show{display:flex}
   body.godp #abhud{display:none!important}
-  .gp{pointer-events:auto;cursor:pointer;width:128px;padding:6px 8px 7px;background:rgba(10,10,14,.62);border:1px solid rgba(255,207,138,.28);
+  .gp{position:relative;pointer-events:auto;cursor:pointer;width:128px;padding:6px 8px 7px;background:rgba(10,10,14,.62);border:1px solid rgba(255,207,138,.28);
     font-family:'Cormorant SC',serif;color:#cfc8b8;user-select:none;touch-action:none}
   .gp .gk{font-size:10px;letter-spacing:2px;color:#8f8874}
+  .gp .gc{position:absolute;top:4px;right:4px;width:20px;height:20px;border:1px solid rgba(207,200,184,.45);font-size:14px;line-height:18px;text-align:center;color:#ffcf8a;background:rgba(0,0,0,.35)}
+  .gp.pick .gc{border-color:rgba(255,207,138,.8)}
+  .gp:not(.pick){opacity:.72}
   .gp .gn{font-size:12px;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .gp .gb{height:5px;margin-top:5px;background:rgba(255,255,255,.08);position:relative}
   .gp .gb i{position:absolute;left:0;top:0;bottom:0;background:#ffcf8a}
@@ -1317,7 +1320,11 @@ const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id
    admin (admins/{uid}, which only that account can read), so nobody else ever sees it. Choosing it does
    not change save.main; everyone else — co-op, the watch page, the leaderboards, the run history —
    sees the legend it is dressed as (pub). */
-const GOD={on:false,ok:false,uid:'',c:null,st:[]};
+const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true]};
+/* which powers G / the power button fire together (the ticks on the boxes), remembered on this device */
+try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length===4)GOD.sel=v.map(Boolean);}catch(e){}
+function godToggle(i){GOD.sel[i]=!GOD.sel[i];try{localStorage.setItem('hm_gsel',JSON.stringify(GOD.sel));}catch(e){}
+  const n=GOD.c?GOD.c.ab.parts[i].n:'';toast((GOD.sel[i]?'\u2713 ':'\u2715 ')+n+(GOD.sel[i]?' \u2014 FIRES WITH THE OTHERS':' \u2014 LEFT OUT'),1.6);}
 const godActive=()=>GOD.on&&GOD.ok&&!!GOD.c;
 /* each of its powers has its own essence (refills by itself) and its own cooldown */
 const GOD_REGEN=3;   /* essence per second, per power */
@@ -1327,7 +1334,7 @@ function godBuild(){
   return {id:'god',n:'GOD',e:'Keeper of the House',c:'ADMIN',tier:4,pw:100,r:b.r,t:b.t,look:b.look,st:[100,100,100,100],pub:b.id,
     l:'Only the keeper of Hollowmere walks as this.',
     ab:{n:'EVERY HAND AT ONCE',k:'multi',cd:35,cost:30,parts,
-      p:'Testudo, Dead or Alive, Unerring Arrow and Horseborn \u2014 four powers, each with its own essence and cooldown. Keys 1\u20134 fire one; G fires every one that is ready.',
+      p:'Testudo, Dead or Alive, Unerring Arrow and Horseborn \u2014 four powers, each with its own essence and cooldown. Fire one (keys 1\u20134, or tap its box) or the ticked ones together (G or the power button). Tick or untick a box (its corner, or Alt + 1\u20134) to choose which go together.',
       d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once.'}};}
 const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
 /* the legend everyone else sees you as */
@@ -2938,8 +2945,10 @@ function godFire(i,quiet){
   return true;
 }
 function godFireAll(){
-  const n=curLegend().ab.parts.map((_,i)=>godFire(i,true)).filter(Boolean).length;
-  if(!n)toast('NONE OF YOUR POWERS ARE READY',1.6);
+  const parts=curLegend().ab.parts;
+  if(!GOD.sel.some(Boolean)){toast('NO POWERS TICKED \u2014 TICK A BOX TO FIRE IT WITH G',2);return;}
+  const n=parts.map((_,i)=>GOD.sel[i]?godFire(i,true):false).filter(Boolean).length;
+  if(!n)toast('NONE OF YOUR TICKED POWERS ARE READY',1.6);
 }
 /* four bars: each power's own essence, its cooldown, and whether it is working right now */
 function godHud(){
@@ -2947,14 +2956,18 @@ function godHud(){
   el.classList.toggle('show',state==='play'&&!vaultOpen);
   const parts=curLegend().ab.parts;
   if(el.children.length!==parts.length){
-    el.innerHTML=parts.map((pa,i)=>'<div class="gp" data-gp="'+i+'"><div class="gk">'+(isTouch?'TAP':'KEY '+(i+1))+'</div><div class="gn">'+escHTML(pa.n)+'</div><div class="gb"><i></i></div><div class="gs"></div></div>').join('');
+    el.innerHTML=parts.map((pa,i)=>'<div class="gp" data-gp="'+i+'"><span class="gc" title="Fire with the others (G)"></span><div class="gk">'+(isTouch?'TAP':'KEY '+(i+1))+'</div><div class="gn">'+escHTML(pa.n)+'</div><div class="gb"><i></i></div><div class="gs"></div></div>').join('');
     Array.from(el.children).forEach(ch=>{
-      const fire=e=>{e.preventDefault();e.stopPropagation();godFire(+ch.getAttribute('data-gp'),false);};
-      ch.addEventListener('touchstart',fire,{passive:false});ch.addEventListener('click',fire);});}
+      const i=+ch.getAttribute('data-gp');
+      /* the corner tick chooses whether it fires with the others; the rest of the box fires it alone */
+      const act=e=>{e.preventDefault();e.stopPropagation();
+        if(e.target.closest('.gc'))godToggle(i);else godFire(i,false);};
+      ch.addEventListener('touchstart',act,{passive:false});ch.addEventListener('click',act);});}
   parts.forEach((pa,i)=>{const s=GOD.st[i],ch=el.children[i];if(!s||!ch)return;
     const live=pa.k==='ward'?AB.ward>0:pa.k==='haste'?AB.hasteT>0:pa.k==='reveal'?AB.revealT>1000:false;
     const ready=!live&&s.cd<=0&&s.ess>=pa.cost;
-    ch.className='gp'+(live?' live':ready?' ready':'')+(s.ess<pa.cost?' low':'');
+    ch.className='gp'+(live?' live':ready?' ready':'')+(s.ess<pa.cost?' low':'')+(GOD.sel[i]?' pick':'');
+    const gc=ch.querySelector('.gc');if(gc)gc.textContent=GOD.sel[i]?'\u2713':'';
     ch.querySelector('.gb i').style.width=Math.round(s.ess)+'%';
     ch.querySelector('.gs').textContent=live?(pa.k==='haste'?Math.ceil(AB.hasteT)+'s ACTIVE':pa.k==='ward'?AB.ward+' LEFT':'ALL NIGHT')
       :s.cd>0?Math.ceil(s.cd)+'s':s.ess<pa.cost?'ESSENCE '+Math.round(s.ess):'READY';});
@@ -6572,7 +6585,8 @@ function specCamera(dt,t){
   el.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});});
 addEventListener('keydown',e=>{
   const m=/^Digit([1-4])$/.exec(e.code);
-  if(m&&godActive()&&state==='play'&&!settingsOpen&&!vaultOpen&&!e.repeat){e.preventDefault();godFire(+m[1]-1,false);}});
+  if(m&&godActive()&&state==='play'&&!settingsOpen&&!vaultOpen&&!e.repeat){e.preventDefault();
+    if(e.altKey)godToggle(+m[1]-1);else godFire(+m[1]-1,false);}});
 addEventListener('keydown',e=>{if(!SPEC.on)return;
   if(e.code==='ArrowLeft'||e.code==='KeyQ'){e.preventDefault();specNext(-1);}
   else if(e.code==='ArrowRight'||e.code==='KeyE'){e.preventDefault();specNext(1);}});
