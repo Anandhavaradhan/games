@@ -84,23 +84,31 @@
   #gearBtn{position:absolute;top:52px;right:18px;z-index:15;width:40px;height:40px;display:flex;align-items:center;justify-content:center;
     border:1px solid #3a3630;background:rgba(8,9,14,.55);color:#9a927e;font-size:19px;cursor:pointer;pointer-events:auto}
   #gearBtn:hover{color:#d8cfb6;border-color:#6a5a42}
-  #godhud{display:none;position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:16;gap:8px;pointer-events:none}
+  /* the admin legend: a power icon per ability (like every legend's, with its own ring) and a thin essence bar each */
+  #godhud{display:none;position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:16;gap:12px;align-items:flex-end;pointer-events:none}
   body.godp #godhud.show{display:flex}
-  body.godp #abhud{display:none!important}
-  .gp{position:relative;pointer-events:auto;cursor:pointer;width:128px;padding:6px 8px 7px;background:rgba(10,10,14,.62);border:1px solid rgba(255,207,138,.28);
-    font-family:'Cormorant SC',serif;color:#cfc8b8;user-select:none;touch-action:none}
-  .gp .gk{font-size:10px;letter-spacing:2px;color:#8f8874}
-  .gp .gc{position:absolute;top:4px;right:4px;width:20px;height:20px;border:1px solid rgba(207,200,184,.45);font-size:14px;line-height:18px;text-align:center;color:#ffcf8a;background:rgba(0,0,0,.35)}
-  .gp.pick .gc{border-color:rgba(255,207,138,.8)}
-  .gp:not(.pick){opacity:.72}
-  .gp .gn{font-size:12px;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .gp .gb{height:5px;margin-top:5px;background:rgba(255,255,255,.08);position:relative}
-  .gp .gb i{position:absolute;left:0;top:0;bottom:0;background:#ffcf8a}
-  .gp .gs{font-size:10px;letter-spacing:1px;margin-top:3px;color:#8f8874;height:12px}
-  .gp.ready{border-color:rgba(255,207,138,.75)}.gp.ready .gs{color:#ffcf8a}
-  .gp.live{border-color:rgba(159,209,138,.75)}.gp.live .gs{color:#9fd18a}.gp.live .gb i{background:#9fd18a}
-  .gp.low .gb i{background:#a07a70}
-  @media (pointer:coarse){#godhud{left:12px;bottom:12px;transform:none;flex-wrap:wrap;max-width:276px}.gp{width:128px}}
+  body.godp #abhud,body.godp #btnPower{display:none!important}
+  .gpi{position:relative;pointer-events:auto;cursor:pointer;width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:'Cormorant SC',serif;font-size:9px;letter-spacing:0;color:var(--vt);background:rgba(15,15,22,.55);touch-action:none;user-select:none}
+  .gpi .ringsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;transform:rotate(-90deg)}
+  .gpi .gl{position:relative;z-index:1;text-align:center;line-height:1.05;padding:0 3px}
+  .gpi .gt{position:absolute;top:-3px;right:-3px;width:15px;height:15px;border-radius:50%;background:#0c0c10;border:1px solid rgba(207,200,184,.4);
+    font-size:10px;line-height:13px;text-align:center;color:#ffcf8a;z-index:2}
+  .gpi.pick .gt{border-color:#ffcf8a}
+  .gpi:not(.pick):not(.combo){opacity:.8}
+  .gpi.tbtn{width:58px;height:58px;border:2px solid transparent;font-size:9px;letter-spacing:0;color:var(--vt);background:rgba(15,15,22,.55)}
+  .gpi.tbtn.combo{width:64px;height:64px;font-size:10px}
+  .gpi small{font-size:9px;opacity:.6}
+  .abx.cool .gl{opacity:.55}
+  #trowGod{display:none}
+  body.godp #trowGod{display:flex}
+  #godess{display:none;margin-top:6px}
+  body.godp #godess{display:block}
+  .ge{display:flex;align-items:center;gap:6px;margin-top:3px}
+  .ge span{font-size:9px;letter-spacing:1px;color:#b9b09a;width:62px;white-space:nowrap;overflow:hidden;font-family:'Cormorant SC',serif;text-shadow:0 1px 4px #000}
+  .ge .gebar{flex:1;height:3px;background:#0c0d10;border:1px solid #22252c;position:relative}
+  .ge .gebar i{position:absolute;left:0;top:0;bottom:0}
+  .ge.low .gebar i{opacity:.4}
   #micBtn{display:none;position:absolute;top:100px;right:12px;z-index:15;min-width:52px;height:34px;padding:0 8px;align-items:center;justify-content:center;
     font-family:'Cormorant SC',serif;font-size:11px;letter-spacing:2px;color:#8f8874;border:1px solid rgba(160,150,130,.35);background:rgba(10,10,14,.55);
     cursor:pointer;pointer-events:auto;user-select:none}
@@ -604,6 +612,7 @@
     <div id="zoneL"></div><div id="zoneR"></div>
     <div id="stickBase"><div id="stickKnob"></div></div>
     <div id="tbtns">
+      <div class="trow" id="trowGod"></div>
       <div class="trow">
         <div id="btnHide" class="tbtn small">HIDE</div>
         <div id="btnHeart" class="tbtn small">HEART</div>
@@ -627,7 +636,7 @@
     <div id="objective"></div>
     <div id="floorlabel"></div>
     <div id="timer"></div>
-    <div id="esswrap"><div id="esslabel">ESSENCE</div><div id="essbar"><div id="essfill"></div></div></div>
+    <div id="esswrap"><div id="esslabel">ESSENCE</div><div id="essbar"><div id="essfill"></div></div><div id="godess"></div></div>
     <div id="toast"></div><div id="subtitle"></div><div id="hidePrompt"></div><div id="seen">IT HAS SEEN YOU</div>
     <div id="ethrun"></div>
     <div id="abhud" class="abx">
@@ -2950,27 +2959,50 @@ function godFireAll(){
   const n=parts.map((_,i)=>GOD.sel[i]?godFire(i,true):false).filter(Boolean).length;
   if(!n)toast('NONE OF YOUR TICKED POWERS ARE READY',1.6);
 }
-/* four bars: each power's own essence, its cooldown, and whether it is working right now */
+/* the admin legend's HUD: an icon per power (its ring is its cooldown, like every legend's) plus an ALL
+   icon for the ticked ones together, and a thin essence bar per power under the main essence bar.
+   Tap an icon: fire it alone. Hold it (half a second): tick / untick it for ALL. */
+const GOD_COL=['#ff9a8a','#ffcf8a','#d8c76a','#a8e8d8'];
+function godWord(n){return n.replace(/^(THE|A|AN)\s+/,'').split(/[\s,]+/)[0].replace(/[^A-Z0-9]/g,'').slice(0,9);}
+function godIcon(i,label,col,combo){
+  return '<div class="gpi tbtn abx'+(combo?' combo':'')+'" data-gp="'+i+'" style="--vt:'+col+'">'
+    +'<svg class="ringsvg" viewBox="0 0 100 100" aria-hidden="true"><circle class="ringbg" cx="50" cy="50" r="46"/><circle class="ring" cx="50" cy="50" r="46"/></svg>'
+    +'<span class="aura a1"></span><span class="aura a2"></span>'
+    +'<span class="gl">'+label+'</span>'+(combo?'':'<b class="gt"></b>')+'</div>';}
+function godBind(el){
+  Array.from(el.querySelectorAll('.gpi')).forEach(ch=>{
+    const i=+ch.getAttribute('data-gp');let t0=0,held=null;
+    const fire=()=>{if(i<0)godFireAll();else godFire(i,false);};
+    ch.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();t0=performance.now();
+      if(i>=0)held=setTimeout(()=>{held=null;godToggle(i);t0=0;},450);},{passive:false});
+    ch.addEventListener('touchend',e=>{e.preventDefault();e.stopPropagation();
+      if(held){clearTimeout(held);held=null;}if(t0){t0=0;fire();}},{passive:false});
+    ch.addEventListener('touchcancel',()=>{if(held){clearTimeout(held);held=null;}t0=0;});
+    ch.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(e.altKey&&i>=0)godToggle(i);else fire();});});}
 function godHud(){
-  const el=$('godhud');if(!el)return;
-  el.classList.toggle('show',state==='play'&&!vaultOpen);
   const parts=curLegend().ab.parts;
-  if(el.children.length!==parts.length){
-    el.innerHTML=parts.map((pa,i)=>'<div class="gp" data-gp="'+i+'"><span class="gc" title="Fire with the others (G)"></span><div class="gk">'+(isTouch?'TAP':'KEY '+(i+1))+'</div><div class="gn">'+escHTML(pa.n)+'</div><div class="gb"><i></i></div><div class="gs"></div></div>').join('');
-    Array.from(el.children).forEach(ch=>{
-      const i=+ch.getAttribute('data-gp');
-      /* the corner tick chooses whether it fires with the others; the rest of the box fires it alone */
-      const act=e=>{e.preventDefault();e.stopPropagation();
-        if(e.target.closest('.gc'))godToggle(i);else godFire(i,false);};
-      ch.addEventListener('touchstart',act,{passive:false});ch.addEventListener('click',act);});}
-  parts.forEach((pa,i)=>{const s=GOD.st[i],ch=el.children[i];if(!s||!ch)return;
+  const host=isTouch?$('trowGod'):$('godhud');if(!host)return;
+  if(!isTouch)host.classList.toggle('show',state==='play'&&!vaultOpen);
+  if(host.childElementCount!==parts.length+1){
+    host.innerHTML=parts.map((pa,i)=>godIcon(i,godWord(pa.n)+(isTouch?'':'<br><small>'+(i+1)+'</small>'),GOD_COL[i]||'#ffcf8a',false)).join('')
+      +godIcon(-1,'ALL'+(isTouch?'':'<br><small>G</small>'),'#ffe7b8',true);
+    godBind(host);}
+  const eb=$('godess');
+  if(eb&&eb.childElementCount!==parts.length)
+    eb.innerHTML=parts.map((pa,i)=>'<div class="ge"><span>'+escHTML(godWord(pa.n))+'</span><div class="gebar"><i style="background:'+(GOD_COL[i]||'#ffcf8a')+'"></i></div></div>').join('');
+  let anyReady=false;
+  parts.forEach((pa,i)=>{const s=GOD.st[i];if(!s)return;
     const live=pa.k==='ward'?AB.ward>0:pa.k==='haste'?AB.hasteT>0:pa.k==='reveal'?AB.revealT>1000:false;
-    const ready=!live&&s.cd<=0&&s.ess>=pa.cost;
-    ch.className='gp'+(live?' live':ready?' ready':'')+(s.ess<pa.cost?' low':'')+(GOD.sel[i]?' pick':'');
-    const gc=ch.querySelector('.gc');if(gc)gc.textContent=GOD.sel[i]?'\u2713':'';
-    ch.querySelector('.gb i').style.width=Math.round(s.ess)+'%';
-    ch.querySelector('.gs').textContent=live?(pa.k==='haste'?Math.ceil(AB.hasteT)+'s ACTIVE':pa.k==='ward'?AB.ward+' LEFT':'ALL NIGHT')
-      :s.cd>0?Math.ceil(s.cd)+'s':s.ess<pa.cost?'ESSENCE '+Math.round(s.ess):'READY';});
+    const ready=!live&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
+    const cdMax=Math.max(8,Math.round(pa.cd*PS.cdMul)),frac=s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
+    const ic=host.children[i];
+    if(ic){ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
+      ic.querySelector('.ring').style.strokeDashoffset=live?RING_LEN:RING_LEN*(1-frac);
+      const gt=ic.querySelector('.gt');if(gt)gt.textContent=GOD.sel[i]?'\u2713':'';}
+    const row=eb&&eb.children[i];
+    if(row){row.querySelector('i').style.width=Math.round(s.ess)+'%';row.classList.toggle('low',s.ess<pa.cost);}});
+  const all=host.children[parts.length];
+  if(all){all.className='gpi tbtn abx combo '+(anyReady?'ready':'nofuel');all.querySelector('.ring').style.strokeDashoffset=anyReady?0:RING_LEN;}
 }
 
 /* ================= ENTITIES ================= */
