@@ -287,7 +287,9 @@ export function friendlyError(e) {
     'auth/wrong-password': "That email and password don't match an account.",
     'auth/user-not-found': "That email and password don't match an account.",
     'auth/invalid-login-credentials': "That email and password don't match an account.",
-    'auth/email-already-in-use': 'An account already uses that email. Sign in instead.',
+    /* one Hollowmere account per email: a Gmail address that signed in with Google cannot get a second one */
+    'auth/email-already-in-use': 'That email already has a Hollowmere account. Sign in instead \u2014 if it is a Google account, use "Continue with Google".',
+    'auth/account-exists-with-different-credential': 'That email already has a Hollowmere account with a different sign-in. Use the way you signed in before.',
     'auth/weak-password': 'Use a password of at least 6 characters.',
     'auth/invalid-email': "That email address isn't valid.",
     'auth/missing-password': 'Enter your password.',
