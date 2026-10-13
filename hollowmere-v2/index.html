@@ -1551,7 +1551,10 @@ stairs.forEach(s=>{
   s.topLinks.forEach(l=>link(topK,nk(l[2],l[0],l[1])));
   s.bottomLinks.forEach(l=>link(botK,nk(l[2],l[0],l[1])));
   const fk=nk(s.floor+1,s.x,s.zMin-1);        // walk straight forward off the top step
-  if(nodes.has(fk))link(topK,fk);});
+  if(nodes.has(fk))link(topK,fk);
+  /* the bottom step is almost at floor level: it can be stepped onto (and off) from either side too,
+     so its corners are not a wall you catch on */
+  for(const dx of[-1,1]){const sk=nk(s.floor,s.x+dx,s.zMax),sn=nodes.get(sk);if(sn&&sn.ramp==null)link(botK,sk);}});
 function blocksSight(f,x,z){ if(x<0||z<0||x>=W||z>=D)return true;
   if(holeSet.has(`${f},${x},${z}`))return false; return maps[f][z][x]==='#';}
 function rampH(s,x,z){const zc=z/CS;const t=Math.min(1,Math.max(0,((s.zMax+0.5)-zc)/(s.zMax-s.zMin+1)));return s.floor*FH+t*FH;}
@@ -2140,11 +2143,11 @@ stairs.forEach(s=>{const base=s.floor*FH-0.3;
       m.position.set((s.x+.5)*CS,(base+ht)/2,zc*CS);shadowOn(m);m.userData.bake=true;scene.add(m);
       const nose=new THREE.Mesh(boxGeo,darkWood);nose.scale.set(CS*0.98,0.04,0.05);
       nose.position.set((s.x+.5)*CS,ht-0.02,zc*CS-CS/6+0.01);nose.userData.bake=true;scene.add(nose);}
-    if(z!==s.zMin)for(const sd of[-1,1]){
+    if(z!==s.zMin&&z!==s.zMax)for(const sd of[-1,1]){   /* no posts at the foot: nothing to snag on */
       const p=new THREE.Mesh(boxGeo,darkWood);p.scale.set(0.07,0.95,0.07);
       p.position.set((s.x+.5)*CS+sd*(CS/2-0.08),htc+0.47,(z+0.5)*CS);shadowOn(p);p.userData.bake=true;scene.add(p);}
   }
-  for(const sd of[-1,1]){const z0=(s.zMin+1)*CS,z1=(s.zMax+1)*CS,y0=rampH(s,0,z0)+0.95,y1=rampH(s,0,z1-0.01)+0.95;
+  for(const sd of[-1,1]){const z0=(s.zMin+1)*CS,z1=(s.zMax-0.5)*CS,y0=rampH(s,0,z0)+0.95,y1=rampH(s,0,z1-0.01)+0.95;
     const len=Math.hypot(z1-z0,y1-y0),rail=new THREE.Mesh(boxGeo,darkWood);rail.scale.set(0.08,0.07,len);
     rail.position.set((s.x+.5)*CS+sd*(CS/2-0.08),(y0+y1)/2,(z0+z1)/2);rail.rotation.x=Math.atan2(y1-y0,z1-z0);
     shadowOn(rail);rail.userData.bake=true;scene.add(rail);}});
@@ -3410,15 +3413,39 @@ function resolveDest(ent,tx,tz){
   if(nbrs.has(sameKey))consider(sameKey);
   for(const k of nbrs){const p=k.split(',');if(+p[1]===tx&&+p[2]===tz)consider(k);}
   return best;}
+/* CORNER ASSIST (the player only): walking into a wall right next to an opening — the foot of a
+   staircase, a doorway — turns the blocked push into a slide towards the opening, so you round the
+   corner instead of sticking on it. */
+function openingSide(ent,ax,cx,cz,tx,tz,frac){
+  /* is there a way round through the neighbouring column/row on side s, and are we on that side? */
+  for(const s of(frac>0.5?[1,-1]:[-1,1])){
+    if(s===1?frac<0.38:frac>0.62)continue;          /* only when we are already leaning that way */
+    const sx=ax?cx:cx+s,sz=ax?cz+s:cz,ex=ax?tx:tx+s,ez=ax?tz+s:tz;
+    const here=ent.nodeKey,side=nk(ent.floor,sx,sz),a=adj.get(here);
+    if(!a||!a.has(side))continue;
+    const b=adj.get(side);if(!b)continue;
+    for(const k of b){const n=nodes.get(k);if(n&&n.x===ex&&n.z===ez)return s;}
+  }
+  return 0;
+}
 function moveEnt(ent,vx,vz,dt){
+  const assist=ent===P;
   let nx=ent.x+vx*dt;let[cx,cz]=cellOf(ent.x,ent.z);let[nxc]=cellOf(nx,ent.z);
+  let slideZ=0,slideX=0;
   if(nxc!==cx){const k=resolveDest(ent,nxc,cz);
     if(k){ent.nodeKey=k;ent.floor=nodes.get(k).f;}
-    else nx=nxc>cx?(nxc)*CS-RAD:(cx)*CS+RAD;}
-  let nz=ent.z+vz*dt;let[cx2,cz2]=cellOf(nx,ent.z);let[,nzc]=cellOf(nx,nz);
+    else{nx=nxc>cx?(nxc)*CS-RAD:(cx)*CS+RAD;
+      if(assist){const s=openingSide(ent,true,cx,cz,nxc,cz,ent.z/CS-cz);if(s)slideZ=s*Math.abs(vx);}}}
+  let nz=ent.z+(vz+slideZ)*dt;let[cx2,cz2]=cellOf(nx,ent.z);let[,nzc]=cellOf(nx,nz);
   if(nzc!==cz2){const k=resolveDest(ent,cx2,nzc);
     if(k){ent.nodeKey=k;ent.floor=nodes.get(k).f;}
-    else nz=nzc>cz2?(nzc)*CS-RAD:(cz2)*CS+RAD;}
+    else{nz=nzc>cz2?(nzc)*CS-RAD:(cz2)*CS+RAD;
+      if(assist){const s=openingSide(ent,false,cx2,cz2,cx2,nzc,nx/CS-cx2);if(s)slideX=s*Math.abs(vz);}}}
+  if(slideX){
+    /* the slide itself has to respect walls too */
+    const sx=nx+slideX*dt,[sxc]=cellOf(sx,nz);
+    if(sxc===cx2)nx=sx;
+    else{const k=resolveDest(ent,sxc,cz2);if(k){ent.nodeKey=k;ent.floor=nodes.get(k).f;nx=sx;}}}
   ent.x=nx;ent.z=nz;
   const node=nodes.get(ent.nodeKey);
   const gh=node&&node.ramp!=null?rampH(stairs[node.ramp],ent.x,ent.z):ent.floor*FH;
