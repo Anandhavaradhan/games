@@ -101,7 +101,9 @@
   .gpi small{font-size:9px;opacity:.6}
   .abx.cool .gl{opacity:.55}
   #trowGod{display:none}
-  body.godp #trowGod{display:flex}
+  /* on a tablet the icons sit on an arc round the bottom-right buttons (positions set in godArc) */
+  body.godp #trowGod{display:block;position:absolute;right:0;bottom:0;width:0;height:0;pointer-events:none}
+  #trowGod .gpi{position:absolute}
   #godess{display:none;margin-top:6px}
   body.godp #godess{display:block}
   .ge{display:flex;align-items:center;gap:6px;margin-top:3px}
@@ -2979,6 +2981,18 @@ function godBind(el){
       if(held){clearTimeout(held);held=null;}if(t0){t0=0;fire();}},{passive:false});
     ch.addEventListener('touchcancel',()=>{if(held){clearTimeout(held);held=null;}t0=0;});
     ch.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(e.altKey&&i>=0)godToggle(i);else fire();});});}
+/* place the icons on a quarter-circle round the bottom-right corner, ALL at the top, the four powers
+   sweeping down to the left of VEIL — clear of HEART, VEIL and BURST */
+function godArc(host){
+  const tb=$('tbtns'),cs=getComputedStyle(tb),offR=parseFloat(cs.right)||14,offB=parseFloat(cs.bottom)||20;
+  const R=222,cr0=7,cb0=6;                       /* arc radius and centre, from the screen's bottom-right corner */
+  const n=host.children.length-1;              /* the powers; ALL is the last child */
+  const place=(el,deg)=>{const a=deg*Math.PI/180,sz=el.classList.contains('combo')?64:58;
+    el.style.right=(cr0-R*Math.cos(a)-sz/2-offR).toFixed(1)+'px';
+    el.style.bottom=(cb0+R*Math.sin(a)-sz/2-offB).toFixed(1)+'px';};
+  place(host.children[n],100);
+  for(let i=n-1;i>=0;i--)place(host.children[i],100+17*(n-i));   /* last power next to ALL, the first at the end */
+}
 function godHud(){
   const parts=curLegend().ab.parts;
   const host=isTouch?$('trowGod'):$('godhud');if(!host)return;
@@ -2986,7 +3000,8 @@ function godHud(){
   if(host.childElementCount!==parts.length+1){
     host.innerHTML=parts.map((pa,i)=>godIcon(i,godWord(pa.n)+(isTouch?'':'<br><small>'+(i+1)+'</small>'),GOD_COL[i]||'#ffcf8a',false)).join('')
       +godIcon(-1,'ALL'+(isTouch?'':'<br><small>G</small>'),'#ffe7b8',true);
-    godBind(host);}
+    godBind(host);
+    if(isTouch)godArc(host);}
   const eb=$('godess');
   if(eb&&eb.childElementCount!==parts.length)
     eb.innerHTML=parts.map((pa,i)=>'<div class="ge"><span>'+escHTML(godWord(pa.n))+'</span><div class="gebar"><i style="background:'+(GOD_COL[i]||'#ffcf8a')+'"></i></div></div>').join('');
