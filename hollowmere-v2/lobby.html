@@ -67,7 +67,7 @@
   <h1>HOLLOWMERE</h1>
   <h2>CO-OP · THE HEART HUNGERS FOR MORE</h2>
   <div class="card" id="card"><p class="note">Reaching the house…</p></div>
-  <a class="back" href="index.html">‹ BACK TO THE TITLE</a>
+  <a class="back" id="backLink" href="index.html">‹ BACK TO THE TITLE</a>
 </main>
 <script type="module">
 import * as mp from './multiplayer.js';
@@ -144,7 +144,9 @@ function viewMenu() {
     <label>ROOM CODE</label>
     <input id="code" class="code" maxlength="5" autocomplete="off" spellcheck="false" placeholder="•••••" value="${esc(mp.normCode(qs.get('join')))}">
     <button id="join">Join</button>
+    <button id="home">\u2039 Back to the title screen</button>
     <div class="err" id="msg"></div>`);
+  document.getElementById('home').onclick = goHome;
   const name = document.getElementById('name'), codeIn = document.getElementById('code');
   const useName = () => { if (!mp.me.account) { const n = name.value.trim(); if (n) mp.saveName(n); } return mp.me.name; };
   document.getElementById('create').onclick = () => go(async () => { useName(); code = await mp.createRoom(); enterLobby(); });
@@ -186,8 +188,9 @@ function viewLobby() {
     <p class="note small">Each difficulty has its own leaderboard. Co-op never has jumpscares.</p>
     <button class="primary" id="start">Begin the night</button>` : '<p class="note small" style="text-align:center">Waiting for the host to choose the difficulty and begin…</p>'}
     ${mp.me.account ? '<div class="inv" id="inv"></div>' : '<p class="note small">Sign in with a username to invite friends straight into this room. Or send them the code or link.</p>'}
-    <button id="leave">Leave room</button>
+    <div class="row"><button id="leave">Leave room</button><button id="leaveHome">Leave \u2014 title screen</button></div>
     <div class="err" id="msg"></div>`);
+  document.getElementById('leaveHome').onclick = goHome;
   renderInv();
   document.getElementById('copy').onclick = async () => {
     try { await navigator.clipboard.writeText(link); setMsg('Link copied — send it to your friends.', true); }
@@ -228,6 +231,15 @@ async function launch() {
   location.replace('index.html?room=' + code + (qs.get('debug') === '1' ? '&debug=1' : ''));
 }
 
+/* back to the game's title screen, leaving the room first if this player is in one */
+async function goHome(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (code && room && !launched) {
+    leaving = true; if (unsub) unsub();
+    try { await Promise.race([mp.leaveRoom(code), new Promise(r => setTimeout(r, 2000))]); } catch (err) { console.warn(err); }
+  }
+  location.href = 'index.html' + (qs.get('debug') === '1' ? '?debug=1' : '');
+}
 async function leave() {
   leaving = true; if (unsub) unsub();
   try { await mp.leaveRoom(code); } catch (e) { console.warn(e); }
@@ -235,6 +247,7 @@ async function leave() {
   qs.delete('join'); viewMenu();
 }
 
+document.getElementById('backLink').onclick = goHome;
 /* ---------------- boot ---------------- */
 (async () => {
   if (!mp.configured) { shell('<p class="note">Co-op is not switched on for this copy of the game yet.</p><p class="note small">Owner: add the Realtime Database URL to firebase-config.js and publish database.rules.json (see MULTIPLAYER.md).</p>'); return; }

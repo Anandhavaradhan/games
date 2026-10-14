@@ -136,6 +136,9 @@
   #setClose{margin-top:18px;width:100%;padding:11px;border:1px solid #4a4436;background:rgba(20,18,14,.7);
     color:#e5dcc2;font-family:'Cormorant SC',serif;font-size:14px;letter-spacing:4px;cursor:pointer;text-align:center}
   #setClose:hover{border-color:#8a7f60}
+  #setHome{display:none;margin-top:10px;width:100%;padding:11px;border:1px solid #5a3a30;background:rgba(30,14,12,.7);
+    color:#e8b9a8;font-family:'Cormorant SC',serif;font-size:13px;letter-spacing:3px;cursor:pointer;text-align:center}
+  #setHome:hover{border-color:#a86a50}
   /* ===== CO-OP ===== */
   #team{position:absolute;left:22px;top:112px;z-index:10;pointer-events:none;font-size:13px;letter-spacing:1px;color:#8f8874}
   #team .tm{display:flex;align-items:center;gap:8px;margin-bottom:5px;text-shadow:0 1px 6px #000}
@@ -755,6 +758,7 @@
       <div id="musicBtn"></div>
     </div>
     <div id="setClose">CLOSE</div>
+    <div id="setHome">END THIS NIGHT · TITLE SCREEN</div>
   </div>
   <div id="titleOv" class="overlay">
     <h1>HOLLOWMERE</h1>
@@ -787,6 +791,7 @@
     <button id="titleFriends" class="ovbtn">FRIENDS</button>
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
     <button id="titleCoop" class="ovbtn">CO-OP — PLAY WITH FRIENDS</button>
+    <button id="titleLeave" class="ovbtn" style="display:none">LEAVE CO-OP — BACK TO THE TITLE</button>
     <div class="diffRow" data-where="title"></div>
     <div id="mpBanner" style="display:none"></div>
     <div id="acctLine" class="acctline">Playing as a guest</div>
@@ -799,6 +804,7 @@
     <div class="stat" id="deathTime"></div>
     <div class="stat" id="runSum"></div>
     <button id="btnVaultD" class="ovbtn">THE VAULT — SPEND YOUR ETHER</button>
+    <button id="btnHomeD" class="ovbtn">TITLE SCREEN</button>
     <div class="diffRow" data-where="death"></div>
     <div class="pulse" id="risePrompt">TAP OR PRESS R TO BEGIN A NEW NIGHT</div>
   </div>
@@ -810,11 +816,14 @@
     <div class="stat" id="winRank"></div>
     <button id="btnVaultW" class="ovbtn">THE VAULT — SPEND YOUR ETHER</button>
     <button id="btnBoardW" class="ovbtn">LEADERBOARD</button>
+    <button id="btnLobbyW" class="ovbtn" style="display:none">BACK TO THE LOBBY</button>
+    <button id="btnHomeW" class="ovbtn">TITLE SCREEN</button>
     <div class="diffRow" data-where="win"></div>
     <div class="pulse" id="winPulse">TAP OR ENTER TO HAUNT AGAIN</div>
   </div>
   <div id="pauseOv" class="overlay hidden">
     <h1 style="font-size:40px">THE DARK WAITS</h1>
+    <button id="btnHomeP" class="ovbtn">END THIS NIGHT — TITLE SCREEN</button>
     <div class="pulse">CLICK OR ENTER TO RETURN</div>
   </div>
   <div id="vaultOv" class="hidden">
@@ -3968,6 +3977,7 @@ $('viewBtn').addEventListener('click',e=>{e.stopPropagation();settings.view=sett
 $('qualBtn').addEventListener('click',e=>{e.stopPropagation();const o=['high','medium','low'];
   settings.quality=o[(o.indexOf(settings.quality)+1)%3];saveSettings();syncSetUI();applyQuality();});
 function openSettings(){if(settingsOpen)return;settingsOpen=true;syncSetUI();setPanel.style.display='block';
+  if(typeof navSync==='function')navSync();
   if(!isTouch&&document.pointerLockElement){suppressPause=true;try{document.exitPointerLock();}catch(e){}}}
 function closeSettings(){if(!settingsOpen)return;settingsOpen=false;setPanel.style.display='none';
   if(state==='play')lockMouse();}
@@ -5374,6 +5384,45 @@ function advance(){
   else if(state==='play'&&!pauseOv.classList.contains('hidden')){showOv(null);lockMouse();}}
 document.addEventListener('click',()=>{try{advance();}catch(e){fatal('Click error: '+e.message);}});
 [deathOv,winOv,pauseOv,titleOv].forEach(ov=>ov.addEventListener('click',e=>{e.stopPropagation();try{advance();}catch(err){}}));
+/* ---- WAYS BACK ----
+   Solo: end the night (or leave the finished one) and stand on the title screen again.
+   Co-op: leave the team and the room, and go back to the title screen (or the lobby). */
+const midNight=()=>state==='play'||state==='caught';
+function goTitle(){
+  if(MP){mpLeaveTo('index.html');return;}
+  if(midNight()&&!confirm('End this night and go back to the title screen? What you found tonight is lost.'))return;
+  closeSettings();
+  if(state!=='title'){fullReset();state='title';}
+  showOv(titleOv);setScreenState();
+  try{document.exitPointerLock();}catch(e){}
+  applyPendingUser();
+}
+let mpLeaving=false;
+async function mpLeaveTo(url){
+  if(!MP||mpLeaving)return;
+  const stillOn=!TEAM.done&&(midNight()||state==='dead'||state==='win');
+  if(stillOn&&!confirm('Leave your team? You cannot come back into this night.'))return;
+  mpLeaving=true;closeSettings();toast('LEAVING THE TEAM\u2026',3);
+  const n=MP.net,c=MP.code;
+  try{await Promise.race([Promise.all([n.leaveGame(c),n.leaveRoom(c)]),new Promise(r=>setTimeout(r,2000))]);}catch(e){console.warn('Leave:',e);}
+  location.href=url+(DEBUG?(url.indexOf('?')<0?'?':'&')+'debug=1':'');
+}
+/* the labels say what each button does here */
+function navSync(){
+  $('titleLeave').style.display=MP?'':'none';
+  $('btnLobbyW').style.display=MP?'':'none';
+  $('btnHomeD').textContent=MP?'LEAVE THE TEAM \u2014 TITLE SCREEN':'TITLE SCREEN';
+  $('btnHomeW').textContent=MP?'LEAVE THE TEAM \u2014 TITLE SCREEN':'TITLE SCREEN';
+  $('btnHomeP').textContent=MP?'LEAVE THE TEAM \u2014 TITLE SCREEN':'END THIS NIGHT \u2014 TITLE SCREEN';
+  const sh=$('setHome');
+  sh.style.display=(state==='title'&&!MP)?'none':'block';
+  sh.textContent=MP?'LEAVE THE TEAM \u00b7 TITLE SCREEN':midNight()?'END THIS NIGHT \u00b7 TITLE SCREEN':'TITLE SCREEN';
+}
+navSync();
+[['btnHomeD',goTitle],['btnHomeW',goTitle],['btnHomeP',goTitle],['setHome',goTitle],['titleLeave',goTitle],
+ ['btnLobbyW',()=>mpLeaveTo('lobby.html')]].forEach(([id,fn])=>{const b=$(id);if(!b)return;
+  b.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();fn();});
+  b.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});});
 setObjective(OBJ_TEXT());hudEmbers();
 
 /* ================= MONSTER AI ================= */
