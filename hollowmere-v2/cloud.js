@@ -172,13 +172,34 @@ export function claimUsername(uid, name, oldName) {
   if (oldKey && oldKey !== key) b.delete(F.doc(db, 'usernames', oldKey));
   return b.commit();
 }
-/* after a username change, the player's own solo escapes carry the new name */
-export async function renameEscapes(uid, name) {
+/* a co-op entry's name ("A+B") after one of its players changed username. members (newer entries) lists
+   the players' accounts in the same order as the names; older entries only have the names, so the old
+   name is looked for (also cut short, as long team names are). null = this player is not in it. */
+function teamRenamed(name,members,uid,oldName,newName){
+  const k=n=>String(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const segs=String(name||'').split('+');
+  let i=Array.isArray(members)&&members.length===segs.length?members.indexOf(uid):-1;
+  if(i<0&&oldName){const ok=k(oldName);
+    i=segs.findIndex(sg=>k(sg)===ok);
+    if(i<0)i=segs.findIndex(sg=>k(sg).length>=3&&ok.indexOf(k(sg))===0&&String(name).length>=36);}
+  if(i<0||segs[i]===newName)return null;
+  segs[i]=newName;
+  let t=segs.join('+');
+  if(t.length>40){const each=Math.max(3,Math.floor((40-(segs.length-1))/segs.length));t=segs.map(n=>n.slice(0,each)).join('+').slice(0,40);}
+  return t;
+}
+/* after a username change, the player's escapes carry the new name: their own solo ones, and every
+   co-op entry that lists them as a member (older co-op entries can only be fixed from admin.html) */
+export async function renameEscapes(uid, name, oldName) {
   const snap = await F.getDocs(F.query(F.collection(db, 'escapes'), F.where('uid', '==', uid), F.where('team', '==', false)));
-  const todo = snap.docs.filter(d => d.data().name !== name);
+  const todo = snap.docs.filter(d => d.data().name !== name).map(d => [d.ref, name]);
+  try {
+    const ts = await F.getDocs(F.query(F.collection(db, 'escapes'), F.where('members', 'array-contains', uid)));
+    ts.docs.forEach(d => { const v = d.data(), t = teamRenamed(v.name, v.members, uid, oldName, name); if (t && t !== v.name) todo.push([d.ref, t]); });
+  } catch (e) { console.warn('Team entries not renamed:', e); }
   for (let i = 0; i < todo.length; i += 400) {
     const b = F.writeBatch(db);
-    todo.slice(i, i + 400).forEach(d => b.update(d.ref, { name }));
+    todo.slice(i, i + 400).forEach(([ref, n]) => b.update(ref, { name: n }));
     await b.commit();
   }
 }
@@ -192,7 +213,7 @@ export const DIFFS = ['easy', 'normal', 'hard', 'nightmare'];
 export const diffOf = r => (r && DIFFS.indexOf(r.diff) >= 0) ? r.diff : 'normal';
 export const authUid = () => (auth && auth.currentUser) ? auth.currentUser.uid : null;
 function escapeDoc(uid, e) {
-  return {
+  return Object.assign({
     uid,
     name: String(e.name || 'Ghost').slice(0, 40),
     time: Math.round(e.time * 10) / 10,
@@ -202,7 +223,7 @@ function escapeDoc(uid, e) {
     team: !!e.team,
     diff: DIFFS.indexOf(e.diff) >= 0 ? e.diff : 'normal',
     at: F.serverTimestamp()
-  };
+  }, (e.team && Array.isArray(e.members) && e.members.length) ? { members: e.members.slice(0, 8).map(String) } : {});
 }
 export async function addEscape(uid, e, id) {
   if (id) { await F.setDoc(F.doc(db, 'escapes', id), escapeDoc(uid, e)); return id; }

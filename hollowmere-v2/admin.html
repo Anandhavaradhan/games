@@ -281,6 +281,42 @@ async function mergeOldGuests(){
 /* Usernames: one per account, unique (usernames/{key} = {uid, name}; key = lower-case letters and digits only).
    The key a name maps to, and whether a name is allowed at all, mirror firestore.rules and cloud.js. */
 const unameKey=n=>String(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+/* a co-op entry's name ("A+B") after one of its players changed username. members (newer entries) lists
+   the players' accounts in the same order as the names; older entries only have the names, so the old
+   name is looked for (also cut short, as long team names are). null = this player is not in it. */
+function teamRenamed(name,members,uid,oldName,newName){
+  const k=n=>String(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const segs=String(name||'').split('+');
+  let i=Array.isArray(members)&&members.length===segs.length?members.indexOf(uid):-1;
+  if(i<0&&oldName){const ok=k(oldName);
+    i=segs.findIndex(sg=>k(sg)===ok);
+    if(i<0)i=segs.findIndex(sg=>k(sg).length>=3&&ok.indexOf(k(sg))===0&&String(name).length>=36);}
+  if(i<0||segs[i]===newName)return null;
+  segs[i]=newName;
+  let t=segs.join('+');
+  if(t.length>40){const each=Math.max(3,Math.floor((40-(segs.length-1))/segs.length));t=segs.map(n=>n.slice(0,each)).join('+').slice(0,40);}
+  return t;
+}
+/* put a player's new name into every co-op entry they are in (or, given an old name, every entry that has it) */
+async function renameInTeams(uid,oldName,newName){
+  const snap=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('team','==',true)));
+  let n=0;
+  for(const d of snap.docs){const v=d.data();
+    const mine=Array.isArray(v.members)&&v.members.indexOf(uid)>=0;
+    const t=teamRenamed(v.name,mine?v.members:null,uid,oldName,newName);
+    if(t&&t!==v.name){await F.updateDoc(d.ref,{name:t});n++;}}
+  return n;
+}
+async function fixTeamName(uid){
+  const p=players.find(x=>x.uid===uid);if(!p)return;
+  const el=document.getElementById('e_oldname'),old=(el&&el.value||'').trim();
+  if(!old){alert('Type the name this player used to have, as it shows in the co-op entries.');return;}
+  if(!p.name){alert('This player has no username yet.');return;}
+  try{const n=await renameInTeams(uid,old,p.name);
+    notice(n?'Changed "'+old+'" to "'+p.name+'" in '+n+' co-op '+(n===1?'entry':'entries')+'.':'No co-op entries have the name "'+old+'".');}
+  catch(e){alert('Could not update the co-op entries: '+e.message);}
+}
+
 const unameOk=n=>/^[A-Za-z0-9 _.-]{2,24}$/.test(String(n||''))&&unameKey(n).length>=2;
 /* Reserve each existing account's current name, OLDEST ACCOUNT FIRST, wherever it is valid and still free.
    Anyone left out (a clash, or a name that is not allowed such as a long Google name) is asked to choose
@@ -312,7 +348,10 @@ const IMPORT_FLAG='hm_board_import_v3';
 /* difficulty levels: each has its own board. Entries from before they existed count as Normal. */
 const DIFF_KEYS=['easy','normal','hard','nightmare'],DIFF_NAME={easy:'Easy',normal:'Normal',hard:'Hard',nightmare:'Nightmare'};
 const diffOf=r=>DIFF_KEYS.indexOf(r&&r.diff)>=0?r.diff:'normal';
-let boardDiff='all';
+let boardDiff='all',boardMode='best';   /* best: each player once, at their fastest */
+function bestPerPlayer(list){const k=n=>String(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');const seen=new Set(),out=[];
+  for(const r of list){const who=r.team?String(r.name||'').split('+').map(k).filter(Boolean):[k(r.name)||'u:'+r.uid];
+    if(!who.length||who.every(x=>seen.has(x)))continue;who.forEach(x=>seen.add(x));out.push(r);}return out;}
 async function migrateBoard(adminUid,force){
   try{
     for(const e of SEED_ESCAPES){
@@ -514,8 +553,10 @@ function render(){
   h+=live.length?'<div class="live">'+live.map(liveCard).join('')+'</div>'
     :'<p class="empty">No one is in the house right now.</p>';
   /* ---- leaderboard ---- */
-  const shown=board.filter(r=>boardDiff==='all'||diffOf(r)===boardDiff);
-  h+='<h3>Leaderboard <small>every escape, fastest first · '+shown.length+' shown</small> '
+  const inDiff=board.filter(r=>boardDiff==='all'||diffOf(r)===boardDiff);
+  const shown=boardMode==='best'?bestPerPlayer(inDiff):inDiff;
+  h+='<h3>Leaderboard <small>'+(boardMode==='best'?'each player once, at their fastest (a co-op escape counts for everyone in it)':'every escape, fastest first')+' · '+shown.length+' shown</small> '
+    +'<select id="bmode" class="mini"><option value="best"'+(boardMode==='best'?' selected':'')+'>Best per player</option><option value="all"'+(boardMode==='all'?' selected':'')+'>All entries</option></select> '
     +'<select id="bdiff" class="mini">'+[['all','All difficulties']].concat(DIFF_KEYS.map(k=>[k,DIFF_NAME[k]])).map(([k,t])=>'<option value="'+k+'"'+(k===boardDiff?' selected':'')+'>'+t+'</option>').join('')+'</select> '
     +'<button class="mini" id="reimport">Re-import past escapes</button></h3>';
   h+=shown.length?'<ol class="board">'+shown.map((r,i)=>'<li'+(i<3?' class="top"':'')+'>'
@@ -556,6 +597,7 @@ function render(){
   app.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>removeFromBoard(b.dataset.rm,false));
   app.querySelectorAll('[data-ban]').forEach(b=>b.onclick=()=>removeFromBoard(b.dataset.ban,true));
   const bd=document.getElementById('bdiff');if(bd)bd.onchange=()=>{boardDiff=bd.value;render();};
+  const bm=document.getElementById('bmode');if(bm)bm.onchange=()=>{boardMode=bm.value;render();};
   const mg=document.getElementById('mergeGuests');if(mg)mg.onclick=mergeOldGuests;
   const ri=document.getElementById('reimport');
   if(ri)ri.onclick=async()=>{ri.disabled=true;ri.textContent='Importing\u2026';await migrateBoard(auth.currentUser.uid,true);const pn=await seedPlaytime();notice(pn?'Added '+pn+' players to Most Time Played':'Most Time Played is up to date');ri.disabled=false;ri.textContent='Re-import past escapes';};
@@ -690,6 +732,8 @@ async function saveWithName(uid,p,newName,st){
       try{
         const es=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('uid','==',uid),F.where('team','==',false)));
         for(const d of es.docs)await F.updateDoc(d.ref,{name:newName});
+        const nt=await renameInTeams(uid,p.name,newName);   /* and the co-op entries they are in */
+        if(nt)notice('Also renamed in '+nt+' co-op '+(nt===1?'entry':'entries')+'.');
         const pt=await F.getDoc(F.doc(db,'playtime',uid));
         if(pt.exists())await F.updateDoc(pt.ref,{name:newName});
       }catch(e){console.warn('Renaming their board entries:',e);}
@@ -833,6 +877,7 @@ function renderDrawer(){
   const on=(id,fn)=>{const el=document.getElementById(id);if(el)el.onclick=fn;};
   on('e_save',()=>saveForm(p.uid));
   on('e_post',()=>postToLeaderboard(p.uid));
+  on('e_fixteam',()=>fixTeamName(p.uid));
   on('e_grant',()=>grantAll(p.uid));
   on('e_revoke',()=>revokeAll(p.uid));
   on('e_pend',()=>clearPending(p.uid));
@@ -870,6 +915,8 @@ function editPanel(p){
     +'<button class="btn" id="e_revoke">Reset legends</button>'
     +((p.pending||[]).length?'<button class="btn" id="e_pend">Clear unclaimed ether</button>':'')
     +(note?'<span class="saved">'+esc(note)+'</span>':'')+'</div>'
+    +'<div class="frm" style="margin-top:12px"><div style="grid-column:1/-1"><label for="e_oldname">Co-op entries still show an old name? Type it, and it becomes \u201c'+esc(p.name||'')+'\u201d</label>'
+      +'<div style="display:flex;gap:8px"><input id="e_oldname" type="text" maxlength="40" placeholder="The old name, e.g. Rajeshwari V" style="flex:1"><button class="btn" id="e_fixteam">Replace in co-op entries</button></div></div></div>'
     +'<div class="danger"><button class="btn bad" id="e_del">Delete this player\'s record</button></div>'
     +'</div>';
 }

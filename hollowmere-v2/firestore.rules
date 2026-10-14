@@ -109,12 +109,13 @@ service cloud.firestore {
     //  · Solo escape (random id): the name MUST be the player's own claimed username.
     //  · Co-op team escape (id starts "mp_"): "user1+user2" — registered players only, guests are
     //    never named — posted by the first signed-in teammate out (a fixed id, so later writes are refused).
-    // The only edit a player may make is renaming their own solo escapes after changing username.
+    // The only edit a player may make is renaming their own solo escapes after changing username,
+    // or putting their new username into a co-op entry that lists them in members (newer co-op entries).
     // Each escape records its difficulty (easy / normal / hard / nightmare): one board per difficulty.
     // Entries from before difficulty levels have none and count as Normal.
     function validEscape() {
       let e = request.resource.data;
-      return e.keys().hasOnly(['uid','name','time','legend','deaths','embers','team','diff','at'])
+      return e.keys().hasOnly(['uid','name','time','legend','deaths','embers','team','diff','at','members'])
         && e.keys().hasAll(['uid','name','time','legend','deaths','embers','team','diff','at'])
         && e.diff in ['easy','normal','hard','nightmare']
         && e.uid is string
@@ -124,6 +125,7 @@ service cloud.firestore {
         && e.deaths is int && e.deaths >= 0 && e.deaths <= 100000
         && e.embers is int && e.embers >= 0 && e.embers <= 40
         && e.team is bool
+        && (!('members' in e) || (e.team && e.members is list && e.members.size() >= 1 && e.members.size() <= 8))
         && e.at == request.time;
     }
     match /escapes/{id} {
@@ -131,13 +133,20 @@ service cloud.firestore {
       allow create: if (signedIn() && validEscape()
                         && request.resource.data.uid == request.auth.uid
                         && !banned(request.auth.uid)
-                        && ((request.resource.data.team && id.matches('mp_.*') && realUser())
+                        && ((request.resource.data.team && id.matches('mp_.*') && realUser()
+                             && (!('members' in request.resource.data) || request.auth.uid in request.resource.data.members))
                             || (!request.resource.data.team && !id.matches('mp_.*')
                                 && realUser() && ownsName(request.resource.data.name))))
                     || isAdmin();
       allow update: if (realUser() && resource.data.uid == request.auth.uid && !resource.data.team
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
                         && ownsName(request.resource.data.name))
+                    // a co-op entry: anyone listed in it may put their new username into its name
+                    || (realUser() && resource.data.team && ('members' in resource.data)
+                        && request.auth.uid in resource.data.members
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+                        && request.resource.data.name is string
+                        && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 40)
                     || isAdmin();
       allow delete: if isAdmin();
     }

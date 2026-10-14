@@ -6056,7 +6056,7 @@ async function ensureUsername(){
         u.unameOk=true;
         if(want!==cur){
           u.name=want;await cloudPush();
-          cloud.renameEscapes(u.uid,want).catch(e=>console.warn('Escape rename failed:',e));
+          cloud.renameEscapes(u.uid,want,cur).catch(e=>console.warn('Escape rename failed:',e));
           setTimeout(()=>toast('YOUR USERNAME IS '+want.toUpperCase(),3.5),3000);}
         unameWhy='';unameTries=0;updateAcctLine();
         return;}}
@@ -6192,11 +6192,12 @@ async function acctAction(act,btn){
       const own=await cloud.usernameOwner(nm);
       if(own&&own.uid!==cloudUser.uid){setAcctMsg('That username is already taken. Try another.');return;}
       /* claim the new name and let go of the old one in a single write */
+      const oldNm=cloudUser.name;
       await cloud.claimUsername(cloudUser.uid,nm,cloudUser.unameOk?cloudUser.name:null);
       cloudUser.name=nm;cloudUser.unameOk=true;acctRenaming=false;unameWhy='';
       await cloudPush();                                  /* players/{uid}.name */
       if(ptLoaded)await ptRename();else await ptLoad();   /* their time-played entry */
-      cloud.renameEscapes(cloudUser.uid,nm).catch(e=>console.warn('Escape rename failed:',e));   /* and their past escapes */
+      cloud.renameEscapes(cloudUser.uid,nm,oldNm).catch(e=>console.warn('Escape rename failed:',e));   /* and their past escapes */
       if(SOC.friends.length)cloud.renameInFriends(cloudUser.uid,nm,SOC.friends.map(f=>f.uid));    /* and in each friend's list */
       if(SOC.net)socialPresence(true);else socialStart();
       renderAcct();setAcctMsg('Username saved.',true);
@@ -6293,12 +6294,12 @@ async function boardAfterEscape(nt,newBest){
 }
 
 /* co-op: the whole party goes up as one name, e.g. "user1+user2" */
-async function teamBoardName(){
+async function teamBoardName(members){
   const names=[];
   for(const u of ((MP&&MP.cfg.order)||[])){
-    if(u===MP.uid){names.push(cloudUser.name);continue;}
+    if(u===MP.uid){names.push(cloudUser.name);if(members)members.push(u);continue;}
     const nm=String(mpName(u));
-    if(await MP.net.isRegistered(u,nm))names.push(nm);}   /* guests are left out */
+    if(await MP.net.isRegistered(u,nm)){names.push(nm);if(members)members.push(u);}}   /* guests are left out */
   let t=names.join('+');
   if(t.length>40){const each=Math.max(3,Math.floor((40-(names.length-1))/names.length));
     t=names.map(n=>n.slice(0,each)).join('+').slice(0,40);}
@@ -6314,13 +6315,18 @@ async function boardAfterTeamEscape(nt){
      and the team's name lists only the registered players in it */
   if(!canPost()){el.textContent=needsUname()?'CHOOSE A USERNAME IN YOUR ACCOUNT TO PUT YOUR TEAM ON THE LEADERBOARD':'GUESTS ARE NOT SHOWN ON THE LEADERBOARD \u2014 SIGN IN TO APPEAR';return;}
   const uid=cloudUser.uid;
-  const team=await teamBoardName(),id='mp_'+code0+'_'+go0;
-  const entry={name:team,time:nt,legend:pubLegend(),deaths:deaths0,embers:got0,team:true,diff:dk0};
+  const members=[],team=await teamBoardName(members),id='mp_'+code0+'_'+go0;
+  /* members: the accounts in the team, in the same order as the names, so a later rename can update it */
+  const entry={name:team,time:nt,legend:pubLegend(),deaths:deaths0,embers:got0,team:true,diff:dk0,members};
   try{
     let ex=null;try{ex=await cloud.loadEscape(id);}catch(e){}
     if(!ex){el.textContent=team.toUpperCase()+' — POSTING TO THE LEADERBOARD…';
       try{await cloud.addEscape(uid,entry,id);ex=entry;}
-      catch(e){ex=await cloud.loadEscape(id).catch(()=>null);if(!ex)throw e;}}   /* a teammate got there first */
+      catch(e){ex=await cloud.loadEscape(id).catch(()=>null);   /* a teammate got there first */
+        /* still on the older firestore.rules (no members field allowed): post it without the member list */
+        if(!ex&&entry.members){const plain=Object.assign({},entry);delete plain.members;
+          try{await cloud.addEscape(uid,plain,id);ex=plain;}catch(e2){ex=await cloud.loadEscape(id).catch(()=>null);}}
+        if(!ex)throw e;}}
     let rank=0;try{const list=await cloud.loadEscapes(BOARD_SIZE,dk0);rank=list.filter(r=>r.time<ex.time).length+1;}catch(e){}
     el.textContent=team.toUpperCase()+' ARE ON THE '+DIFFS[dk0].n+' LEADERBOARD \u00b7 '+fmtTime(ex.time)+(rank?' \u00b7 #'+rank:'');
   }catch(e){console.warn('Team escape post failed:',e);el.textContent='TEAM TIME '+fmtTime(nt);}
@@ -6584,10 +6590,39 @@ function makeLabel(name){
   g.shadowColor='#000';g.shadowBlur=8;g.fillStyle='#dbe8ff';g.fillText(String(name).toUpperCase().slice(0,18),128,32);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:canvasToTex(c,true),transparent:true,depthWrite:false,fog:false,opacity:0.85}));
   sp.scale.set(1.7,0.42,1);sp.visible=false;scene.add(sp);return sp;}
+/* SMOOTH PLAYBACK of things that move on someone else's screen. Their positions arrive a few times a
+   second, unevenly. Chasing each new one makes them lurch; instead keep the last few (with the time they
+   arrived) and show where they were a moment ago, moving at an even speed between two of them. The delay
+   follows how often updates actually arrive (about 1.5 gaps), so a slow connection stays smooth too. */
+function ipNew(){return {s:[],gap:110,off:null,jit:20,ts:false,dl:null};}
+/* st: when the sender made this update, on its own clock (newer players send it; older ones do not) */
+function ipPush(b,x,y,z,r,f,snap,st){
+  const now=performance.now(),l=b.s[b.s.length-1],hasT=typeof st==='number'&&isFinite(st)&&st>0;
+  if(hasT&&!b.ts){b.ts=true;b.s.length=0;b.off=null;}
+  const t=hasT&&b.ts?st:now;
+  if(l&&t<=l.t)return;                                     /* old news, or out of order */
+  if(hasT&&b.ts){const d=now-st;
+    if(b.off===null||d<b.off)b.off=d;else b.off+=(d-b.off)*0.002;   /* the quickest an update has ever come through */
+    b.jit+=((d-b.off)-b.jit)*0.1;}                         /* how late they usually are on top of that */
+  if(l){const g=t-l.t;if(g>15&&g<1500)b.gap+=(g-b.gap)*0.2;}
+  if(snap||(l&&(l.f!==f||Math.hypot(x-l.x,z-l.z)>6||Math.abs(y-l.y)>4)))b.s.length=0;   /* a jump: no gliding through walls */
+  b.s.push({t,x,y,z,r,f});if(b.s.length>12)b.s.shift();}
+const angLerp=(a,b,k)=>{let d=b-a;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return a+d*k;};
+function ipAt(b){
+  const n=b.s.length;if(!n)return null;
+  /* the delay drifts gently towards what the connection needs (a sudden change would look like a stumble) */
+  const want=b.ts?Math.min(700,b.gap+b.jit*2+25):Math.max(90,Math.min(650,b.gap*1.5));
+  b.dl=b.dl===null?want:b.dl+(want-b.dl)*0.01;
+  const S=b.s,at=performance.now()-(b.ts?b.off:0)-b.dl;
+  if(n===1||at<=S[0].t)return S[0];
+  for(let i=n-1;i>0;i--){const a=S[i-1],c=S[i];
+    if(at>=a.t){if(at>=c.t)return c;const k=(at-a.t)/Math.max(1,c.t-a.t);
+      return {x:a.x+(c.x-a.x)*k,y:a.y+(c.y-a.y)*k,z:a.z+(c.z-a.z)*k,r:angLerp(a.r,c.r,k),f:c.f};}}
+  return S[n-1];}
 function mpRemote(uid){
   let r=REMOTE.get(uid);if(r)return r;
   const nm=mpName(uid);
-  r={uid,name:nm,lg:null,gh:null,label:makeLabel(nm),ph:0,alive:false,seen:false,tx:0,ty:0,tz:0,yaw:0,gy:0,
+  r={uid,name:nm,lg:null,gh:null,label:makeLabel(nm),ph:0,alive:false,seen:false,tx:0,ty:0,tz:0,yaw:0,gy:0,ip:ipNew(),
     ent:{x:0,y:0,z:0,floor:0,nodeKey:'',hiding:false,veiling:false,dashing:false,moving:false,invis:false,noiseR:0,hideSpot:null,isRemote:true,uid}};
   REMOTE.set(uid,r);return r;}
 function mpDropRemote(r){
@@ -6602,7 +6637,9 @@ function mpApplyStateRaw(uid,v){
   r.tx=+v.x||0;r.ty=+v.y||0;r.tz=+v.z||0;r.yaw=+v.r||0;r.ent.floor=v.f|0;
   r.ent.hiding=!!(fl&1);r.ent.veiling=!!(fl&2);r.ent.dashing=!!(fl&4);r.ent.moving=!!(fl&8);r.ent.invis=!!(fl&16);
   r.ent.noiseR=+v.nz||0;r.ph=v.ph|0;r.alive=r.ph===1;r.et=+v.et||0;
-  if(!r.seen||Math.hypot(r.tx-r.ent.x,r.tz-r.ent.z)>6||Math.abs(r.ty-r.ent.y)>4){r.seen=true;r.ent.x=r.tx;r.ent.y=r.ty;r.ent.z=r.tz;r.gy=r.yaw;}
+  const jump=!r.seen||Math.hypot(r.tx-r.ent.x,r.tz-r.ent.z)>6||Math.abs(r.ty-r.ent.y)>4;
+  if(jump){r.seen=true;r.ent.x=r.tx;r.ent.y=r.ty;r.ent.z=r.tz;r.gy=r.yaw;}
+  ipPush(r.ip,r.tx,r.ty,r.tz,r.yaw,r.ent.floor,jump,+v.ts);
   if(v.lg&&v.lg!==r.lg){
     r.lg=v.lg;if(r.gh){disposeLegend(r.gh);r.gh=null;}
     const c=BYID[v.lg]||ROSTER[0];
@@ -6613,8 +6650,9 @@ function mpApplyStateRaw(uid,v){
     else if(r.ph===3)toast(n+' ESCAPED THE HOUSE',4);
     else if(r.ph===1&&prev===2)toast(n+' RISES AGAIN',2.5);}}
 function mpUpdateRemote(r,dt,t){
-  const e=r.ent,k=Math.min(1,dt*10);
-  e.x+=(r.tx-e.x)*k;e.y+=(r.ty-e.y)*k;e.z+=(r.tz-e.z)*k;
+  const e=r.ent,q=ipAt(r.ip);
+  if(q){e.x=q.x;e.y=q.y;e.z=q.z;r.gy=angLerp(r.gy,q.r,Math.min(1,dt*14));}
+  else{const k=Math.min(1,dt*10);e.x+=(r.tx-e.x)*k;e.y+=(r.ty-e.y)*k;e.z+=(r.tz-e.z)*k;}
   e.nodeKey=nk(e.floor,Math.floor(e.x/CS),Math.floor(e.z/CS));
   e.hideSpot=e.hiding?{x:e.x,z:e.z}:null;
   const show=r.ph===1&&!!r.gh;
@@ -6623,7 +6661,6 @@ function mpUpdateRemote(r,dt,t){
     r.label.visible=show&&e.floor===P.floor&&!e.hiding&&Math.hypot(e.x-P.x,e.z-P.z)<24;
     if(show){
       r.gh.g.position.set(e.x,e.y+0.22+Math.sin(t*2.1+r.yaw)*0.07,e.z);
-      let dy=r.yaw-r.gy;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;r.gy+=dy*Math.min(1,dt*10);
       r.gh.g.rotation.y=r.gy;
       const mo=e.hiding?0.04:e.veiling?0.16:0.85,co=e.hiding?0.02:e.veiling?0.1:0.5,q=Math.min(1,dt*8);
       r.gh.mat.opacity+=(mo-r.gh.mat.opacity)*q;r.gh.coreMat.opacity+=(co-r.gh.coreMat.opacity)*q;
@@ -6637,16 +6674,19 @@ function mpApplyMon(uid,v){
   const i=PUP.findIndex(p=>p.uid===uid);
   if(!v){if(i>=0){const p=PUP[i];if(catcher===p)catcher=null;scene.remove(p.mon.g);PUP.splice(i,1);}return;}
   let p=PUP[i];
-  if(!p){p={uid,M:Object.assign(entAt(0,0,0),{state:'patrol',stunT:0,goneT:0,slowT:0,yaw:0,noticeT:-1,tg:''}),mon:buildMonster(),tx:0,ty:0,tz:0,yt:0,seen:false};
+  if(!p){p={uid,M:Object.assign(entAt(0,0,0),{state:'patrol',stunT:0,goneT:0,slowT:0,yaw:0,noticeT:-1,tg:''}),mon:buildMonster(),tx:0,ty:0,tz:0,yt:0,seen:false,ip:ipNew()};
     p.mon.mute=true;PUP.push(p);}
   p.tx=+v.x||0;p.ty=+v.y||0;p.tz=+v.z||0;p.yt=+v.r||0;p.M.floor=v.f|0;
   p.M.state=['patrol','investigate','search','chase'][v.s|0]||'patrol';
   p.M.goneT=v.g?1:0;p.M.stunT=v.st?1:0;p.M.tg=v.tg||'';
-  if(!p.seen||Math.hypot(p.tx-p.M.x,p.tz-p.M.z)>6){p.seen=true;p.M.x=p.tx;p.M.z=p.tz;p.M.y=p.ty;p.M.yaw=p.yt;}}
+  const jump=!p.seen||Math.hypot(p.tx-p.M.x,p.tz-p.M.z)>6;
+  if(jump){p.seen=true;p.M.x=p.tx;p.M.z=p.tz;p.M.y=p.ty;p.M.yaw=p.yt;}
+  if(p.ip)ipPush(p.ip,p.tx,p.ty,p.tz,p.yt,p.M.floor,jump,+v.ts);}
 function mpUpdatePuppet(p,dt){
-  const m=p.M,k=Math.min(1,dt*10);
-  m.x+=(p.tx-m.x)*k;m.z+=(p.tz-m.z)*k;m.y+=(p.ty-m.y)*k;
-  let dy=p.yt-m.yaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;m.yaw+=dy*Math.min(1,dt*8);
+  const m=p.M,q=p.ip&&ipAt(p.ip);
+  if(q){m.x=q.x;m.y=q.y;m.z=q.z;m.yaw=angLerp(m.yaw,q.r,Math.min(1,dt*12));}
+  else{const k=Math.min(1,dt*10);m.x+=(p.tx-m.x)*k;m.z+=(p.tz-m.z)*k;m.y+=(p.ty-m.y)*k;
+    let dy=p.yt-m.yaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;m.yaw+=dy*Math.min(1,dt*8);}
   m.nodeKey=nk(m.floor,Math.floor(m.x/CS),Math.floor(m.z/CS));
   p.mon.g.visible=m.goneT<=0;}
 /* a hunter that belongs to someone else has reached you */
@@ -6698,12 +6738,13 @@ function mpPublish(){
   const ph=state==='play'?1:(state==='caught'||state==='dead')?2:state==='win'?3:0;
   const fl=(P.hiding?1:0)|(P.veiling?2:0)|(P.dashing?4:0)|(P.moving?8:0)|(AB.invisT>0?16:0)|(AB.silentT>0?32:0);
   const nr=ph===1&&!(P.veiling||AB.invisT>0||AB.silentT>0)?((P.dashing&&P.moving)?PS.noiseB:(P.moving?PS.noise:0))*(AB.loudT>0?1.7:1):0;
-  const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:pubLegend()};
+  const ts=Math.round(performance.now());   /* when this was sent, so the others can play it back evenly */
+  const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:pubLegend(),ts};
   if(ph===3)so.et=TEAM.myOut;   /* when I got out: the team's time is the latest of these */
   MP.net.publishState(MP.code,so).catch(()=>{});
   const st={patrol:0,investigate:1,search:2,chase:3}[M.state]||0;
   const tg=M.state==='chase'&&M.tgt?(M.tgt===P?MP.uid:(M.tgt.uid||'')):'';
-  MP.net.publishMon(MP.code,{x:r2(M.x),y:r2(M.y),z:r2(M.z),f:M.floor,r:r2(M.yaw),s:st,g:M.goneT>0?1:0,st:M.stunT>0?1:0,tg}).catch(()=>{});}
+  MP.net.publishMon(MP.code,{x:r2(M.x),y:r2(M.y),z:r2(M.z),f:M.floor,r:r2(M.yaw),s:st,g:M.goneT>0?1:0,st:M.stunT>0?1:0,tg,ts}).catch(()=>{});}
 
 function mpTeamHud(){
   if(!mpRoom||!mpRoom.players)return;
@@ -6896,9 +6937,11 @@ function specCamera(dt,t){
   for(let i=1;i<=14;i++){const k=i/14;
     const px=tgt.x+(cp.x-tgt.x)*k,py=tgt.y+(cp.y-tgt.y)*k,pz=tgt.z+(cp.z-tgt.z)*k;
     if(blocksSight(f,Math.floor(px/CS),Math.floor(pz/CS))||(py>f*FH+LINTEL-0.1&&DOORSET.has(nk(f,Math.floor(px/CS),Math.floor(pz/CS))))){best=(i-1)/14*0.92;break;}}
-  cp=tgt.clone().lerp(cp,best);
+  /* pull in at once when a wall comes between, ease back out (no flicking in and out at corners) */
+  if(!SPEC.cam||SPEC.bf==null||best<SPEC.bf)SPEC.bf=best;else SPEC.bf+=(best-SPEC.bf)*Math.min(1,dt*2.5);
+  cp=tgt.clone().lerp(cp,SPEC.bf);
   if(!SPEC.cam){SPEC.cam=true;camera.position.copy(cp);}
-  camera.position.lerp(cp,Math.min(1,dt*8));
+  camera.position.lerp(cp,Math.min(1,dt*12));
   const look=tgt.clone().addScaledVector(fwd,1.4);look.y+=0.05;
   camera.lookAt(look);
   camera.fov+=(62-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();
@@ -6991,7 +7034,7 @@ function socialTick(now){
   if(!SOC.net||!SOC.uid||WATCH)return;
   socialPresence(false);
   if(!SOC.friends.length||!inNightState()){if(SOC.lastWatch){SOC.lastWatch=0;SOC.epSig='';SOC.net.clearWatch(SOC.uid);}return;}
-  if(now-SOC.lastWatch<250)return;
+  if(now-SOC.lastWatch<150)return;
   SOC.lastWatch=now;
   const q=v=>Math.round(v*100)/100;
   const ep=embers.map(e=>[e.f,q(e.x),q(e.z)]),sig=JSON.stringify(ep);
@@ -7002,7 +7045,7 @@ function socialTick(now){
   REMOTE.forEach(r=>{if(r.ph===1&&r.lg)mates.push([q(r.ent.x),q(r.ent.y),q(r.ent.z),r.ent.floor,q(r.gy||r.yaw||0),r.lg,String(r.name).slice(0,24),
     (r.ent.hiding?1:0)|(r.ent.veiling?2:0)|(r.ent.dashing?4:0)|(r.ent.moving?8:0)]);});
   SOC.net.publishWatch(SOC.uid,{
-    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,mp:MP?MP.code:'',lg:pubLegend(),n:cloudUser.name,
+    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,mp:MP?MP.code:'',lg:pubLegend(),n:cloudUser.name,ts:Math.round(performance.now()),
     p:[q(P.x),q(P.y),q(P.z),P.floor,q(ghostYaw),fl],
     m:[monRow(M)].concat(PUP.map(p=>monRow(p.M))),
     o:mates,
@@ -7105,7 +7148,7 @@ $('acctScrim').addEventListener('click',()=>closeFriends());
    same size and shows it from behind them. Nothing here is played or saved. Only friends can read
    watch/{uid} (database.rules.json).
    ========================================================= */
-const WV={s:null,ep:null,at:0,net:null,unsub:null,name:'',reloading:false,mates:new Set(),pups:[],ok:false,err:''};
+const WV={pb:ipNew(),mb:[],s:null,ep:null,at:0,net:null,unsub:null,name:'',reloading:false,mates:new Set(),pups:[],ok:false,err:''};
 async function watchInit(){
   document.body.classList.add('watching');
   state='watch';showOv(null);setScreenState();
@@ -7116,7 +7159,9 @@ async function watchInit(){
     const net=await import('./multiplayer.js');
     await net.initSocial();WV.net=net;
     if(!net.me||!net.me.signedIn){watchBar('SIGN IN TO WATCH FRIENDS','Open the title screen, sign in, then use FRIENDS');return;}
-    WV.unsub=net.onWatch(WATCH,s=>{WV.s=s;WV.at=performance.now();},ep=>{WV.ep=ep;watchEmbers();});
+    WV.unsub=net.onWatch(WATCH,s=>{WV.s=s;WV.at=performance.now();
+      if(s&&Array.isArray(s.p)){const p=s.p;ipPush(WV.pb,+p[0]||0,+p[1]||0,+p[2]||0,+p[4]||0,p[3]|0,false,+s.ts);}
+      if(s&&Array.isArray(s.m))s.m.forEach((row,i)=>{if(!Array.isArray(row))return;WV.mb[i]=WV.mb[i]||ipNew();ipPush(WV.mb[i],+row[0]||0,+row[1]||0,+row[2]||0,+row[4]||0,row[3]|0,false,+s.ts);});},ep=>{WV.ep=ep;watchEmbers();});
     WV.ok=true;
   }catch(e){console.warn('Watch:',e);watchBar('COULD NOT REACH YOUR FRIEND',String(e.message||e));}
 }
@@ -7137,9 +7182,9 @@ function watchFrame(dt,t){
   /* a different house size (co-op ↔ solo): rebuild for it */
   if(s.nf&&s.nf!==NF&&!WV.reloading){WV.reloading=true;location.replace('index.html?watch='+encodeURIComponent(WATCH)+'&floors='+s.nf);return;}
   const k=Math.min(1,dt*8),p=s.p||[0,0,0,0,0,0];
-  if(Math.hypot(p[0]-P.x,p[2]-P.z)>6||p[3]!==P.floor){P.x=p[0];P.y=p[1];P.z=p[2];}
-  else{P.x+=(p[0]-P.x)*k;P.y+=(p[1]-P.y)*k;P.z+=(p[2]-P.z)*k;}
-  P.floor=p[3];P.nodeKey=nk(P.floor,Math.floor(P.x/CS),Math.floor(P.z/CS));
+  {const q=ipAt(WV.pb);if(q){P.x=q.x;P.y=q.y;P.z=q.z;P.floor=q.f;}
+   else{P.x=p[0];P.y=p[1];P.z=p[2];P.floor=p[3];}}
+  P.nodeKey=nk(P.floor,Math.floor(P.x/CS),Math.floor(P.z/CS));
   P.hiding=!!(p[5]&1);P.veiling=!!(p[5]&2);P.dashing=!!(p[5]&4);P.moving=!!(p[5]&8);
   let dy=p[4]-ghostYaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;ghostYaw+=dy*Math.min(1,dt*10);
   let cy=ghostYaw-camYaw;while(cy>Math.PI)cy-=2*Math.PI;while(cy<-Math.PI)cy+=2*Math.PI;camYaw+=cy*Math.min(1,dt*3);
@@ -7154,17 +7199,19 @@ function watchFrame(dt,t){
   ghost.light.intensity+=((P.hiding?0.3:P.veiling?2.5:7)-ghost.light.intensity)*Math.min(1,dt*6);
   /* the hunters: their own one is ours to draw, the rest are puppets */
   const ms=s.m||[],ST=['patrol','investigate','search','chase'];
-  const apply=(m,row,snap)=>{
-    if(snap||Math.hypot(row[0]-m.x,row[2]-m.z)>6||row[3]!==m.floor){m.x=row[0];m.y=row[1];m.z=row[2];}
+  const apply=(m,row,snap,i)=>{
+    const q=!snap&&WV.mb[i]&&ipAt(WV.mb[i]);
+    if(q){m.x=q.x;m.y=q.y;m.z=q.z;}
+    else if(snap||Math.hypot(row[0]-m.x,row[2]-m.z)>6||row[3]!==m.floor){m.x=row[0];m.y=row[1];m.z=row[2];}
     else{m.x+=(row[0]-m.x)*k;m.y+=(row[1]-m.y)*k;m.z+=(row[2]-m.z)*k;}
     m.floor=row[3];let d=row[4]-(m.yaw||0);while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;m.yaw=(m.yaw||0)+d*Math.min(1,dt*8);
     m.state=ST[row[5]]||'patrol';m.goneT=row[6]?1:0;m.nodeKey=nk(m.floor,Math.floor(m.x/CS),Math.floor(m.z/CS));};
-  if(ms[0])apply(M,ms[0]);
+  if(ms[0])apply(M,ms[0],false,0);
   mon.g.visible=!!ms[0]&&M.goneT<=0;
   while(PUP.length<ms.length-1){const pp={uid:'w'+PUP.length,M:Object.assign(entAt(0,0,0),{state:'patrol',stunT:0,goneT:0,slowT:0,yaw:0,noticeT:-1,tg:''}),mon:buildMonster(),tx:0,ty:0,tz:0,yt:0,seen:true};
-    pp.mon.mute=true;PUP.push(pp);apply(pp.M,ms[PUP.length],true);}
+    pp.mon.mute=true;PUP.push(pp);apply(pp.M,ms[PUP.length],true,PUP.length);}
   while(PUP.length>Math.max(0,ms.length-1)){const pp=PUP.pop();scene.remove(pp.mon.g);}
-  PUP.forEach((pp,i)=>{apply(pp.M,ms[i+1]);pp.mon.g.visible=pp.M.goneT<=0;});
+  PUP.forEach((pp,i)=>{apply(pp.M,ms[i+1],false,i+1);pp.mon.g.visible=pp.M.goneT<=0;});
   animateAllMonsters(dt,t);
   /* their teammates */
   const seen=new Set();
