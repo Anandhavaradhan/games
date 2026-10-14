@@ -682,6 +682,7 @@
     <h3>LEADERBOARD</h3>
     <div class="lbtabs"><span data-lbtab="esc" class="on">FASTEST ESCAPES</span><span data-lbtab="time">MOST TIME PLAYED</span></div>
     <div class="lbtabs sub" id="lbDiffTabs"><span data-lbdiff="easy">EASY</span><span data-lbdiff="normal" class="on">NORMAL</span><span data-lbdiff="hard">HARD</span><span data-lbdiff="nightmare">NIGHTMARE</span></div>
+    <div class="lbtabs sub" id="lbModeTabs"><span data-lbmode="all" class="on">ALL ENTRIES</span><span data-lbmode="best">BEST PER PLAYER</span></div>
     <p class="lbsub" id="lbSub"></p>
     <div id="lbBody"></div>
     <div id="lbClose">CLOSE</div>
@@ -6048,6 +6049,21 @@ setInterval(()=>{if(acctOpen&&cloudUser)updateAcctLive();},5000);
 const BOARD_SIZE=300;         /* rows shown in the panel (it scrolls) */
 const BOARD_MIN_TIME=20;      /* seconds; faster is impossible, so it is rejected (also in firestore.rules) */
 let lbOpen=false,lbData=null,lbErr='',lbMine=null,lbTab='esc',lbDiff='normal';
+/* FASTEST ESCAPES has two views: every run (a player can be on it many times) or each player once, at their best */
+let lbMode=(function(){try{return localStorage.getItem('hm_lbmode')==='best'?'best':'all';}catch(e){return 'all';}})();
+const lbKey=n=>String(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+/* each player's fastest run, once. A co-op run counts for everyone in it, so it stands as the best of any
+   member who has nothing faster; a player already shown further up is not shown again. */
+function bestPerPlayer(list){
+  const seen=new Set(),out=[];
+  for(const r of list){
+    /* usernames are unique, so the name is the player (co-op rows only carry the names) */
+    const who=r.team?String(r.name||'').split('+').map(lbKey).filter(Boolean):[lbKey(r.name)||'u:'+r.uid];
+    if(!who.length||who.every(k=>seen.has(k)))continue;
+    who.forEach(k=>seen.add(k));out.push(r);}
+  return out;
+}
+const lbRows=()=>!lbData?null:(lbTab==='esc'&&lbMode==='best'?bestPerPlayer(lbData):lbData).slice(0,BOARD_SIZE);
 const titleCase=t=>String(t).toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase());
 const canPost=()=>!!(cloud&&cloudUser&&!cloudUser.anon&&cloudUser.unameOk);
 const needsUname=()=>!!(cloud&&cloudUser&&!cloudUser.anon&&!cloudUser.unameOk);
@@ -6107,6 +6123,7 @@ async function boardAfterTeamEscape(nt){
 
 /* ---- the panel ---- */
 const LB_SUB={esc:'Every escape from Hollowmere, fastest first, on its own board for each difficulty. The clock runs from waking to the front door.',
+  best:'Each player once, at their fastest escape, on its own board for each difficulty. A co-op escape counts for everyone in it.',
   time:'Time spent actually playing. Standing still, hiding too long, idling or repeating the same moves does not count.'};
 function openBoard(){
   if(lbOpen)return;
@@ -6122,8 +6139,10 @@ function setBoardTab(t){
   lbTab=t;lbData=null;lbErr='';lbMine=null;
   document.querySelectorAll('#lbPanel [data-lbtab]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-lbtab')===t));
   document.querySelectorAll('#lbPanel [data-lbdiff]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-lbdiff')===lbDiff));
+  document.querySelectorAll('#lbPanel [data-lbmode]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-lbmode')===lbMode));
   $('lbDiffTabs').style.display=t==='esc'?'flex':'none';
-  $('lbSub').textContent=LB_SUB[t];
+  $('lbModeTabs').style.display=t==='esc'?'flex':'none';
+  $('lbSub').textContent=LB_SUB[t==='esc'&&lbMode==='best'?'best':t];
   renderBoard();loadBoard();
 }
 function closeBoard(){
@@ -6136,12 +6155,12 @@ async function loadBoard(){
   const tab=lbTab,dk=lbDiff;
   if(!cloud){lbErr='off';renderBoard();return;}
   let data=null,err='',mine=null;
-  try{data=tab==='esc'?await cloud.loadEscapes(BOARD_SIZE,dk):await cloud.loadPlaytimeBoard(BOARD_SIZE);}
+  try{data=tab==='esc'?await cloud.loadEscapes(2000,dk):await cloud.loadPlaytimeBoard(BOARD_SIZE);}
   catch(e){console.warn('Leaderboard read failed:',e);err='read';}
   /* your own best solo escape on this difficulty, straight from the board */
   if(tab==='esc'&&canPost()&&data){
     const i=data.findIndex(r=>r.uid===cloudUser.uid&&!r.team);
-    if(i>=0)mine={v:data[i].time,rank:i+1};}
+    if(i>=0)mine={v:data[i].time,rank:i+1,id:data[i].id};}
   if(tab==='time'&&canPost()&&ptBase!==null){
     const v=ptBase;mine={v,rank:0};try{mine.rank=await cloud.playtimeRank(v);}catch(e){}}
   if(!lbOpen||tab!==lbTab||dk!==lbDiff)return;
@@ -6152,8 +6171,8 @@ function renderBoard(){
   if(lbErr==='off')h='<p class="acnote">The leaderboard needs accounts switched on for this copy of the game.</p>';
   else if(lbErr)h='<p class="acnote">The leaderboard could not be reached. Check your connection, then open it again.</p>';
   else if(!lbData)h='<p class="acnote" style="text-align:center">Reading the board…</p>';
-  else if(!lbData.length)h='<p class="acnote" style="text-align:center">'+(lbTab==='esc'?'No one has escaped on '+titleCase(DIFFS[lbDiff].n)+' yet. The first name here could be yours.':'No time recorded yet. Play, and yours will be the first.')+'</p>';
-  else h='<div id="lbList">'+lbData.map((r,i)=>{
+  else if(!lbRows().length)h='<p class="acnote" style="text-align:center">'+(lbTab==='esc'?'No one has escaped on '+titleCase(DIFFS[lbDiff].n)+' yet. The first name here could be yours.':'No time recorded yet. Play, and yours will be the first.')+'</p>';
+  else h='<div id="lbList">'+lbRows().map((r,i)=>{
     const me=!!(cloudUser&&r.uid===cloudUser.uid&&!r.team);
     let meta,val;
     if(lbTab==='esc'){
@@ -6172,7 +6191,9 @@ function renderBoard(){
     if(needsUname())foot='Choose a username in your account to appear on the boards.';
     else if(!canPost())foot=lbTab==='esc'?'Sign in, then escape, to put your name on the board.':'Sign in, then play, to put your time on the board.';
     else if(lbTab==='esc'){
-      if(lbMine)foot='Your best solo on '+titleCase(DIFFS[lbDiff].n)+': '+fmtTime(lbMine.v)+' \u00b7 #'+lbMine.rank;
+      if(lbMine){let rk=lbMine.rank;
+        if(lbMode==='best'){const j=bestPerPlayer(lbData).findIndex(r=>r.id===lbMine.id);rk=j>=0?j+1:0;}
+        foot='Your best solo on '+titleCase(DIFFS[lbDiff].n)+': '+fmtTime(lbMine.v)+(rk?' \u00b7 #'+rk:'');}
       else foot='Escape on '+titleCase(DIFFS[lbDiff].n)+' to set your first time here.';}
     else if(lbMine)foot='Your active time: '+fmtDur(lbMine.v)+(lbMine.rank?' · #'+lbMine.rank:'');
   }
@@ -6181,7 +6202,11 @@ function renderBoard(){
 ['titleBoard','btnBoardW'].forEach(id=>$(id).addEventListener('click',e=>{e.stopPropagation();openBoard();}));
 $('lbPanel').addEventListener('click',e=>{e.stopPropagation();
   const t=e.target.closest('[data-lbtab]');if(t&&t.getAttribute('data-lbtab')!==lbTab)setBoardTab(t.getAttribute('data-lbtab'));
-  const d=e.target.closest('[data-lbdiff]');if(d&&d.getAttribute('data-lbdiff')!==lbDiff){lbDiff=d.getAttribute('data-lbdiff');setBoardTab(lbTab);}});
+  const d=e.target.closest('[data-lbdiff]');if(d&&d.getAttribute('data-lbdiff')!==lbDiff){lbDiff=d.getAttribute('data-lbdiff');setBoardTab(lbTab);}
+  const m=e.target.closest('[data-lbmode]');if(m&&m.getAttribute('data-lbmode')!==lbMode){lbMode=m.getAttribute('data-lbmode');
+    try{localStorage.setItem('hm_lbmode',lbMode);}catch(e){}
+    document.querySelectorAll('#lbPanel [data-lbmode]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-lbmode')===lbMode));
+    $('lbSub').textContent=LB_SUB[lbMode==='best'?'best':'esc'];renderBoard();}});
 $('lbClose').addEventListener('click',e=>{e.stopPropagation();closeBoard();});
 
 /* =========================================================
