@@ -199,7 +199,7 @@ function dur(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.flo
 function ago(t){if(!t)return '—';const d=(Date.now()-t)/1000;
   if(d<45)return 'just now';if(d<3600)return Math.round(d/60)+' min ago';if(d<86400)return Math.round(d/3600)+' h ago';
   if(d<86400*14)return Math.round(d/86400)+' d ago';return new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});}
-const legendName=id=>BY[id]?BY[id][1].replace(/(^|\s)(\S)(\S*)/g,(m,a,b,c)=>a+b+c.toLowerCase()):(id||'—');
+const legendName=id=>BY[id]?BY[id][1].replace(/(^|\s)(\S)(\S*)/g,(m,a,b,c)=>a+b+c.toLowerCase()):/^cx/.test(id||'')?'A combined legend':(id||'—');
 const legendColour=id=>BY[id]?BY[id][3]:'#8c8573';
 const titleCase=s=>String(s||'').toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase());
 const plural=(n,w)=>n+' '+w+(n===1?'':'s');

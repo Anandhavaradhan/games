@@ -439,6 +439,20 @@
   .vbtn.dim{border-color:#3a3630;color:#6f6a5c;cursor:default}
   .vbtn .eg{font-size:13px}
   .vneed{font-size:11px;letter-spacing:2px;color:#8a7f60;margin-top:9px;text-align:center}
+  /* combining legends */
+  .vchip.cmb{color:#ffcf8a;border-color:rgba(255,207,138,.5)}
+  .vchip.cmb.on{background:rgba(255,207,138,.12)}
+  .vcmb-price{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
+  .vcmb-price span{font-size:10px;letter-spacing:1.5px;padding:5px 8px;border:1px solid #33302a;color:#8f8874}
+  .vcmb-price span.on{border-color:#ffcf8a;color:#ffcf8a}
+  .vcmb-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .vcmb-pick{position:relative;cursor:pointer;font-family:'Cormorant SC',serif;font-size:11px;letter-spacing:1.5px;padding:7px 10px 7px 10px;
+    border:1px solid #33302a;background:rgba(10,12,18,.66);color:#a89f8a}
+  .vcmb-pick.on{border-color:var(--pt);color:var(--pt);background:rgba(255,255,255,.04)}
+  .vcmb-pick.full{opacity:.4;cursor:default}
+  .vcmb-pick b{display:inline-block;min-width:14px;margin-right:5px;color:var(--pt)}
+  .vcmb-pw{font-size:12px;line-height:1.5;color:#a89f8a;margin-top:4px}
+  .vcmb-pw i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
 
   @media (max-width:820px){
     #vDoss{width:300px;flex:0 0 300px}
@@ -1302,7 +1316,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)guestFlush(
 addEventListener('pagehide',()=>guestFlush(true));
 const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned'];
 function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,legendRuns:{}};}
-function freshSave(){return {ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
+function freshSave(){return {combos:[],ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
    new account. A signed-in account's local copy (LS_KEY:uid) stays in localStorage as before. */
@@ -1333,13 +1347,55 @@ function cleanSave(raw,isLocal){
   /* One-time re-cut for old local saves: the leagues were re-ordered by power,
      so saves made before that go back to the free five and keep their ether. */
   if(isLocal&&raw&&raw.v!==SAVE_V)out.unlocked=FREE.slice();
-  if(BYID[src.main]&&out.unlocked.indexOf(src.main)>=0)out.main=src.main;
+  /* combined legends (kept in the cloud inside stats, so the account rules need no change) */
+  const cs=Array.isArray(src.combos)?src.combos:(src.stats&&Array.isArray(src.stats.combos))?src.stats.combos:[];
+  const seenK={};
+  out.combos=cs.filter(x=>x&&typeof x.id==='string'&&/^cx[a-z0-9]{1,20}$/.test(x.id)&&Array.isArray(x.p)
+      &&x.p.length>=2&&x.p.length<=COMBO_MAX&&x.p.every((id,i,a)=>BYID[id]&&!BYID[id].combo&&id!=='god'&&a.indexOf(id)===i&&out.unlocked.indexOf(id)>=0))
+    .filter(x=>{const k=comboKey(x.p);if(seenK[k])return false;seenK[k]=1;return true;})
+    .slice(0,COMBO_LIMIT).map(x=>({id:x.id,p:x.p.slice()}));
+  if(st.legendRuns&&typeof st.legendRuns==='object')
+    out.combos.forEach(x=>{if(typeof st.legendRuns[x.id]==='number')out.stats.legendRuns[x.id]=st.legendRuns[x.id];});
+  if(BYID[src.main]&&!BYID[src.main].combo&&out.unlocked.indexOf(src.main)>=0)out.main=src.main;
+  else if(out.combos.some(x=>x.id===src.main))out.main=src.main;
   return out;
 }
+/* =========================================================
+   COMBINED LEGENDS — fuse 2, 3 or 4 legends you own into one.
+   It carries every one of their powers (each with its own essence and cooldown, fired alone or
+   together, like the keeper's legend), the highest of each stat, and the look of the first one picked.
+   Everyone else — co-op, the watch page, the leaderboards — sees that first legend.
+   Price: 10,000 ether for two, doubling for each one more.
+   ========================================================= */
+const COMBO_MAX=4,COMBO_LIMIT=20;
+const comboCost=n=>10000*Math.pow(2,Math.max(0,n-2));
+const comboKey=p=>p.slice().sort().join('|');
+const shortName=c=>c.n.replace(/^THE\s+/,'');
+function comboBuild(x){
+  const tc=t=>String(t).toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase());
+  const parts=x.p.map(id=>BYID[id]),b=parts[0];
+  const st=[0,1,2,3].map(i=>Math.max.apply(null,parts.map(c=>c.st[i])));
+  const abs=parts.map(c=>c.ab);
+  return {id:x.id,combo:true,p:x.p.slice(),n:parts.map(shortName).join(' + '),e:'Many Souls, One Shape',c:'COMBINED',
+    tier:0,pw:Math.max.apply(null,parts.map(c=>c.pw||0)),r:b.r,t:b.t,look:b.look,st,pub:b.id,
+    l:'Fused in the vault from '+parts.map(c=>tc(c.n)).join(', ')+'. It walks the house as '+tc(b.n)+'.',
+    ab:{n:abs.map(a=>a.n).join(' + '),k:'multi',cd:Math.min.apply(null,abs.map(a=>a.cd)),cost:Math.min.apply(null,abs.map(a=>a.cost)),parts:abs,
+      p:abs.map(a=>a.n).join(', ')+' \u2014 '+abs.length+' powers, each with its own essence and cooldown. Fire one (keys 1\u2013'+abs.length+', or tap its icon) or the ticked ones together (G or ALL). Hold an icon (or Alt + its number) to tick or untick it.',
+      d:abs.map(a=>a.d).join(' ')}};
+}
+/* put this save's combined legends into the vault (and take out any from another save) */
+function comboSync(list){
+  for(let i=ROSTER.length-1;i>=0;i--)if(ROSTER[i].combo){delete BYID[ROSTER[i].id];ROSTER.splice(i,1);}
+  for(let i=ORDER.length-1;i>=0;i--)if(ORDER[i].combo)ORDER.splice(i,1);
+  const at=ORDER.length&&ORDER[0].id==='god'?1:0;
+  (list||[]).slice().reverse().forEach(x=>{if(!x.p.every(id=>BYID[id]))return;
+    const c=comboBuild(x);ROSTER.push(c);BYID[c.id]=c;ORDER.splice(at,0,c);});
+}
 let save=cleanSave(readLocal(LS_KEY),true);
+comboSync(save.combos);
 function saveNow(){try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
 saveNow();
-const isUnlocked=id=>id==='god'?GOD.ok:save.unlocked.indexOf(id)>=0;
+const isUnlocked=id=>id==='god'?GOD.ok:(BYID[id]&&BYID[id].combo)?true:save.unlocked.indexOf(id)>=0;
 const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id);
 /* An account-only legend. It is added to the vault only once the database confirms this account is an
    admin (admins/{uid}, which only that account can read), so nobody else ever sees it. Choosing it does
@@ -1348,12 +1404,17 @@ const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id
 const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true]};
 /* which powers G / the power button fire together (the ticks on the boxes), remembered on this device */
 try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length===4)GOD.sel=v.map(Boolean);}catch(e){}
-function godToggle(i){if(GOD.c&&godIsAuto(GOD.c.ab.parts[i]))return;GOD.sel[i]=!GOD.sel[i];try{localStorage.setItem('hm_gsel',JSON.stringify(GOD.sel));}catch(e){}
-  const n=GOD.c?GOD.c.ab.parts[i].n:'';toast((GOD.sel[i]?'\u2713 ':'\u2715 ')+n+(GOD.sel[i]?' \u2014 FIRES WITH THE OTHERS':' \u2014 LEFT OUT'),1.6);}
-const godActive=()=>GOD.on&&GOD.ok&&!!GOD.c;
+function godToggle(i){const ps=curLegend().ab.parts||[];if(!ps[i]||godIsAuto(ps[i]))return;GOD.sel[i]=!GOD.sel[i];try{localStorage.setItem('hm_gsel',JSON.stringify(GOD.sel));}catch(e){}
+  const n=ps[i].n;toast((GOD.sel[i]?'\u2713 ':'\u2715 ')+n+(GOD.sel[i]?' \u2014 FIRES WITH THE OTHERS':' \u2014 LEFT OUT'),1.6);}
+/* the keeper's own legend */
+const isRealGod=()=>GOD.on&&GOD.ok&&!!GOD.c;
+/* any legend with several powers: the keeper's or a combined one. They share the same HUD and upkeep. */
+const godActive=()=>curLegend().ab.k==='multi';
 /* each of its powers has its own essence (refills by itself) and its own cooldown */
 const GOD_REGEN=3;   /* essence per second, per power */
-function godReset(){GOD.st=GOD.c?GOD.c.ab.parts.map(()=>({ess:100,cd:0})):[];}
+function godReset(){const a=curLegend().ab;GOD.st=a.k==='multi'?a.parts.map(()=>({ess:100,cd:0})):[];}
+/* after the legend changes: right HUD, fresh powers */
+function multiSync(){document.body.classList.toggle('godp',godActive());godReset();}
 function godBuild(){
   const b=BYID.bountyhunter,parts=['legionary','bountyhunter','archer','outrider'].map(id=>BYID[id].ab);
   return {id:'god',n:'GOD',e:'Keeper of the House',c:'ADMIN',tier:4,pw:100,r:b.r,t:b.t,look:b.look,st:[100,100,100,100],pub:b.id,
@@ -1407,6 +1468,7 @@ function computePS(c){
   PS.nerve     = 1+SP*0.0100;
 }
 computePS(curLegend());
+multiSync();
 
 /* ---------------- ABILITY AT A GLANCE ----------------
    Three plain chips instead of a wall of generated clauses:
@@ -2915,6 +2977,7 @@ function setLegend(id){
   ghost.mat.opacity=0.85;
   computePS(c);
   AB.cd=0;AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));
+  if(typeof multiSync==='function')multiSync();
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
 }
 /* the account-only legend: switch it on or off (remembered on this device for this account) */
@@ -2922,8 +2985,7 @@ function godSave(){try{if(GOD.uid)localStorage.setItem('hm_gd:'+GOD.uid,GOD.on?'
 function setGod(on,quiet){
   if(on&&!GOD.ok)return;
   GOD.on=!!on;godSave();
-  document.body.classList.toggle('godp',godActive());
-  if(GOD.on&&GOD.st.length!==((GOD.c&&GOD.c.ab.parts.length)||0))godReset();
+  multiSync();
   if(quiet)return;
   const c=curLegend();
   const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
@@ -2952,13 +3014,13 @@ function godDisable(){
   delete BYID.god;delete ORD.god;
   if(typeof vSel==='number'&&vSel>=ROSTER.length)vSel=0;
   if(wasOn)setGod(false);
-  document.body.classList.remove('godp');
+  multiSync();
 }
 /* fire one of the god's powers (i = 0..3) from its own essence and cooldown */
 /* Testudo (ward) and Dead or Alive (reveal) run by themselves: no button, no essence. */
-const godIsAuto=pa=>!!pa&&(pa.k==='ward'||pa.k==='reveal');
+const godIsAuto=pa=>isRealGod()&&!!pa&&(pa.k==='ward'||pa.k==='reveal');
 function godAuto(){
-  if(!godActive()||state!=='play')return;
+  if(!isRealGod()||state!=='play')return;
   curLegend().ab.parts.forEach((pa,i)=>{const s=GOD.st[i];if(!s||!godIsAuto(pa)||s.cd>0)return;
     if(pa.k==='ward'&&AB.ward>0)return;
     if(pa.k==='reveal'&&AB.revealT>1000)return;
@@ -3024,7 +3086,7 @@ function godHud(){
   /* on screen: a small counter for Testudo, an icon for each power you fire yourself, then ALL.
      Dead or Alive fires on its own and has nothing on screen. */
   const shown=[];parts.forEach((pa,i)=>{if(pa.k==='ward')shown.push({i,mini:1});else if(!godIsAuto(pa))shown.push({i});});
-  const sig=shown.map(o=>o.i+(o.mini?'m':'')).join(',');
+  const sig=shown.map(o=>o.i+(o.mini?'m':'')+parts[o.i].n).join(',');
   if(host.getAttribute('data-sig')!==sig){host.setAttribute('data-sig',sig);
     host.innerHTML=shown.map(o=>{const pa=parts[o.i],col=GOD_COL[o.i]||'#ffcf8a';
         if(o.mini)return '<div class="gpi tbtn abx mini" data-gm="'+o.i+'" style="--vt:'+col+'">'
@@ -3036,7 +3098,8 @@ function godHud(){
     if(isTouch)godArc(host);}
   const manual=shown.filter(o=>!o.mini).map(o=>o.i);
   const eb=$('godess');
-  if(eb&&eb.getAttribute('data-sig')!==manual.join(',')){eb.setAttribute('data-sig',manual.join(','));
+  const esig=manual.map(i=>i+parts[i].n).join(',');
+  if(eb&&eb.getAttribute('data-sig')!==esig){eb.setAttribute('data-sig',esig);
     eb.innerHTML=manual.map(i=>'<div class="ge" data-ge="'+i+'"><span>'+escHTML(godWord(parts[i].n))+'</span><div class="gebar"><i style="background:'+(GOD_COL[i]||'#ffcf8a')+'"></i></div></div>').join('');}
   let anyReady=false;
   Array.from(host.children).forEach(ic=>{
@@ -4005,7 +4068,7 @@ function awardEther(n,key,shout){
   if(shout)toast('+'+n+' ETHER \u00b7 '+key,1.6);
 }
 function resetRun(){
-  if(GOD.c)godReset();
+  godReset();
   RUN.ether=0;RUN.spotted=false;RUN.floors={[spawnDef[2]]:1};RUN.done=false;RUN.tally={};
   RUN.title='';
   AB.cd=0;AB.used=0;AB.invisT=0;AB.after=0;AB.expose=0;AB.silentT=0;AB.hasteT=0;AB.hasteMul=1;
@@ -4546,13 +4609,13 @@ function previewGhost(t){
 }
 
 /* --- THE VAULT ------------------------------------------------- */
-let vaultOpen=false,vSel=0,vaultRed=null,vFilter='ALL';
+let vaultOpen=false,vSel=0,vaultRed=null,vFilter='ALL',vCombining=false,vCmbPick=[];
 function openVault(){
   if(vaultOpen)return;
   vaultOpen=true;
   if(settingsOpen)closeSettings();
   vSel=Math.max(0,ROSTER.findIndex(c=>isBound(c.id)));
-  vFilter='ALL';
+  vFilter='ALL';vCombining=false;vCmbPick=[];
   $('vaultOv').classList.remove('sheet');
   renderVault();
   dressVault();
@@ -4592,10 +4655,16 @@ function renderVault(){
   ROLES.forEach(function(r){counts[r]=ROSTER.filter(function(c){return c.r===r;}).length;});
   $('vFilters').innerHTML=['ALL'].concat(ROLES).map(function(r){
     return '<button class="vchip'+(r===vFilter?' on':'')+'" data-r="'+r+'">'
-      +r+'<i>'+counts[r]+'</i></button>';}).join('');
-  Array.prototype.forEach.call($('vFilters').children,function(ch){
+      +r+'<i>'+counts[r]+'</i></button>';}).join('')
+    +'<button class="vchip cmb'+(vCombining?' on':'')+'" id="vCmbBtn">\u2726 COMBINE</button>';
+  $('vCmbBtn').addEventListener('click',function(e){e.stopPropagation();
+    vCombining=true;vCmbPick=[];
+    if(typeof SFX.uiPick==='function')SFX.uiPick();
+    if(isTouch)$('vaultOv').classList.add('sheet');
+    renderVault();});
+  Array.prototype.forEach.call($('vFilters').querySelectorAll('[data-r]'),function(ch){
     ch.addEventListener('click',function(e){e.stopPropagation();
-      vFilter=ch.getAttribute('data-r');
+      vFilter=ch.getAttribute('data-r');vCombining=false;
       if(typeof SFX.uiPick==='function')SFX.uiPick();
       renderVault();});
   });
@@ -4610,7 +4679,7 @@ function renderVault(){
     if(isBound(c.id))cls.push('bound');
     if(!un)cls.push('sealed',!open?'locked':(save.ether>=cost?'afford':'poor'));
     return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-i="'+i+'" style="--vt:'+c.t+'">'
-      +'<div class="vc-top"><span>'+(c.id==='god'?'\u2726':pad2(ORD[c.id]))+'</span><span class="vc-tier">TIER '+TIER_NAME[c.tier]+'</span></div>'
+      +'<div class="vc-top"><span>'+(c.id==='god'?'\u2726':c.combo?'+':pad2(ORD[c.id]))+'</span><span class="vc-tier">'+(c.combo?'COMBINED':'TIER '+TIER_NAME[c.tier])+'</span></div>'
       +'<div class="vc-name">'+c.n.replace(/^THE /,'')+'</div>'
       +'<div class="vc-role">'+c.r+'</div>'
       +'<div class="vc-foot">'
@@ -4622,12 +4691,13 @@ function renderVault(){
   }).join('');
   Array.prototype.forEach.call($('vGrid').children,function(card){
     card.addEventListener('click',function(e){e.stopPropagation();
-      vSel=parseInt(card.getAttribute('data-i'),10);
+      vSel=parseInt(card.getAttribute('data-i'),10);vCombining=false;
       if(typeof SFX.uiPick==='function')SFX.uiPick();
       if(isTouch)$('vaultOv').classList.add('sheet');
       renderVault();});
   });
 
+  if(vCombining){renderCombine();return;}
   /* --- the dossier --- */
   const c=ROSTER[vSel],un=isUnlocked(c.id),cost=TIER_COST[c.tier],a=c.ab;
   /* the highlighted ghost stands in the dossier's own little scene */
@@ -4657,7 +4727,7 @@ function renderVault(){
         +' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   }
   $('vDossBody').innerHTML=
-     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':pad2(ORD[c.id]))+' / 40</span><span>\u00b7</span>'
+     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':c.combo?'COMBINED \u00b7 '+c.p.length+' LEGENDS':pad2(ORD[c.id])+' / 40')+'</span><span>\u00b7</span>'
       +'<b>'+c.r+'</b></div>'
     +'<div class="vd-note">'+ROLE_NOTE[c.r]+'</div>'
     +'<div class="vd-name">'+c.n+'</div>'
@@ -4692,6 +4762,60 @@ function renderVault(){
     save.ether-=cost;save.unlocked.push(c.id);saveNow();
     setLegend(c.id);renderVault();
     SFX.chime();toast(c.n+' \u2014 DECLASSIFIED',2.8);});
+}
+/* the combine panel (in the dossier's place) */
+function renderCombine(){
+  const owned=ORDER.filter(c=>!c.combo&&c.id!=='god'&&save.unlocked.indexOf(c.id)>=0);
+  vCmbPick=vCmbPick.filter(id=>owned.some(c=>c.id===id));
+  const n=vCmbPick.length,cost=comboCost(Math.max(2,n)),ps=vCmbPick.map(id=>BYID[id]);
+  const dup=n>=2&&save.combos.some(x=>comboKey(x.p)===comboKey(vCmbPick));
+  const full=save.combos.length>=COMBO_LIMIT;
+  const ok=n>=2&&!dup&&!full&&save.ether>=cost;
+  const lead=ps[0]||null;
+  if(lead)pvShow(lead);else pvClear();
+  const KEYS=['MIGHT','GRACE','WITS','SPIRIT'];
+  let bars='';
+  if(n>=2)KEYS.forEach((k,i)=>{const v=Math.max.apply(null,ps.map(c=>c.st[i]));
+    bars+='<div class="vd-stat"><span>'+k+'</span><span class="vd-track"><span class="vd-fill" style="width:'+v+'%"></span></span><span class="vd-val">'+v+'</span><span class="vd-mean"></span></div>';});
+  let act;
+  if(n<2)act='<button class="vbtn dim" disabled>PICK '+(2-n)+' MORE</button>';
+  else if(full)act='<button class="vbtn dim" disabled>THE VAULT HOLDS '+COMBO_LIMIT+' COMBINED LEGENDS AT MOST</button>';
+  else if(dup)act='<button class="vbtn dim" disabled>YOU ALREADY HAVE THIS COMBINATION</button>';
+  else act='<button class="vbtn'+(ok?'':' dim')+'" id="vCmbGo"'+(ok?'':' disabled')+'>COMBINE \u2014 '+cost.toLocaleString('en-IN')+' '+EG+'</button>'
+    +(save.ether<cost?'<div class="vneed">'+EG+' '+(cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
+  $('vDossBody').innerHTML=
+     '<div class="vd-tag"><span>\u2726 THE FORGE</span></div>'
+    +'<div class="vd-name">COMBINE LEGENDS</div>'
+    +'<div class="vd-plain">Fuse 2 to '+COMBO_MAX+' legends you own into a new one. It keeps <b>every</b> power \u2014 each with its own essence and cooldown, fired alone or together \u2014 and the highest of each stat. It looks like the first legend you pick, and that is the legend everyone else sees. Your originals stay yours.</div>'
+    +'<div class="vcmb-price">'+[2,3,4].slice(0,COMBO_MAX-1).map(k=>'<span class="'+(n===k?'on':'')+'">'+k+' LEGENDS \u2014 '+comboCost(k).toLocaleString('en-IN')+'</span>').join('')+'</div>'
+    +'<div class="vd-label">YOUR LEGENDS \u2014 TAP TO PICK, IN ORDER</div>'
+    +'<div class="vcmb-list">'+owned.map(c=>{const k=vCmbPick.indexOf(c.id);
+        return '<span class="vcmb-pick'+(k>=0?' on':(n>=COMBO_MAX?' full':''))+'" data-cp="'+c.id+'" style="--pt:'+c.t+'">'+(k>=0?'<b>'+(k+1)+'</b>':'')+escHTML(shortName(c))+'</span>';}).join('')+'</div>'
+    +(n?'<div class="vd-label">THE NEW LEGEND</div>'
+      +'<div class="vd-ability">'+escHTML(ps.map(shortName).join(' + '))+'</div>'
+      +'<div class="vcmb-pw">Looks like <b>'+escHTML(titleCase(lead.n))+'</b>'+(n<2?' \u2014 pick at least one more.':'')+'</div>'
+      +ps.map(c=>'<div class="vcmb-pw"><i style="background:'+c.t+'"></i>'+escHTML(c.ab.n)+' \u2014 '+escHTML(c.ab.p)+'</div>').join(''):'')
+    +(bars?'<div class="vd-label">STATS (THE HIGHEST OF EACH)</div><div class="vd-stats">'+bars+'</div>':'')
+    +'<div class="vd-act">'+act+'</div>';
+  const col=lead?lead.t:'#ffcf8a';
+  document.documentElement.style.setProperty('--vt',col);$('vDoss').style.setProperty('--vt',col);
+  $('vDossBody').querySelectorAll('[data-cp]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();
+    const id=el.getAttribute('data-cp'),k=vCmbPick.indexOf(id);
+    if(k>=0)vCmbPick.splice(k,1);else if(vCmbPick.length<COMBO_MAX)vCmbPick.push(id);else return;
+    if(typeof SFX.uiPick==='function')SFX.uiPick();
+    renderCombine();}));
+  const go=$('vCmbGo');
+  if(go)go.addEventListener('click',e=>{e.stopPropagation();
+    const p=vCmbPick.slice(),price=comboCost(p.length);
+    if(p.length<2||p.length>COMBO_MAX||save.ether<price||save.combos.length>=COMBO_LIMIT)return;
+    if(save.combos.some(x=>comboKey(x.p)===comboKey(p)))return;
+    const id='cx'+Date.now().toString(36);
+    save.ether-=price;save.combos.push({id,p});comboSync(save.combos);
+    if(GOD.on)setGod(false,true);
+    setLegend(id);
+    vCombining=false;vCmbPick=[];vSel=ROSTER.indexOf(BYID[id]);vFilter='ALL';
+    renderVault();
+    SFX.chime();toast(BYID[id].n+' \u2014 COMBINED AND BOUND',3);});
 }
 $('vaultOv').addEventListener('click',e=>e.stopPropagation());
 $('vClose').addEventListener('click',e=>{e.stopPropagation();closeVault();});
@@ -5753,7 +5877,8 @@ function cloudPush(create){
   const data={name:cloudUser.name,email:cloudUser.email||'',provider:cloudUser.provider||'',
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
     pending:save.pending.map(e=>({l:e.l,n:e.n})),music:save.music,lastDay:save.lastDay,v:SAVE_V,
-    stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns)}),
+    stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
+      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()}))}),
     live:liveNow()};
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
     .then(()=>{lastSync=Date.now();syncBad=false;updateAcctLive();})
@@ -5775,6 +5900,8 @@ addEventListener('pagehide',()=>{if(cloudUser)cloudPush();});
 function replaceSave(next){
   Object.keys(save).forEach(k=>{delete save[k];});
   Object.assign(save,next);
+  comboSync(save.combos);
+  if(typeof vSel==='number'&&vSel>=ROSTER.length)vSel=0;
   const c=curLegend();
   if(ghost&&ghost.legend&&ghost.legend.id!==c.id)setLegend(c.id);
   else{computePS(c);AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));refreshLegendHUD();}
@@ -5938,7 +6065,7 @@ function renderAcct(){
        :'<span class="aclink" data-act="rename">Change username</span>')
      +'<div class="acstats">'
      +'<div>Ether<b>'+save.ether+'</b></div>'
-     +'<div>Legends<b>'+save.unlocked.length+' / '+ROSTER.length+'</b></div>'
+     +'<div>Legends<b>'+save.unlocked.length+' / 40</b></div>'
      +'<div>Escapes<b>'+save.escapes+'</b></div>'
      +'<div>Best night<b>'+(st.bestTime?fmtTime(st.bestTime):'\u2014')+'</b></div>'
      +'<div>Deaths<b>'+st.deaths+'</b></div>'
