@@ -6590,35 +6590,53 @@ function makeLabel(name){
   g.shadowColor='#000';g.shadowBlur=8;g.fillStyle='#dbe8ff';g.fillText(String(name).toUpperCase().slice(0,18),128,32);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:canvasToTex(c,true),transparent:true,depthWrite:false,fog:false,opacity:0.85}));
   sp.scale.set(1.7,0.42,1);sp.visible=false;scene.add(sp);return sp;}
-/* SMOOTH PLAYBACK of things that move on someone else's screen. Their positions arrive a few times a
-   second, unevenly. Chasing each new one makes them lurch; instead keep the last few (with the time they
-   arrived) and show where they were a moment ago, moving at an even speed between two of them. The delay
-   follows how often updates actually arrive (about 1.5 gaps), so a slow connection stays smooth too. */
-function ipNew(){return {s:[],gap:110,off:null,jit:20,ts:false,dl:null};}
-/* st: when the sender made this update, on its own clock (newer players send it; older ones do not) */
+/* LIVE PLAYBACK of things that move on someone else's screen.
+   Every update carries the moment it was sent (on the sender's clock). We work out, from the quickest any
+   update has ever arrived, where the sender is RIGHT NOW (plus half the measured round trip on a direct
+   link) and draw them there: between two updates when we have them, otherwise carried forward along
+   their last speed and direction (at most a quarter of a second). When a fresh update shows the guess was a
+   little off, the difference melts away over about a tenth of a second instead of jumping.
+   Players on an older version send no times: they are shown a moment behind, evenly, as before. */
+function ipNew(){return {s:[],gap:110,off:null,ds:[],ts:false,dl:null,lead:0,err:[0,0,0],last:null,lt:0};}
+/* st: when the sender made this update, on its own clock */
 function ipPush(b,x,y,z,r,f,snap,st){
   const now=performance.now(),l=b.s[b.s.length-1],hasT=typeof st==='number'&&isFinite(st)&&st>0;
-  if(hasT&&!b.ts){b.ts=true;b.s.length=0;b.off=null;}
+  if(hasT&&!b.ts){b.ts=true;b.s.length=0;b.off=null;b.ds.length=0;}
   const t=hasT&&b.ts?st:now;
-  if(l&&t<=l.t)return;                                     /* old news, or out of order */
-  if(hasT&&b.ts){const d=now-st;
-    if(b.off===null||d<b.off)b.off=d;else b.off+=(d-b.off)*0.002;   /* the quickest an update has ever come through */
-    b.jit+=((d-b.off)-b.jit)*0.1;}                         /* how late they usually are on top of that */
-  if(l){const g=t-l.t;if(g>15&&g<1500)b.gap+=(g-b.gap)*0.2;}
-  if(snap||(l&&(l.f!==f||Math.hypot(x-l.x,z-l.z)>6||Math.abs(y-l.y)>4)))b.s.length=0;   /* a jump: no gliding through walls */
-  b.s.push({t,x,y,z,r,f});if(b.s.length>12)b.s.shift();}
+  if(l&&t<=l.t)return false;                               /* old news (it came the slower way), or out of order */
+  if(hasT&&b.ts){b.ds.push(now-st);if(b.ds.length>60)b.ds.shift();b.off=Math.min.apply(null,b.ds);}
+  if(l){const g=t-l.t;if(g>8&&g<1500)b.gap+=(g-b.gap)*0.2;}
+  if(snap||(l&&(l.f!==f||Math.hypot(x-l.x,z-l.z)>6||Math.abs(y-l.y)>4))){b.s.length=0;b.last=null;b.err=[0,0,0];}   /* a jump */
+  b.s.push({t,x,y,z,r,f});if(b.s.length>16)b.s.shift();
+  return true;}
 const angLerp=(a,b,k)=>{let d=b-a;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return a+d*k;};
+/* where it is at sender-time `at`: between two updates, or carried on past the newest one */
+function ipRaw(b,at){
+  const S=b.s,n=S.length;if(!n)return null;
+  if(n===1||at<=S[0].t)return {x:S[0].x,y:S[0].y,z:S[0].z,r:S[0].r,f:S[0].f,vx:0,vy:0,vz:0};
+  for(let i=n-1;i>0;i--){const a=S[i-1],c=S[i],d=Math.max(1,c.t-a.t);
+    const vx=(c.x-a.x)/d,vy=(c.y-a.y)/d,vz=(c.z-a.z)/d;
+    if(at>=c.t){   /* past the newest: carry on (only on a direct line of play, and not for long) */
+      const e=b.ts&&a.f===c.f&&d<400?Math.min(250,at-c.t):0;
+      return {x:c.x+vx*e,y:c.y+vy*e,z:c.z+vz*e,r:c.r,f:c.f,vx:e?vx:0,vy:e?vy:0,vz:e?vz:0};}
+    if(at>=a.t){const k=(at-a.t)/d;
+      return {x:a.x+(c.x-a.x)*k,y:a.y+(c.y-a.y)*k,z:a.z+(c.z-a.z)*k,r:angLerp(a.r,c.r,k),f:c.f,vx,vy,vz};}}
+  return {x:S[0].x,y:S[0].y,z:S[0].z,r:S[0].r,f:S[0].f,vx:0,vy:0,vz:0};}
 function ipAt(b){
-  const n=b.s.length;if(!n)return null;
-  /* the delay drifts gently towards what the connection needs (a sudden change would look like a stumble) */
-  const want=b.ts?Math.min(700,b.gap+b.jit*2+25):Math.max(90,Math.min(650,b.gap*1.5));
-  b.dl=b.dl===null?want:b.dl+(want-b.dl)*0.01;
-  const S=b.s,at=performance.now()-(b.ts?b.off:0)-b.dl;
-  if(n===1||at<=S[0].t)return S[0];
-  for(let i=n-1;i>0;i--){const a=S[i-1],c=S[i];
-    if(at>=a.t){if(at>=c.t)return c;const k=(at-a.t)/Math.max(1,c.t-a.t);
-      return {x:a.x+(c.x-a.x)*k,y:a.y+(c.y-a.y)*k,z:a.z+(c.z-a.z)*k,r:angLerp(a.r,c.r,k),f:c.f};}}
-  return S[n-1];}
+  if(!b.s.length)return null;
+  const now=performance.now(),dt=b.lt?Math.min(100,now-b.lt):0;b.lt=now;
+  let at;
+  if(b.ts)at=now-b.off+b.lead;
+  else{const want=Math.max(90,Math.min(650,b.gap*1.5));b.dl=b.dl===null?want:b.dl+(want-b.dl)*0.01;at=now-b.dl;}
+  const q=ipRaw(b,at),L=b.last,E=b.err;
+  if(L&&L.f===q.f&&dt>0){
+    /* where we would have drawn it had nothing new come in, against where it is now: the gap is eased away */
+    const ex=L.x+L.vx*dt-q.x,ey=L.y+L.vy*dt-q.y,ez=L.z+L.vz*dt-q.z;
+    if(Math.hypot(ex,ez)<4&&Math.abs(ey)<3){E[0]+=ex;E[1]+=ey;E[2]+=ez;}else{E[0]=E[1]=E[2]=0;}
+    const k=Math.exp(-dt/110);E[0]*=k;E[1]*=k;E[2]*=k;}
+  else{E[0]=E[1]=E[2]=0;}
+  b.last=q;
+  return {x:q.x+E[0],y:q.y+E[1],z:q.z+E[2],r:q.r,f:q.f};}
 function mpRemote(uid){
   let r=REMOTE.get(uid);if(r)return r;
   const nm=mpName(uid);
@@ -6630,6 +6648,8 @@ function mpDropRemote(r){
   if(r.label){scene.remove(r.label);r.label.material.map.dispose();r.label.material.dispose();}}
 function mpApplyState(uid,v){
   if(!MP||uid===MP.uid)return;
+  /* the same update can come twice (direct link and database): only the newest counts */
+  if(v&&+v.ts){const r=REMOTE.get(uid);if(r&&r.lastTs&&+v.ts<=r.lastTs)return;if(r)r.lastTs=+v.ts;mpApplyStateRaw(uid,v);const r2=REMOTE.get(uid);if(r2)r2.lastTs=+v.ts;return;}
   mpApplyStateRaw(uid,v);}
 function mpApplyStateRaw(uid,v){
   if(!v){const r=REMOTE.get(uid);if(r){mpDropRemote(r);REMOTE.delete(uid);if(!mpSyncing)toast(r.name.toUpperCase()+' HAS LEFT THE HOUSE',3);}return;}
@@ -6672,6 +6692,7 @@ function mpUpdateRemote(r,dt,t){
 function mpApplyMon(uid,v){
   if(!MP||uid===MP.uid)return;
   const i=PUP.findIndex(p=>p.uid===uid);
+  if(v&&+v.ts&&i>=0){const p0=PUP[i];if(p0.lastTs&&+v.ts<=p0.lastTs)return;p0.lastTs=+v.ts;}
   if(!v){if(i>=0){const p=PUP[i];if(catcher===p)catcher=null;scene.remove(p.mon.g);PUP.splice(i,1);}return;}
   let p=PUP[i];
   if(!p){p={uid,M:Object.assign(entAt(0,0,0),{state:'patrol',stunT:0,goneT:0,slowT:0,yaw:0,noticeT:-1,tg:''}),mon:buildMonster(),tx:0,ty:0,tz:0,yt:0,seen:false,ip:ipNew()};
@@ -6734,17 +6755,27 @@ function mpOnEvent(ev){
   subtitle(mpName(ev.from)+"'s power turns a hunter aside.",3);}
 
 /* ---- reporting this player ---- */
-function mpPublish(){
+function mpStateNow(){
   const ph=state==='play'?1:(state==='caught'||state==='dead')?2:state==='win'?3:0;
   const fl=(P.hiding?1:0)|(P.veiling?2:0)|(P.dashing?4:0)|(P.moving?8:0)|(AB.invisT>0?16:0)|(AB.silentT>0?32:0);
   const nr=ph===1&&!(P.veiling||AB.invisT>0||AB.silentT>0)?((P.dashing&&P.moving)?PS.noiseB:(P.moving?PS.noise:0))*(AB.loudT>0?1.7:1):0;
   const ts=Math.round(performance.now());   /* when this was sent, so the others can play it back evenly */
   const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:pubLegend(),ts};
   if(ph===3)so.et=TEAM.myOut;   /* when I got out: the team's time is the latest of these */
-  MP.net.publishState(MP.code,so).catch(()=>{});
   const st={patrol:0,investigate:1,search:2,chase:3}[M.state]||0;
   const tg=M.state==='chase'&&M.tgt?(M.tgt===P?MP.uid:(M.tgt.uid||'')):'';
-  MP.net.publishMon(MP.code,{x:r2(M.x),y:r2(M.y),z:r2(M.z),f:M.floor,r:r2(M.yaw),s:st,g:M.goneT>0?1:0,st:M.stunT>0?1:0,tg,ts}).catch(()=>{});}
+  return [so,{x:r2(M.x),y:r2(M.y),z:r2(M.z),f:M.floor,r:r2(M.yaw),s:st,g:M.goneT>0?1:0,st:M.stunT>0?1:0,tg,ts}];}
+function mpPublish(){
+  const [so,mo]=mpStateNow();
+  MP.net.publishState(MP.code,so).catch(()=>{});
+  MP.net.publishMon(MP.code,mo).catch(()=>{});}
+/* the direct line to each teammate (the voice connection's data channel): far quicker than the database */
+let dcAcc=0;
+function dcPublish(now){
+  if(now-dcAcc<33)return;dcAcc=now;
+  let open=0;VOICE.peers.forEach(p=>{if(p.dc&&p.dc.readyState==='open')open++;});if(!open)return;
+  const [so,mo]=mpStateNow(),msg=JSON.stringify({k:'s',v:so,m:mo});
+  VOICE.peers.forEach(p=>{if(p.dc&&p.dc.readyState==='open'&&p.dc.bufferedAmount<16000){try{p.dc.send(msg);}catch(e){}}});}
 
 function mpTeamHud(){
   if(!mpRoom||!mpRoom.players)return;
@@ -6849,7 +6880,7 @@ function mpFrame(dt,t){
   mpWatchAllDead(dt);
   mpTeamCheck();
   voiceTick(performance.now());
-  {const nowMs=performance.now();if(nowMs-mpAcc>=100){mpAcc=nowMs;mpPublish();}}
+  {const nowMs=performance.now();if(nowMs-mpAcc>=100){mpAcc=nowMs;mpPublish();}dcPublish(nowMs);}
   if((mpHudT-=dt)<=0){mpHudT=0.5;mpTeamHud();}}
 
 function mpInit(){
@@ -6941,7 +6972,7 @@ function specCamera(dt,t){
   if(!SPEC.cam||SPEC.bf==null||best<SPEC.bf)SPEC.bf=best;else SPEC.bf+=(best-SPEC.bf)*Math.min(1,dt*2.5);
   cp=tgt.clone().lerp(cp,SPEC.bf);
   if(!SPEC.cam){SPEC.cam=true;camera.position.copy(cp);}
-  camera.position.lerp(cp,Math.min(1,dt*12));
+  camera.position.lerp(cp,Math.min(1,dt*22));
   const look=tgt.clone().addScaledVector(fwd,1.4);look.y+=0.05;
   camera.lookAt(look);
   camera.fov+=(62-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();
@@ -7034,7 +7065,7 @@ function socialTick(now){
   if(!SOC.net||!SOC.uid||WATCH)return;
   socialPresence(false);
   if(!SOC.friends.length||!inNightState()){if(SOC.lastWatch){SOC.lastWatch=0;SOC.epSig='';SOC.net.clearWatch(SOC.uid);}return;}
-  if(now-SOC.lastWatch<150)return;
+  if(now-SOC.lastWatch<100)return;
   SOC.lastWatch=now;
   const q=v=>Math.round(v*100)/100;
   const ep=embers.map(e=>[e.f,q(e.x),q(e.z)]),sig=JSON.stringify(ep);
@@ -7259,14 +7290,34 @@ function voicePeer(uid,initiator){
   VOICE.peers.set(uid,p);
   pc.onicecandidate=e=>{if(e.candidate)MP.net.sendRtc(MP.code,uid,{sid:VOICE.sid,t:'ice',d:JSON.stringify(e.candidate)});};
   pc.ontrack=e=>voiceAttach(p,(e.streams&&e.streams[0])||new MediaStream([e.track]));
+  pc.ondatachannel=e=>dcSetup(p,e.channel);
   pc.onconnectionstatechange=()=>{const s=pc.connectionState;
     if(s==='connected')p.badAt=0;
     else if((s==='failed'||s==='disconnected')&&!p.badAt)p.badAt=performance.now();};
   return p;
 }
+/* where everyone is, sent straight between the two browsers ~30 times a second (lost messages are not
+   resent: the next one is already on its way). It also measures the round trip, so playback can show
+   the teammate where they are now rather than where they were. */
+function dcSetup(p,ch){
+  p.dc=ch;p.rtt=0;
+  ch.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(err){return;}
+    if(!m||!MP)return;
+    if(m.k==='s'){if(m.v)mpApplyState(p.uid,m.v);if(m.m)mpApplyMon(p.uid,m.m);dcLead(p);}
+    else if(m.k==='p'){try{ch.send(JSON.stringify({k:'q',t:m.t}));}catch(err){}}
+    else if(m.k==='q'){const r=performance.now()-(+m.t||0);if(r>0&&r<3000)p.rtt=p.rtt?p.rtt+(r-p.rtt)*0.2:r;dcLead(p);}};
+  const ping=()=>{if(ch.readyState!=='open')return;try{ch.send(JSON.stringify({k:'p',t:performance.now()}));}catch(e){}};
+  const go=()=>{if(p.pingT)return;ping();p.pingT=setInterval(ping,1000);};
+  ch.onopen=go;if(ch.readyState==='open')go();
+  ch.onclose=()=>{clearInterval(p.pingT);};
+}
+/* half the round trip: how far behind the newest update really is */
+function dcLead(p){const r=REMOTE.get(p.uid),lead=Math.min(150,(p.rtt||0)/2);
+  if(r&&r.ip)r.ip.lead=lead;const pp=PUP.find(x=>x.uid===p.uid);if(pp&&pp.ip)pp.ip.lead=lead;}
 function voiceClose(uid){
   const p=VOICE.peers.get(uid);if(!p)return;
   VOICE.peers.delete(uid);
+  clearInterval(p.pingT);
   try{p.pc.close();}catch(e){}
   if(p.audio){p.audio.srcObject=null;p.audio.remove();}
   delete VOICE.speak[uid];
@@ -7276,6 +7327,7 @@ const micTrack=()=>VOICE.on&&VOICE.mic?VOICE.mic.getAudioTracks()[0]||null:null;
 async function voiceCall(uid){
   const p=voicePeer(uid,true);
   p.tr=p.pc.addTransceiver('audio',{direction:'sendrecv'});
+  try{dcSetup(p,p.pc.createDataChannel('hm',{ordered:false,maxRetransmits:0}));}catch(e){}
   await p.tr.sender.replaceTrack(micTrack());
   await p.pc.setLocalDescription(await p.pc.createOffer());
   MP.net.sendRtc(MP.code,uid,{sid:VOICE.sid,t:'offer',d:p.pc.localDescription.sdp});
