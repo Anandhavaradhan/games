@@ -682,7 +682,7 @@
     <h3>LEADERBOARD</h3>
     <div class="lbtabs"><span data-lbtab="esc" class="on">FASTEST ESCAPES</span><span data-lbtab="time">MOST TIME PLAYED</span></div>
     <div class="lbtabs sub" id="lbDiffTabs"><span data-lbdiff="easy">EASY</span><span data-lbdiff="normal" class="on">NORMAL</span><span data-lbdiff="hard">HARD</span><span data-lbdiff="nightmare">NIGHTMARE</span></div>
-    <div class="lbtabs sub" id="lbModeTabs"><span data-lbmode="all" class="on">ALL ENTRIES</span><span data-lbmode="best">BEST PER PLAYER</span></div>
+    <div class="lbtabs sub" id="lbModeTabs"><span data-lbmode="best" class="on">BEST PER PLAYER</span><span data-lbmode="all">ALL ENTRIES</span></div>
     <p class="lbsub" id="lbSub"></p>
     <div id="lbBody"></div>
     <div id="lbClose">CLOSE</div>
@@ -6050,7 +6050,7 @@ const BOARD_SIZE=300;         /* rows shown in the panel (it scrolls) */
 const BOARD_MIN_TIME=20;      /* seconds; faster is impossible, so it is rejected (also in firestore.rules) */
 let lbOpen=false,lbData=null,lbErr='',lbMine=null,lbTab='esc',lbDiff='normal';
 /* FASTEST ESCAPES has two views: every run (a player can be on it many times) or each player once, at their best */
-let lbMode=(function(){try{return localStorage.getItem('hm_lbmode')==='best'?'best':'all';}catch(e){return 'all';}})();
+let lbMode='best';   /* every time the board opens it starts on BEST PER PLAYER */
 const lbKey=n=>String(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 /* each player's fastest run, once. A co-op run counts for everyone in it, so it stands as the best of any
    member who has nothing faster; a player already shown further up is not shown again. */
@@ -6132,6 +6132,7 @@ function openBoard(){
   lbOpen=true;
   /* from a finished night (or in co-op) open on that night's difficulty, otherwise the one selected */
   lbDiff=(MP||state==='win'||state==='dead')?runDiff:settings.diff;
+  lbMode='best';
   $('lbPanel').style.display='block';$('acctScrim').style.display='block';
   setBoardTab(lbTab);
 }
@@ -6204,7 +6205,6 @@ $('lbPanel').addEventListener('click',e=>{e.stopPropagation();
   const t=e.target.closest('[data-lbtab]');if(t&&t.getAttribute('data-lbtab')!==lbTab)setBoardTab(t.getAttribute('data-lbtab'));
   const d=e.target.closest('[data-lbdiff]');if(d&&d.getAttribute('data-lbdiff')!==lbDiff){lbDiff=d.getAttribute('data-lbdiff');setBoardTab(lbTab);}
   const m=e.target.closest('[data-lbmode]');if(m&&m.getAttribute('data-lbmode')!==lbMode){lbMode=m.getAttribute('data-lbmode');
-    try{localStorage.setItem('hm_lbmode',lbMode);}catch(e){}
     document.querySelectorAll('#lbPanel [data-lbmode]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-lbmode')===lbMode));
     $('lbSub').textContent=LB_SUB[lbMode==='best'?'best':'esc'];renderBoard();}});
 $('lbClose').addEventListener('click',e=>{e.stopPropagation();closeBoard();});
