@@ -1300,8 +1300,10 @@ let cloud=null,cloudUser=null,cloudTimer=null;
 /* GUEST ACCOUNTS: what a guest plays (time in the house, active time, escapes) waiting to be added to
    the single guest total (guestStats/total) the admin page shows as "Guest accounts". */
 const GUEST={secs:0,act:0,esc:0};let guestBusy=false;
+let acctIn=false;   /* a real account is signed in on this device (even while it is still loading) */
+let authKnown=false;   /* the account service has said who (if anyone) is signed in */
 async function guestFlush(force){
-  if(!cloud||guestBusy||cloudUser)return;
+  if(!cloud||guestBusy||cloudUser||acctIn||!authKnown)return;
   const s=Math.min(120,Math.floor(GUEST.secs)),a=Math.min(120,Math.floor(GUEST.act)),e=Math.min(1,GUEST.esc);
   if(!e&&s<(force?1:30))return;
   guestBusy=true;
@@ -4114,7 +4116,7 @@ function endRun(win){
   if(SOLO_RANKED){cloudLogRun(win);
   if(win)boardAfterEscape(Math.round(elapsed*10)/10,newBest);}
   /* co-op: the team's leaderboard entry waits until the last soul is out (mpTeamCheck) */
-  if(win&&!cloudUser){GUEST.esc++;guestFlush(true);}   /* a guest's escape counts in the guest total only */
+  if(win&&!cloudUser&&!acctIn){GUEST.esc++;guestFlush(true);}   /* a guest's escape counts in the guest total only */
 }
 
 /* --- primitives ------------------------------------------------ */
@@ -5822,7 +5824,7 @@ function loop(now){requestAnimationFrame(loop);
   const dt=Math.min(DT_CAP,(now-last)/1000);last=now;const t=now/1000;
   /* the night does not wait for anyone in co-op, so a menu never freezes the house */
   const paused=(settingsOpen||vaultOpen)&&!MP;
-  if(state==='play'){if(!paused){elapsed=MP?mpElapsed():elapsed+dt;save.stats.playTime+=dt;if(!cloudUser)GUEST.secs+=dt;updatePlayer(dt,t);updateAbilities(dt,t);updateMonster(dt,t);
+  if(state==='play'){if(!paused){elapsed=MP?mpElapsed():elapsed+dt;save.stats.playTime+=dt;if(!cloudUser&&!acctIn)GUEST.secs+=dt;updatePlayer(dt,t);updateAbilities(dt,t);updateMonster(dt,t);
     if(!MP&&DF().scare>0&&elapsed>nextScareAt&&graceT<=0&&M.state!=='chase'&&!doorOpen&&!P.hiding&&M.floor===P.floor
        &&AB.foreT<=0&&AB.invisT<=0&&M.goneT<=0&&M.stunT<=0){
       triggerJumpscare();nextScareAt=elapsed+(45+Math.random()*45)*(1-0.3*heat())*DF().every;}}}
@@ -5912,9 +5914,16 @@ function replaceSave(next){
 }
 function onCloudUser(u){
   if(u&&u.anon)u=null;   /* a co-op guest's temporary id is not an account */
-  authUser=u;
+  const first=!authKnown;authKnown=true;
+  /* signed in from the start: what was played before the account answered was this account's, not a guest's */
+  if(u&&first){GUEST.secs=0;GUEST.act=0;GUEST.esc=0;}
+  /* a guest signing in now: their time so far goes to the guest total first */
+  else if(u&&!acctIn)guestFlush(true);
+  authUser=u;acctIn=!!u;
   /* never swap saves in the middle of a run; it happens when the run ends */
-  if(state==='play'||state==='caught'){pendingUser={u};return;}
+  /* (in co-op the night starts on a shared clock, often before the account has loaded, so the account
+     goes in at once — otherwise the team's escape could not be posted under it) */
+  if(!MP&&(state==='play'||state==='caught')){pendingUser={u};return;}
   applyUser(u);
 }
 function applyPendingUser(){if(pendingUser){const pu=pendingUser;pendingUser=null;applyUser(pu.u);}}
@@ -6196,15 +6205,32 @@ const canPost=()=>!!(cloud&&cloudUser&&!cloudUser.anon&&cloudUser.unameOk);
 const needsUname=()=>!!(cloud&&cloudUser&&!cloudUser.anon&&!cloudUser.unameOk);
 
 /* solo: called from endRun() on every escape in the standard house */
+/* a signed-in player whose account is still loading (or still settling its username): wait for it,
+   so the escape is posted under their name instead of being lost */
+async function waitForAccount(el,ms){
+  if(canPost())return true;
+  const t0=Date.now(),nap=()=>new Promise(r=>setTimeout(r,400));
+  /* first: has the account service answered at all yet? */
+  if(!authKnown&&cloudState!=='off'){if(el)el.textContent='CONNECTING TO YOUR ACCOUNT\u2026';
+    while(!authKnown&&cloudState!=='off'&&Date.now()-t0<ms)await nap();}
+  if(canPost()||!authUser||authUser.anon)return canPost();
+  if(el)el.textContent='CONNECTING TO YOUR ACCOUNT\u2026';
+  applyPendingUser();
+  while(!canPost()&&Date.now()-t0<ms){await nap();if(!authUser)break;}
+  return canPost();
+}
 async function boardAfterEscape(nt,newBest){
   const el=$('winRank');if(!el)return;
   el.textContent='';
-  if(!cloud)return;                                      /* accounts not switched on */
+  if(nt<BOARD_MIN_TIME)return;
+  const dk0=runDiff,deaths0=deaths,got0=got;
+  await waitForAccount(el,30000);
+  if(!cloud){el.textContent='';return;}                  /* accounts not switched on */
   if(!canPost()){el.textContent=needsUname()?'CHOOSE A USERNAME IN YOUR ACCOUNT TO POST YOUR ESCAPES':'SIGN IN TO PUT YOUR ESCAPES ON THE LEADERBOARD';return;}
   if(nt<BOARD_MIN_TIME)return;
   /* build the entry now, before any await, while deaths/got still describe this night */
-  const dk=runDiff,dn=DIFFS[dk].n;
-  const entry={name:cloudUser.name,time:nt,legend:pubLegend(),deaths:deaths,embers:got,team:false,diff:dk};
+  const dk=dk0,dn=DIFFS[dk].n;
+  const entry={name:cloudUser.name,time:nt,legend:pubLegend(),deaths:deaths0,embers:got0,team:false,diff:dk};
   el.textContent='POSTING YOUR ESCAPE TO THE '+dn+' LEADERBOARD\u2026';
   try{
     await cloud.addEscape(cloudUser.uid,entry);
@@ -6231,20 +6257,23 @@ async function teamBoardName(){
 async function boardAfterTeamEscape(nt){
   const el=$('winRank');if(!el)return;
   el.textContent='';
-  if(!cloud||nt<BOARD_MIN_TIME)return;
+  if(nt<BOARD_MIN_TIME)return;
+  const dk0=runDiff,deaths0=deaths,got0=got,code0=MP.code,go0=mpGO;
+  await waitForAccount(el,45000);
+  if(!cloud){el.textContent='';return;}
   /* guests are never on the leaderboard: only a signed-in player with a username posts the team,
      and the team's name lists only the registered players in it */
   if(!canPost()){el.textContent=needsUname()?'CHOOSE A USERNAME IN YOUR ACCOUNT TO PUT YOUR TEAM ON THE LEADERBOARD':'GUESTS ARE NOT SHOWN ON THE LEADERBOARD \u2014 SIGN IN TO APPEAR';return;}
   const uid=cloudUser.uid;
-  const team=await teamBoardName(),id='mp_'+MP.code+'_'+mpGO;
-  const entry={name:team,time:nt,legend:pubLegend(),deaths:deaths,embers:got,team:true,diff:runDiff};
+  const team=await teamBoardName(),id='mp_'+code0+'_'+go0;
+  const entry={name:team,time:nt,legend:pubLegend(),deaths:deaths0,embers:got0,team:true,diff:dk0};
   try{
     let ex=null;try{ex=await cloud.loadEscape(id);}catch(e){}
     if(!ex){el.textContent=team.toUpperCase()+' — POSTING TO THE LEADERBOARD…';
       try{await cloud.addEscape(uid,entry,id);ex=entry;}
       catch(e){ex=await cloud.loadEscape(id).catch(()=>null);if(!ex)throw e;}}   /* a teammate got there first */
-    let rank=0;try{const list=await cloud.loadEscapes(BOARD_SIZE,runDiff);rank=list.filter(r=>r.time<ex.time).length+1;}catch(e){}
-    el.textContent=team.toUpperCase()+' ARE ON THE '+DF().n+' LEADERBOARD \u00b7 '+fmtTime(ex.time)+(rank?' \u00b7 #'+rank:'');
+    let rank=0;try{const list=await cloud.loadEscapes(BOARD_SIZE,dk0);rank=list.filter(r=>r.time<ex.time).length+1;}catch(e){}
+    el.textContent=team.toUpperCase()+' ARE ON THE '+DIFFS[dk0].n+' LEADERBOARD \u00b7 '+fmtTime(ex.time)+(rank?' \u00b7 #'+rank:'');
   }catch(e){console.warn('Team escape post failed:',e);el.textContent='TEAM TIME '+fmtTime(nt);}
 }
 
@@ -6403,7 +6432,7 @@ function actTick(now){
   ACT.counting=!why;ACT.why=why;
   if(ACT.counting){
     save.stats.activeTime=(save.stats.activeTime||0)+rdt;
-    if(!cloudUser)GUEST.act+=rdt;
+    if(!cloudUser&&!acctIn)GUEST.act+=rdt;
     if(canPost()&&ptLoaded)ACT.pend+=rdt;}
   actNote();
 }
