@@ -15,6 +15,7 @@
    everyone sees the others' monsters as they are reported.
    ========================================================= */
 import { firebaseConfig } from './firebase-config.js';
+import { TabNamePersistence, storageBlocked as allStorageBlocked } from './tabcarry.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0/';
 /* Some phones / browsers block this site's storage ("Access is denied for this document").
@@ -31,6 +32,8 @@ function makeAuth(A, app) {
   if (idbOk() && storageOk('localStorage')) p.push(A.indexedDBLocalPersistence);
   if (storageOk('localStorage')) p.push(A.browserLocalPersistence);
   if (storageOk('sessionStorage')) p.push(A.browserSessionPersistence);
+  /* no storage at all: keep it in this tab instead, so it survives the lobby → night page change (tabcarry.js) */
+  if (allStorageBlocked()) p.push(TabNamePersistence);
   p.push(A.inMemoryPersistence);
   try { return A.initializeAuth(app, { persistence: p, popupRedirectResolver: A.browserPopupRedirectResolver }); }
   catch (e) { return A.getAuth(app); }   /* already set up by the other module on this page */

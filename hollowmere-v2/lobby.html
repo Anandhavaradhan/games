@@ -153,7 +153,7 @@ function viewMenu() {
   document.getElementById('join').onclick = () => go(async () => { useName(); code = await mp.joinRoom(codeIn.value); enterLobby(); });
   codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('join').click(); });
   codeIn.addEventListener('input', () => { codeIn.value = mp.normCode(codeIn.value); });
-  if (!msg && !mp.storageOk('sessionStorage')) msg = 'Heads up: this browser is blocking site data, so you may drop out when the night starts. Allow cookies and site data for this site (tap the icon left of the address), then reload.';
+  if (!msg && !mp.storageOk('sessionStorage')) msg = 'Heads up: this browser is blocking site data for this site. Co-op still works, but reloading the page signs you out. To fix it for good, allow cookies and site data for this site (tap the icon left of the address \u2192 Cookies and site data / Site settings), then reload.';
   renderIncoming();
   setMsg(msg, msgOk);
   if (qs.get('join')) setTimeout(() => codeIn.focus(), 50);
@@ -228,7 +228,7 @@ async function launch() {
   if (launched) return; launched = true;
   shell('<p class="note" style="text-align:center">The night begins. The house is being built for you…</p>');
   await mp.keepPresence(code);
-  location.replace('index.html?room=' + code + (qs.get('debug') === '1' ? '&debug=1' : ''));
+  (window.hmKeepTab&&window.hmKeepTab()),location.replace('index.html?room=' + code + (qs.get('debug') === '1' ? '&debug=1' : ''));
 }
 
 /* back to the game's title screen, leaving the room first if this player is in one */
@@ -238,7 +238,7 @@ async function goHome(e) {
     leaving = true; if (unsub) unsub();
     try { await Promise.race([mp.leaveRoom(code), new Promise(r => setTimeout(r, 2000))]); } catch (err) { console.warn(err); }
   }
-  location.href = 'index.html' + (qs.get('debug') === '1' ? '?debug=1' : '');
+  (window.hmKeepTab&&window.hmKeepTab()),location.href = 'index.html' + (qs.get('debug') === '1' ? '?debug=1' : '');
 }
 async function leave() {
   leaving = true; if (unsub) unsub();
