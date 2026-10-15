@@ -3434,7 +3434,10 @@ function animateMonster(dt,t){
   if(FLASH.level>0.05){const dx=_hv.x-FLASH.pos.x,dy2=_hv.y-FLASH.pos.y,dz=_hv.z-FLASH.pos.z,dl=Math.hypot(dx,dy2,dz)||1;
     const c=(dx*FLASH.dir.x+dy2*FLASH.dir.y+dz*FLASH.dir.z)/dl;shine+=Math.max(0,(c-0.86)/0.14)*FLASH.level*Math.min(1,14/dl)*0.9;}
   if(caught)shine=0.55;
-  mon.eyes.forEach(e=>{e.material.opacity=Math.min(0.8,shine);e.scale.setScalar(0.007+shine*0.009);});
+  /* hunting, its eyes burn: two red pins coming at you through the dark */
+  const burn=hunt||caught;
+  mon.eyes.forEach(e=>{e.material.color.setHex(burn?0xff2a10:0xdfe8ff);e.material.fog=!burn;
+    e.material.opacity=burn?0.85+Math.random()*0.15:Math.min(0.8,shine);e.scale.setScalar(burn?0.05+Math.sin(t*9)*0.008:0.007+shine*0.009);});
   mon.skirt.forEach((sk,i)=>{sk.rotation.x=mon.legs[i].th.rotation.x*0.5+0.06;sk.rotation.z=(i?1:-1)*0.03;});
   if(mon.hair){mon.hair.rotation.x=Math.min(0.5,mon.spd*0.05)+Math.sin(t*1.7)*0.02;mon.hair.rotation.z=Math.sin(ph*0.5)*0.04*(moving?1:0.3);}
 }
@@ -5362,12 +5365,13 @@ function engPlayer(dt){
   else if(!ENG.ccArmed&&ENG.ccCool<=0&&(P.hiding||P.veiling)&&near<CLOSE_IN)ENG.ccArmed=true;
   else if(ENG.ccArmed&&near>CLOSE_OUT){ENG.ccArmed=false;ENG.ccCool=6;ENG.close++;
     awardEther(6,'CLOSE CALLS');toast('A CLOSE CALL · +6 ETHER',2.2);SFX.heart(0.25);}
-  checkBounties();}
+  checkBounties();
+  dreadTick(dt,performance.now()/1000);}
 
 function engReset(){
   ENG.carry=0;ENG.lures=0;ENG.close=0;ENG.hidT=0;ENG.ccArmed=false;ENG.ccCool=0;ENG.fly=null;thrown.visible=false;
   ENG.bounties=drawBounties();ENG.flashT=4;bountyShown='';
-  scatterTrinkets();}
+  scatterTrinkets();dreadReset();}
 /* a night ends: door-only bounties are judged, and the screens get the tally */
 function engEnd(win){
   if(win)ENG.bounties.forEach(b=>{if(!b.done&&!b.failed&&b.def.end&&b.def.end())payBounty(b);});
@@ -5382,6 +5386,136 @@ const btnThrowEl=(()=>{const h=$('btnHide');if(!h)return null;
   const b=document.createElement('div');b.id='btnThrow';b.className='tbtn small';b.textContent='THROW';b.style.display='none';
   h.before(b);b.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();tryThrow();},{passive:false});return b;})();
 setInterval(bountyHUD,150);
+
+/* =========================================================
+   DREAD — the house plays with you
+     · GLIMPSES   a second shape of the thing, that is not there. It stands at the far
+                  end of the hall facing you and is gone the moment you look at it
+                  properly or walk up to it; or it breathes right behind you, and is
+                  there for a heartbeat when you turn round. Never while the real one
+                  is close or hunting, and it can never touch you.
+     · THE HOUSE  every so often, something: a door slams, knocking inside the wall,
+                  a music box, someone running on the floor above, your light dying
+                  while something breathes beside you.
+     · THE THING  a sting when your beam first lands on its face; while it hunts,
+                  it shrieks as it comes (and its eyes burn — see animateMonster).
+   Hooks elsewhere: engPlayer → dreadTick, engReset → dreadReset,
+   updateFlashlight reads DREAD.darkT.
+   ========================================================= */
+const DREAD={next:50,ph:null,phM:null,lookT:0,life:0,kind:'',stingCool:0,shriekT:0,darkT:0,houseT:35};
+/* the glimpse is a second body, built like the first; it never casts a shadow */
+const phantom=buildMonster();
+phantom.mute=true;phantom.g.visible=false;
+phantom.g.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+const _dv=new THREE.Vector3(),_df=new THREE.Vector3();
+const dreadGap=()=>(55+Math.random()*55)*DF().every*(1-0.25*heat());
+function dreadReset(){DREAD.next=40+Math.random()*30;DREAD.houseT=25+Math.random()*20;DREAD.darkT=0;DREAD.shriekT=0;phantomGone(false);}
+/* can a body stand at (x,z) on floor f, in plain sight from where you are? */
+function standable(f,x,z){const[cx,cz]=cellOf(x,z),n=nodes.get(nk(f,cx,cz));
+  return !!n&&n.ramp==null&&losClear(f,P.x,P.z,x,z);}
+function phantomAt(kind){
+  const fwd=camYaw+(kind==='behind'?Math.PI:0);
+  /* ahead: off to one side, at the edge of your light, where you half-see it */
+  const dists=kind==='behind'?[4.2,3.6,3]:[9,8,7,6],s=Math.random()<0.5?1:-1;
+  for(const d of dists)for(const da of(kind==='behind'?[0,0.18,-0.18]:[0.32*s,0.42*s,-0.32*s,-0.42*s,0.22*s])){
+    const a=fwd+da,x=P.x+Math.sin(a)*d,z=P.z+Math.cos(a)*d;
+    if(!standable(P.floor,x,z))continue;
+    const[cx,cz]=cellOf(x,z);
+    /* in the middle of its cell, facing you */
+    const px=(cx+.5)*CS,pz=(cz+.5)*CS;
+    DREAD.phM={x:px,z:pz,y:P.floor*FH,floor:P.floor,yaw:Math.atan2(P.x-px,P.z-pz),state:kind==='behind'?'patrol':'search',stunT:0,goneT:0};
+    phantom.px=px;phantom.pz=pz;return true;}
+  return false;}
+function phantomGone(flick){
+  if(!DREAD.ph)return;
+  DREAD.ph=null;phantom.g.visible=false;
+  if(flick){if(!settings.reduceFlash)flickT=Math.max(flickT,0.28);
+    noiseHit({dur:1.2,vol:.06,type:'bandpass',f:700,f2:300,q:4,echo:.9});
+    tone({f:233,f2:220,type:'sawtooth',dur:1.6,vol:.03,a:.005,echo:.8});}}
+function phantomStart(){
+  if(DREAD.ph)return;
+  let kind=FP()&&Math.random()<0.4?'behind':'ahead';
+  if(!phantomAt(kind)){if(kind==='behind'&&phantomAt('ahead'))kind='ahead';else return;}
+  DREAD.ph=kind;
+  DREAD.lookT=0;DREAD.life=0;DREAD.seen=false;
+  phantom.g.visible=true;
+  if(DREAD.ph==='behind'){
+    /* breath, close, at the back of your neck */
+    voice({f:15,f2:12,dur:1.8,vol:0.32,form:[260,520],q:9});
+    noiseHit({dur:1.6,vol:.05,type:'bandpass',f:500,q:2,att:0.6});}}
+function phantomTick(dt,t){
+  const m=DREAD.phM;
+  /* pose it with the same rig the real one uses */
+  {const fM=M,fm=mon;M=m;mon=phantom;try{animateMonster(dt,t);}finally{M=fM;mon=fm;}}
+  DREAD.life+=dt;
+  phantom.headG.getWorldPosition(_dv);camera.getWorldDirection(_df);
+  const dx=_dv.x-camera.position.x,dy=_dv.y-camera.position.y,dz=_dv.z-camera.position.z,dl=Math.hypot(dx,dy,dz)||1;
+  const look=(dx*_df.x+dy*_df.y+dz*_df.z)/dl;
+  const near=Math.hypot(P.x-m.x,P.z-m.z);
+  const inView=look>0.82&&losClear(P.floor,P.x,P.z,m.x,m.z);
+  if(inView&&!DREAD.seen){DREAD.seen=true;
+    tone({f:46,f2:30,dur:1.1,vol:.32});noiseHit({dur:.7,vol:.12,type:'bandpass',f:2400,f2:900,q:3,echo:.6});}
+  if(DREAD.ph==='behind'){
+    /* you turned round: it is there for a breath, then it is not */
+    if(inView)DREAD.lookT+=dt;
+    if(DREAD.lookT>0.32||DREAD.life>6||near<1.6)phantomGone(DREAD.lookT>0);}
+  else{
+    /* swing your light onto it and it is lit for an instant, then gone */
+    if(look>0.96)DREAD.lookT+=dt;
+    if(DREAD.lookT>0.45||near<4.5||DREAD.life>7||P.floor!==m.floor)phantomGone(DREAD.seen);}}
+
+/* ---- the house ---- */
+function houseScare(){
+  const pan=Math.random()<0.5?-0.85:0.85,k=Math.random();
+  const far=M.goneT>0||M.floor!==P.floor||distPM()>16;
+  if(k<0.2){   /* a door slams, somewhere behind you */
+    noiseHit({dur:.5,vol:.55,f:180,att:0.003,echo:.9});tone({f:62,f2:34,dur:.45,vol:.45});
+    noiseHit({dur:.12,vol:.2,type:'bandpass',f:1400,q:1.5,att:0.002,echo:.6});
+    scareShakeT=Math.max(scareShakeT,0.18);}
+  else if(k<0.4){   /* knocking, inside the wall beside you */
+    const n=3+((Math.random()*2)|0);
+    for(let i=0;i<n;i++){noiseHit({dur:.09,vol:.22,f:240,pan,att:0.002,echo:.4,delay:i*0.36+(i===n-1?0.25:0)});
+      tone({f:95,f2:70,dur:.08,vol:.14,pan,delay:i*0.36+(i===n-1?0.25:0)});}}
+  else if(k<0.56){   /* a music box, wound by no one */
+    const notes=[659.25,587.33,523.25,493.88,440,415.3],st=(Math.random()*2)|0;
+    for(let i=0;i<5;i++){const f=notes[(st+i)%notes.length]*(1-i*0.012);
+      tone({f,type:'triangle',dur:.9,vol:.035,a:.004,pan:pan*0.5,echo:.85,delay:i*0.42+i*i*0.03});}}
+  else if(k<0.72&&P.floor<NF-1){   /* someone runs across the floor above */
+    for(let i=0;i<9;i++)noiseHit({dur:.1,vol:.16,f:130,att:0.004,echo:.5,pan:-0.7+i*0.17,delay:i*0.17});}
+  else if(k<0.86&&far){   /* your light dies, and something breathes beside you */
+    DREAD.darkT=1.7;
+    voice({f:14,f2:11,dur:1.6,vol:0.3,form:[260,520],q:9,delay:0.35});
+    tone({f:52,f2:30,dur:.16,vol:.25,delay:1.75});}
+  else{   /* your name, almost */
+    SFX.whisper();subtitle(['…you came back…','…behind the door…','…it can hear you breathing…',
+      '…stay…','…we never left either…'][(Math.random()*5)|0],3.5);}}
+
+function dreadTick(dt,t){
+  if(DREAD.darkT>0)DREAD.darkT-=dt;
+  if(DREAD.stingCool>0)DREAD.stingCool-=dt;
+  const quiet=M.goneT>0||M.floor!==P.floor||(distPM()>18&&M.state!=='chase');
+  /* glimpses: only while the real one is far and not hunting you */
+  if(DREAD.ph)phantomTick(dt,t);
+  else{DREAD.next-=dt;
+    if(DREAD.next<=0){DREAD.next=quiet&&!P.hiding&&M.state!=='chase'?dreadGap():8;
+      if(quiet&&!P.hiding&&M.state!=='chase')phantomStart();}}
+  DREAD.houseT-=dt;
+  if(DREAD.houseT<=0){DREAD.houseT=(28+Math.random()*34)*DF().every;if(M.state!=='chase')houseScare();}
+  if(M.goneT>0)return;
+  /* the beam finds its face: a sting, the first time in a while */
+  if(DREAD.stingCool<=0&&M.state!=='chase'&&M.floor===P.floor&&FLASH.level>0.3){
+    mon.headG.getWorldPosition(_dv);
+    const dx=_dv.x-FLASH.pos.x,dy=_dv.y-FLASH.pos.y,dz=_dv.z-FLASH.pos.z,dl=Math.hypot(dx,dy,dz)||1;
+    if(dl<15&&(dx*FLASH.dir.x+dy*FLASH.dir.y+dz*FLASH.dir.z)/dl>0.93&&losClear(P.floor,P.x,P.z,M.x,M.z)){
+      DREAD.stingCool=25;SFX.sting();scareShakeT=Math.max(scareShakeT,0.15);}}
+  /* while it hunts you, it shrieks as it comes */
+  if(M.state==='chase'&&(!MP||!M.tgt||M.tgt===P)&&monPan){DREAD.shriekT-=dt;
+    if(DREAD.shriekT<=0){DREAD.shriekT=2.8+Math.random()*3.4;const r=Math.random();
+      voice({f:85+r*35,f2:48,dur:.8+r*.5,vol:.75,out:monPan,form:[900+r*500,2300+r*600],q:4});
+      noiseHit({dur:.6,vol:.2,type:'bandpass',f:2800,f2:1300,q:3,out:monPan});}}
+  else DREAD.shriekT=0.8;}
+/* a glimpse never outlives the night it belongs to */
+setInterval(()=>{if(state!=='play'&&DREAD.ph)phantomGone(false);},120);
 
 /* ================= GAME FLOW ================= */
 /* ---- the difficulty picker (title, death and win screens; solo only) ---- */
@@ -6021,6 +6155,8 @@ function updateFlashlight(dt,t){
     else if(dangerLevel>0.35&&Math.random()<dt*dangerLevel*(M.state==='chase'?7:2.5))flickT=0.05+Math.random()*0.18;}
   if(scareShakeT>0.3)fl=Math.random()<0.6?0.08:1;
   if(DARK.t>0)fl*=0.55;
+  /* the house's dead-torch scare: stutters out and back (a smooth fade with reduced flashing) */
+  if(DREAD.darkT>0)fl*=settings.reduceFlash?Math.max(0.02,Math.abs(DREAD.darkT-0.85)/0.85):(DREAD.darkT>1.45||DREAD.darkT<0.2?(Math.random()<0.5?0.05:0.6):0.02);
   const tint=_tint.set(curLegend().t).lerp(_white,0.82);
   L.color.copy(tint);
   L.intensity=40*FLASH.level*fl;L.visible=L.intensity>0.05;
@@ -7601,7 +7737,7 @@ if(WATCH)watchInit();
 if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return state;},get got(){return got;},get doorOpen(){return doorOpen;},
   get MP(){return MP;},embers,stairs,nodes,adj,findPath,nk,NF,CS,FH,PATROL,maps,entAt,TOTAL_EMBERS,startGame,warpTo,openDoor,camera,scene,get REMOTE(){return typeof REMOTE!=='undefined'?REMOTE:null;},
   get PUP(){return typeof PUP!=='undefined'?PUP:null;}};
-if(DEBUG)Object.assign(window.__hm,{ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;}});
+if(DEBUG)Object.assign(window.__hm,{ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare});
 window.__HM_BOOTED=true;
 </script>
 </body>
