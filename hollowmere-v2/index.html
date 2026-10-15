@@ -632,6 +632,23 @@
   #toast{white-space:normal;width:max-content;max-width:92vw;line-height:1.35}
   #subtitle{width:max-content;max-width:86vw;text-align:center}
   @media (pointer: coarse){ #esswrap{right:70px} }
+  /* ===== BOUNTIES + TRINKETS ===== */
+  #bountyHud{position:absolute;top:100px;right:18px;text-align:right;font-family:'Cormorant SC',serif;font-size:11px;letter-spacing:2px;
+    color:#8f8874;text-shadow:0 1px 6px #000;transition:opacity .4s;pointer-events:none;max-width:46vw}
+  #bountyHud .bh{font-size:10px;letter-spacing:4px;color:#6f7a92;margin-bottom:3px}
+  #bountyHud .bl{margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #bountyHud .bl i{font-style:normal;margin-right:6px;color:#6f6a5c}
+  #bountyHud .bl span{color:#b9b19c;margin-left:4px}
+  #bountyHud .bl.done{color:#ffbe6f;text-shadow:0 0 10px rgba(255,170,80,.45)}
+  #bountyHud .bl.done i{color:#ffbe6f}
+  #bountyHud .bl.fail{opacity:.4;text-decoration:line-through}
+  #bountyHud.flash .bh{color:#ffbe6f;animation:essPulse .9s ease-in-out infinite}
+  #trinkHud{font-family:'Cormorant SC',serif;font-size:11px;letter-spacing:3px;color:#8fd1b0;text-shadow:0 0 10px rgba(120,220,170,.45);margin-bottom:4px;white-space:nowrap}
+  #trinkHud:empty{display:none}
+  #btnThrow{border-color:rgba(143,209,176,.55);color:#bfead0}
+  /* on a touch screen the right side belongs to the thumbs: the list sits on the left, under the objective (and the team) */
+  @media (pointer: coarse){#bountyHud{top:118px;right:auto;left:22px;text-align:left}}
+  @media (max-width:700px){#bountyHud{font-size:9px;letter-spacing:1px}#bountyHud .bh{font-size:8px}}
 </style>
 </head>
 <body>
@@ -776,12 +793,13 @@
       <b>F</b> hide in a wardrobe or crate — safe, but you can't move until you press it again<br>
       <b>R</b> shift your soul back to the Heart — only you move; the embers and the thing stay put (blocked while it is near)<br>
       <b>G</b> your legend’s power — name, cooldown and cost sit at the foot of the screen<br>
+      <b>T</b> throw a trinket you picked up — it shatters, and the thing goes to look<br>
       <b>V</b> the vault · <b>ESC</b> settings
     </div>
     <div class="controls hidden" id="ctrlTouch">
       <b>LEFT THUMB</b> press &amp; drag to walk &nbsp;·&nbsp; <b>RIGHT THUMB</b> drag to look<br>
       hold <b>BURST</b> to run (loud) &nbsp;·&nbsp; hold <b>VEIL</b> to creep, light cupped, nearly unseen<br>
-      tap <b>POWER</b> for your legend’s ability<br>
+      tap <b>POWER</b> for your legend’s ability &nbsp;·&nbsp; tap <b>THROW</b> to lob a trinket and lure it away<br>
       <b>HIDE</b> tucks you into a nearby wardrobe or crate — safe, but you can't move until you tap it again<br>
       <b>HEART</b> shifts only you back to the Heart (blocked while the thing is near) &nbsp;·&nbsp; <b>⚙</b> settings
     </div>
@@ -3870,6 +3888,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyR')tryHeart();
   if(e.code==='KeyF')tryHide();
   if(e.code==='KeyG')tryPower();
+  if(e.code==='KeyT')tryThrow();
   if(e.code==='KeyV'&&state!=='play'){e.preventDefault();if(vaultOpen)closeVault();else openVault();}
   if(['ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();});
 addEventListener('keyup',e=>keys[e.code]=false);
@@ -4092,6 +4111,7 @@ function resetRun(){
   DARK.t=0;
   M.goneT=0;M.stunT=0;M.stunWake=false;M.slowT=0;M.slowMul=1;M.back=null;mon.g.visible=true;
   revealPool.forEach(s=>s.visible=false);
+  engReset();
 }
 function endRun(win){
   if(RUN.done)return;RUN.done=true;
@@ -5201,6 +5221,168 @@ function pvRender(dt,t){
   PV.ren.render(PV.scene,PV.cam);
 }
 
+/* =========================================================
+   TRINKETS, CLOSE CALLS AND THE NIGHT'S BOUNTIES
+   Things to do in the house besides run and hide:
+     · TRINKETS   old bottles lie about, two to a floor. Walk over one to pocket it
+                  (you carry two at most), T / THROW lobs it where you face. It
+                  shatters, and the thing goes to look — even mid-hunt, once it has
+                  lost sight of you. In co-op it only turns your own hunter.
+     · CLOSE CALLS  let it pass within arm's reach while you hide or creep, and walk
+                  away unseen: a little ether and a count for the bounties.
+     · BOUNTIES   three small dares drawn fresh every night (HUD, top right),
+                  each paid in ether the moment it is done.
+   Hooks elsewhere: resetRun → engReset, updatePlayer → engPlayer,
+   doWin / doDeath → engEnd, the T key → tryThrow.
+   ========================================================= */
+const TRINKET_MAX=2, THROW_RANGE=8.5, CLOSE_IN=3.2, CLOSE_OUT=7;
+const ENG={carry:0,lures:0,close:0,hidT:0,ccArmed:false,ccCool:0,fly:null,bounties:[],flashT:0};
+/* a bottle: a lathe of green glass with a faint glint so a beam can find it */
+const trinketGeo=(()=>{const p=[[0,0],[0.045,0],[0.05,0.02],[0.05,0.13],[0.03,0.17],[0.016,0.19],[0.016,0.25],[0.02,0.26],[0,0.26]]
+  .map(([r,y])=>new THREE.Vector2(r,y));const g=new THREE.LatheGeometry(p,10);g.computeVertexNormals();return g;})();
+const trinketMat=std({color:0x2c4a36,roughness:0.15,metalness:0.2,emissive:0x0d2418,emissiveIntensity:0.6});
+function makeTrinket(){const grp=new THREE.Group();
+  const b=new THREE.Mesh(trinketGeo,trinketMat);b.rotation.z=Math.PI/2.3;b.castShadow=true;grp.add(b);
+  const halo=glowSprite(0x8fd1b0,0.28);halo.position.y=0.06;grp.add(halo);
+  grp.position.set(0,-10,0);scene.add(grp);return grp;}
+const trinkets=[];
+for(let i=0;i<NF*TRINKET_MAX;i++)trinkets.push({x:0,z:0,f:0,grp:makeTrinket(),taken:true});
+const thrown=makeTrinket();thrown.visible=false;
+function scatterTrinkets(){
+  let i=0;
+  for(let f=0;f<NF;f++){
+    const pool=emberPools[f].filter(c=>!embers.some(e=>e.f===f&&cellOf(e.x,e.z)[0]===c[0]&&cellOf(e.x,e.z)[1]===c[1])
+      &&!shards.some(s=>s.f===f&&cellOf(s.x,s.z)[0]===c[0]&&cellOf(s.x,s.z)[1]===c[1]));
+    const src=pool.length?pool:emberPools[f];
+    for(let k=0;k<TRINKET_MAX;k++){const t=trinkets[i++];
+      const[x,z]=src[Math.floor(Math.random()*src.length)];
+      /* off-centre in the cell, as if it rolled there */
+      t.f=f;t.x=(x+.5)*CS+(Math.random()-.5)*0.9;t.z=(z+.5)*CS+(Math.random()-.5)*0.9;t.taken=false;
+      t.grp.position.set(t.x,f*FH+0.05,t.z);t.grp.rotation.y=Math.random()*6.28;t.grp.visible=true;}}}
+
+/* ---- the bounties ---- */
+const huntsSurvived=()=>Math.round((RUN.tally['HUNTS SURVIVED']||0)/PAY.hunt);
+/* prog() → how far along (fail() true: it can no longer be done tonight); end: only judged at the front door */
+const BOUNTY_POOL=[
+  {id:'mem',  n:'RECOVER 2 MEMORIES',            goal:2,  pay:30, prog:()=>shardsFound},
+  {id:'lure', n:'LURE IT WITH 2 TRINKETS',       goal:2,  pay:30, prog:()=>ENG.lures},
+  {id:'close',n:'SURVIVE 2 CLOSE CALLS',         goal:2,  pay:35, prog:()=>ENG.close},
+  {id:'hunt', n:'SHAKE IT OFF YOUR TRAIL',       goal:1,  pay:30, prog:huntsSurvived},
+  {id:'walk', n:'WALK EVERY FLOOR',              goal:()=>NF, pay:25, prog:()=>Object.keys(RUN.floors).length},
+  {id:'hide', n:'SPEND 30 SECONDS HIDDEN',       goal:30, pay:20, prog:()=>Math.floor(ENG.hidT)},
+  {id:'swift',n:'TAKE 4 EMBERS BEFORE 4:00',     goal:4,  pay:40, prog:()=>got, fail:()=>elapsed>=240},
+  {id:'ghost',n:'TAKE 3 EMBERS BEFORE IT SEES YOU',goal:3,pay:35, prog:()=>got, fail:()=>RUN.spotted},
+  {id:'calm', n:'ESCAPE WITHOUT YOUR POWER',     goal:1,  pay:40, prog:()=>0, end:()=>AB.used===0, fail:()=>AB.used>0}
+];
+const bGoal=b=>typeof b.def.goal==='function'?b.def.goal():b.def.goal;
+function drawBounties(){
+  const pool=BOUNTY_POOL.slice(),out=[];
+  while(out.length<3&&pool.length)out.push({def:pool.splice(Math.floor(Math.random()*pool.length),1)[0],done:false,failed:false});
+  return out;}
+function payBounty(b){b.done=true;awardEther(b.def.pay,'BOUNTIES');
+  toast('BOUNTY · '+b.def.n+' · +'+b.def.pay+' ETHER',3);SFX.chime();ENG.flashT=2.5;}
+function checkBounties(){
+  ENG.bounties.forEach(b=>{if(b.done||b.failed)return;
+    if(b.def.prog()>=bGoal(b)&&!b.def.end)payBounty(b);
+    else if(b.def.fail&&b.def.fail())b.failed=true;});}
+
+/* ---- HUD: the bounties (top right) and the trinkets you carry (over the essence bar) ---- */
+const bountyEl=document.createElement('div');bountyEl.id='bountyHud';$('hud').appendChild(bountyEl);
+const trinkEl=document.createElement('div');trinkEl.id='trinkHud';$('esswrap').prepend(trinkEl);
+let bountyShown='';
+function bountyHUD(){
+  const on=(state==='play'||state==='caught')&&!vaultOpen;
+  bountyEl.style.opacity=on?'':'0';
+  {const tm=$('team');bountyEl.style.top=isTouch?(tm&&tm.offsetHeight?Math.max(118,tm.offsetTop+tm.offsetHeight+8)+'px':''):(MP?'150px':'');}
+  bountyEl.classList.toggle('flash',ENG.flashT>0);
+  const html='<div class="bh">TONIGHT’S BOUNTIES</div>'+ENG.bounties.map(b=>{
+    const g=bGoal(b),p=Math.min(g,b.def.prog());
+    const tail=b.done?'✓':b.failed?'✕':b.def.end?'AT THE DOOR':(g>1?p+'/'+g:'');
+    return '<div class="bl'+(b.done?' done':b.failed?' fail':'')+'"><i>'+(b.done?'◆':'◇')+'</i>'+b.def.n
+      +(tail?' <span>'+tail+'</span>':'')+'</div>';}).join('');
+  if(html!==bountyShown){bountyShown=html;bountyEl.innerHTML=html;}
+  trinkEl.textContent=ENG.carry?'TRINKETS '+'▲'.repeat(ENG.carry)+(isTouch?'':' · T TO THROW'):'';
+  if(btnThrowEl)btnThrowEl.style.display=on&&ENG.carry&&!P.hiding?'flex':'none';}
+function bountySummary(){
+  const n=ENG.bounties.filter(b=>b.done).length;
+  return 'BOUNTIES '+n+'/'+ENG.bounties.length+(ENG.bounties.length?' · '+ENG.bounties.map(b=>(b.done?'◆ ':'◇ ')+b.def.n).join(' · '):'');}
+
+/* ---- throwing ---- */
+function tryThrow(){
+  if(state!=='play'||settingsOpen||vaultOpen||P.hiding||!ENG.carry||ENG.fly)return;
+  const fx=Math.sin(camYaw),fz=Math.cos(camYaw);
+  /* as far as the throw carries before a wall stops it */
+  let d=THROW_RANGE,tx=P.x,tz=P.z;
+  for(;d>=1;d-=0.25){tx=P.x+fx*d;tz=P.z+fz*d;const[cx,cz]=cellOf(tx,tz);
+    if(!blocksSight(P.floor,cx,cz)&&losClear(P.floor,P.x,P.z,tx,tz))break;}
+  if(d<1){tx=P.x+fx*0.6;tz=P.z+fz*0.6;}
+  ENG.carry--;
+  ENG.fly={x0:P.x,z0:P.z,y0:P.y+1.35,x1:tx,z1:tz,y1:P.floor*FH+0.08,f:P.floor,t:0,dur:0.35+d*0.035};
+  thrown.visible=true;thrown.position.set(P.x,P.y+1.35,P.z);
+  noiseHit({dur:.18,vol:.05,type:'bandpass',f:900,q:1.5});}
+function shatter(fl){
+  thrown.visible=false;ENG.fly=null;
+  const pan=Math.max(-1,Math.min(1,panOf(fl.x1,fl.z1)));
+  const v=0.4+0.6*volAt(Math.hypot(fl.x1-P.x,fl.z1-P.z),18);
+  noiseHit({dur:.35,vol:.32*v,type:'highpass',f:3200,f2:1800,q:0.8,pan,echo:.6,att:0.002});
+  [2200,3100,4150].forEach((f,i)=>tone({f,f2:f*0.92,type:'triangle',dur:.25,vol:.035*v,a:.002,pan,echo:.5,delay:i*0.03+Math.random()*0.04}));
+  for(let i=0;i<12;i++)spawnPart(fl.x1,fl.y1+0.1,fl.z1,0x8fd1b0,{x:(Math.random()-.5)*2.2,y:Math.random()*1.6,z:(Math.random()-.5)*2.2},.6,.18);
+  /* the thing goes to look: on this floor from across the house, through the ceiling or floor if it is close */
+  if(M.goneT>0||M.stunT>0)return;
+  const dm=Math.hypot(M.x-fl.x1,M.z-fl.z1),same=M.floor===fl.f;
+  if(!(same?dm<24:(Math.abs(M.floor-fl.f)===1&&dm<10)))return;
+  if(M.state==='chase'&&(M.losLostT<0.25||(MP&&M.tgt&&M.tgt!==P)))return;   /* it still has you in sight */
+  const[cx,cz]=cellOf(fl.x1,fl.z1);
+  const was=M.state;
+  M.state=was==='chase'?'search':'investigate';M.invT=0;M.searchT=3;M.losLostT=0;M.path=null;M.pathI=0;
+  setTargetCell(cx,cz,fl.f);
+  ENG.lures++;
+  subtitle(was==='chase'?'It wheels toward the breaking glass.':'Somewhere, it turns toward the sound.',2.8);}
+
+/* ---- each frame of play ---- */
+function engPlayer(dt){
+  if(ENG.flashT>0)ENG.flashT-=dt;
+  /* pocketing */
+  if(!P.hiding&&ENG.carry<TRINKET_MAX)trinkets.forEach(t=>{
+    if(t.taken||t.f!==P.floor||ENG.carry>=TRINKET_MAX)return;
+    if(Math.hypot(t.x-P.x,t.z-P.z)<PS.pick+(AB.quickT>0?0.7:0)){t.taken=true;t.grp.visible=false;ENG.carry++;
+      tone({f:1320,f2:1250,type:'triangle',dur:.18,vol:.05,a:.003,echo:.4});
+      if(!ENG.toldThrow){ENG.toldThrow=1;toast(isTouch?'A TRINKET · TAP THROW TO LURE IT AWAY':'A TRINKET · PRESS T TO THROW IT AND LURE IT AWAY',3.2);}}});
+  /* in flight: a lob that tumbles */
+  const fl=ENG.fly;
+  if(fl){fl.t+=dt;const k=Math.min(1,fl.t/fl.dur);
+    thrown.position.set(fl.x0+(fl.x1-fl.x0)*k,fl.y0+(fl.y1-fl.y0)*k+Math.sin(k*Math.PI)*1.1,fl.z0+(fl.z1-fl.z0)*k);
+    thrown.rotation.x+=dt*14;thrown.rotation.z+=dt*9;
+    if(k>=1)shatter(fl);}
+  if(P.hiding)ENG.hidT+=dt;
+  /* close calls: it came within reach while you were tucked away or creeping, and went on without you */
+  if(ENG.ccCool>0)ENG.ccCool-=dt;
+  const near=M.goneT<=0&&M.floor===P.floor?distPM():1e9;
+  if(M.state==='chase'&&(!MP||!M.tgt||M.tgt===P))ENG.ccArmed=false;
+  else if(!ENG.ccArmed&&ENG.ccCool<=0&&(P.hiding||P.veiling)&&near<CLOSE_IN)ENG.ccArmed=true;
+  else if(ENG.ccArmed&&near>CLOSE_OUT){ENG.ccArmed=false;ENG.ccCool=6;ENG.close++;
+    awardEther(6,'CLOSE CALLS');toast('A CLOSE CALL · +6 ETHER',2.2);SFX.heart(0.25);}
+  checkBounties();}
+
+function engReset(){
+  ENG.carry=0;ENG.lures=0;ENG.close=0;ENG.hidT=0;ENG.ccArmed=false;ENG.ccCool=0;ENG.fly=null;thrown.visible=false;
+  ENG.bounties=drawBounties();ENG.flashT=4;bountyShown='';
+  scatterTrinkets();}
+/* a night ends: door-only bounties are judged, and the screens get the tally */
+function engEnd(win){
+  if(win)ENG.bounties.forEach(b=>{if(!b.done&&!b.failed&&b.def.end&&b.def.end())payBounty(b);});
+  checkBounties();
+  const line=bountySummary();
+  ['bountySumD','bountySumW'].forEach(id=>{const el=$(id);if(el)el.textContent=line;});}
+{const mk=(id,after)=>{const el=document.createElement('div');el.className='stat';el.id=id;
+   const a=$(after);if(a)a.after(el);};
+ mk('bountySumD','deathTime');mk('bountySumW','winStats');}
+/* the touch button sits beside HIDE and HEART, and only shows while you carry something */
+const btnThrowEl=(()=>{const h=$('btnHide');if(!h)return null;
+  const b=document.createElement('div');b.id='btnThrow';b.className='tbtn small';b.textContent='THROW';b.style.display='none';
+  h.before(b);b.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();tryThrow();},{passive:false});return b;})();
+setInterval(bountyHUD,150);
+
 /* ================= GAME FLOW ================= */
 /* ---- the difficulty picker (title, death and win screens; solo only) ---- */
 function renderDiffRows(){
@@ -5323,7 +5505,7 @@ function doDeath(){state='dead';deaths++;catcher=null;
       :'Your team keeps every ember. The Heart is rekindling you in the cellar \u2014 your friends are on their own until you rise.';}
   riseTick();
   try{if(document.pointerLockElement)document.exitPointerLock();}catch(e){}
-  endRun(false);redEl.style.opacity=0.8;setScreenState();
+  engEnd(false);endRun(false);redEl.style.opacity=0.8;setScreenState();
   for(let i=0;i<20;i++)spawnPart(P.x,P.y+1,P.z,0xffb060,
     {x:(Math.random()-.5)*3,y:Math.random()*2.5,z:(Math.random()-.5)*3},1.2,.4);
   RUN.title=RUN.title||runTitle();
@@ -5342,7 +5524,7 @@ function doDeath(){state='dead';deaths++;catcher=null;
   applyPendingUser();}
 function doWin(){state='win';
   if(MP){TEAM.myOut=Math.round(mpElapsed()*10)/10;TEAM.done=false;}
-  endRun(true);setScreenState();try{document.exitPointerLock();}catch(e){}SFX.win();
+  engEnd(true);endRun(true);setScreenState();try{document.exitPointerLock();}catch(e){}SFX.win();
   RUN.title=RUN.title||runTitle();
   if(MP){
     /* co-op: the night is not over until every soul is out — watch the others until then */
@@ -5654,6 +5836,7 @@ function updatePlayer(dt,t){
   const[cx,cz]=cellOf(P.x,P.z);
   if(cx===exitCell[0]&&cz===exitCell[1]&&!doorOpen&&t>hintT){hintT=t+4;
     toast(`SEALED BY THE HEART \u2014 ${TOTAL_EMBERS-got} EMBER${TOTAL_EMBERS-got>1?'S':''} REMAIN`);}
+  engPlayer(dt);
   if(doorOpen&&P.z>16.5*CS)doWin();}
 let ghostYaw=Math.PI;
 
@@ -7418,6 +7601,7 @@ if(WATCH)watchInit();
 if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return state;},get got(){return got;},get doorOpen(){return doorOpen;},
   get MP(){return MP;},embers,stairs,nodes,adj,findPath,nk,NF,CS,FH,PATROL,maps,entAt,TOTAL_EMBERS,startGame,warpTo,openDoor,camera,scene,get REMOTE(){return typeof REMOTE!=='undefined'?REMOTE:null;},
   get PUP(){return typeof PUP!=='undefined'?PUP:null;}};
+if(DEBUG)Object.assign(window.__hm,{ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;}});
 window.__HM_BOOTED=true;
 </script>
 </body>
