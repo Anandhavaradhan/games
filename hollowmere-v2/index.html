@@ -785,7 +785,7 @@
       <b>HIDE</b> tucks you into a nearby wardrobe or crate — safe, but you can't move until you tap it again<br>
       <b>HEART</b> shifts only you back to the Heart (blocked while the thing is near) &nbsp;·&nbsp; <b>⚙</b> settings
     </div>
-    <button id="btnVault" class="ovbtn">THE VAULT — 40 LEGENDS</button>
+    <button id="btnVault" class="ovbtn">THE VAULT — 41 LEGENDS</button>
     <button id="titleAccount" class="ovbtn">ACCOUNT</button>
     <button id="titleBoard" class="ovbtn">LEADERBOARD</button>
     <button id="titleFriends" class="ovbtn">FRIENDS</button>
@@ -847,7 +847,7 @@
     <div id="vHead">
       <div id="vTitle">THE VAULT OF LEGENDS</div>
       <div id="vWallet"><svg class="eg" viewBox="0 0 24 24" aria-hidden="true"><use href="#ethglyph"/></svg>
-        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/40</div>
+        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/<span id="vTotal">41</span></div>
       <div id="vClose">CLOSE</div>
     </div>
     <div id="vClaim" style="display:none"></div>
@@ -888,7 +888,7 @@ setTimeout(function(){
 /* =====================================================================
    FILE MAP  (search for the banner text to jump to a section)
      BOOT ............ error reporting, three.js loaded from a CDN with fallbacks
-     VAULT OF LEGENDS  the 40 legends: stats, looks, abilities
+     VAULT OF LEGENDS  the 41 legends: stats, looks, abilities
      SAVE ............ local save format, cleaning, league progression
      CONSTANTS & MAPS  the four floors as text maps, stairs, nav graph, pathfinding
      THREE SETUP ..... renderer + post pass, generated PBR surfaces, the house, furniture, light pool, flashlight
@@ -992,7 +992,7 @@ const DF=()=>DIFFS[runDiff]||DIFFS.normal;
 const SOLO_RANKED=!MP&&NF_WANT===4;
 
 /* =========================================================
-   THE VAULT OF LEGENDS  —  40 ghosts, ported into the manor
+   THE VAULT OF LEGENDS  —  41 ghosts, ported into the manor
    st   = [MIGHT, GRACE, WITS, SPIRIT] (remapped in computePS)
    look = how the spectral mannequin is dressed
    ab.k = which ability primitive it fires in the manor
@@ -1281,7 +1281,14 @@ const ROSTER=[
  l:'The poster says dead or alive. He rarely checks which.',
  ab:{n:'DEAD OR ALIVE',k:'reveal',cd:90,cost:30,t:-1,once:1,
  p:'Marks every ember, memory and the monster for the rest of the night. Once only.',
- d:'Tag the house once. Every ember, every memory and the thing itself stay marked for the rest of the night.'}}
+ d:'Tag the house once. Every ember, every memory and the thing itself stay marked for the rest of the night.'}},
+
+{id:'psychopomp',n:'THE PSYCHOPOMP',e:'The Last Ferry',c:'GUIDE',tier:4,pw:64.0,r:'ESCAPE',t:'#9fe0ff',
+ look:{hat:'hood',wpn:'staff',cape:1},st:[50,72,80,92],
+ l:'She has walked ten thousand souls to the door. None of them looked back.',
+ ab:{n:'LAST FERRY',k:'exit',cd:30,cost:30,
+ p:'Once every ember is gathered, carries you straight out of the house. Useless until then.',
+ d:'Pay the ferryman once the seal is broken. You are out in the rain before the thing can turn its head.'}}
 ];
 
 const BYID={};ROSTER.forEach(function(c){BYID[c.id]=c;});
@@ -1291,6 +1298,8 @@ const BYID={};ROSTER.forEach(function(c){BYID[c.id]=c;});
 const ORDER=ROSTER.slice().sort(function(a,b){
   return (a.tier-b.tier)||(a.pw-b.pw)||(ROSTER.indexOf(a)-ROSTER.indexOf(b));});
 const ORD={};ORDER.forEach(function(c,i){ORD[c.id]=i+1;});
+/* how many legends the vault holds (before combined ones and the keeper's are added) */
+const BASE_COUNT=ROSTER.length;
 /* of the free five, start on the quickest and quietest — the kindest to learn on */
 const FIRST_GHOST=FREE.slice().sort(function(a,b){return BYID[b].st[1]-BYID[a].st[1];})[0];
 const pad2=n=>String(n).padStart(2,'0');
@@ -1412,9 +1421,9 @@ const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id
    admin (admins/{uid}, which only that account can read), so nobody else ever sees it. Choosing it does
    not change save.main; everyone else — co-op, the watch page, the leaderboards, the run history —
    sees the legend it is dressed as (pub). */
-const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true]};
+const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true,true]};
 /* which powers G / the power button fire together (the ticks on the boxes), remembered on this device */
-try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length===4)GOD.sel=v.map(Boolean);}catch(e){}
+try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length>=4)GOD.sel=v.slice(0,5).map(Boolean).concat(v.length<5?[true]:[]);}catch(e){}
 function godToggle(i){const ps=curLegend().ab.parts||[];if(!ps[i]||godIsAuto(ps[i]))return;GOD.sel[i]=!GOD.sel[i];try{localStorage.setItem('hm_gsel',JSON.stringify(GOD.sel));}catch(e){}
   const n=ps[i].n;toast((GOD.sel[i]?'\u2713 ':'\u2715 ')+n+(GOD.sel[i]?' \u2014 FIRES WITH THE OTHERS':' \u2014 LEFT OUT'),1.6);}
 /* the keeper's own legend */
@@ -1427,12 +1436,12 @@ function godReset(){const a=curLegend().ab;GOD.st=a.k==='multi'?a.parts.map(()=>
 /* after the legend changes: right HUD, fresh powers */
 function multiSync(){document.body.classList.toggle('godp',godActive());godReset();}
 function godBuild(){
-  const b=BYID.bountyhunter,parts=['legionary','bountyhunter','archer','outrider'].map(id=>BYID[id].ab);
+  const b=BYID.bountyhunter,parts=['legionary','bountyhunter','archer','outrider','psychopomp'].map(id=>BYID[id].ab);
   return {id:'god',n:'GOD',e:'Keeper of the House',c:'ADMIN',tier:4,pw:100,r:b.r,t:b.t,look:b.look,st:[100,100,100,100],pub:b.id,
     l:'Only the keeper of Hollowmere walks as this.',
     ab:{n:'EVERY HAND AT ONCE',k:'multi',cd:35,cost:30,parts,
-      p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. Unerring Arrow and Horseborn each have their own essence and cooldown: fire one (keys 3\u20134, or tap its icon) or the ticked ones together (G or ALL). Hold an icon (or Alt + 3\u20134) to tick or untick it.',
-      d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once.'}};}
+      p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. Unerring Arrow, Horseborn and Last Ferry each have their own essence and cooldown: fire one (keys 3\u20135, or tap its icon) or the ticked ones together (G or ALL). Last Ferry carries you straight out once every ember is gathered. Hold an icon (or Alt + 3\u20135) to tick or untick it.',
+      d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once \u2014 and, once the seal breaks, the ferry out.'}};}
 const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
 /* the legend everyone else sees you as */
 const pubLegend=()=>curLegend().pub||curLegend().id;
@@ -3047,6 +3056,7 @@ function godFire(i,quiet,auto){
   if(pa.k==='ward'&&AB.ward>0){say(pa.n+' \u2014 STILL HOLDING');return false;}
   if(pa.k==='haste'&&AB.hasteT>0){say(pa.n+' \u2014 STILL ACTIVE');return false;}
   if(pa.k==='reveal'&&AB.revealT>1000){say(pa.n+' \u2014 THE HOUSE IS ALREADY MARKED');return false;}
+  if(pa.k==='exit'&&!exitReady()){if(!quiet)exitSealedToast();return false;}
   if(pa.k==='pull'){if(!pullEmber(pa.scope))return false;SFX.chime();toast(pa.n,2.2);}
   else{fireAbility(c,pa);if(MP)mpPower(pa);}
   if(!auto)s.ess-=pa.cost;s.cd=Math.max(8,Math.round(pa.cd*PS.cdMul));AB.used++;
@@ -3061,7 +3071,7 @@ function godFireAll(){
 /* the admin legend's HUD: an icon per power (its ring is its cooldown, like every legend's) plus an ALL
    icon for the ticked ones together, and a thin essence bar per power under the main essence bar.
    Tap an icon: fire it alone. Hold it (half a second): tick / untick it for ALL. */
-const GOD_COL=['#ff9a8a','#ffcf8a','#d8c76a','#a8e8d8'];
+const GOD_COL=['#ff9a8a','#ffcf8a','#d8c76a','#a8e8d8','#9fe0ff'];
 function godWord(n){return n.replace(/^(THE|A|AN)\s+/,'').split(/[\s,]+/)[0].replace(/[^A-Z0-9]/g,'').slice(0,9);}
 function godIcon(i,label,col,combo){
   return '<div class="gpi tbtn abx'+(combo?' combo':'')+'" data-gp="'+i+'" style="--vt:'+col+'">'
@@ -3088,7 +3098,8 @@ function godArc(host){
     el.style.right=(cr0-R*Math.cos(a)-sz/2-offR).toFixed(1)+'px';
     el.style.bottom=(cb0+R*Math.sin(a)-sz/2-offB).toFixed(1)+'px';};
   place(host.children[n],100);
-  for(let i=n-1;i>=0;i--)place(host.children[i],100+17*(n-i));   /* last power next to ALL, the first at the end */
+  const step=n>4?14:17;   /* a fifth power squeezes the arc so it stays on screen */
+  for(let i=n-1;i>=0;i--)place(host.children[i],100+step*(n-i));   /* last power next to ALL, the first at the end */
 }
 function godHud(){
   const parts=curLegend().ab.parts;
@@ -3125,9 +3136,10 @@ function godHud(){
     const i=+ic.getAttribute('data-gp');if(i<0)return;
     const pa=parts[i],s=GOD.st[i];if(!pa||!s)return;
     const live=pa.k==='haste'?AB.hasteT>0:false;
-    const ready=!live&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
+    const sealed=pa.k==='exit'&&!exitReady();
+    const ready=!live&&!sealed&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
     const cdMax=Math.max(8,Math.round(pa.cd*PS.cdMul)),frac=s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
-    ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
+    ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost||sealed?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
     ic.querySelector('.ring').style.strokeDashoffset=live?RING_LEN:RING_LEN*(1-frac);
     const gt=ic.querySelector('.gt');if(gt)gt.textContent=GOD.sel[i]?'✓':'';});
   if(eb)Array.from(eb.children).forEach(row=>{const i=+row.getAttribute('data-ge'),s=GOD.st[i],pa=parts[i];if(!s)return;
@@ -4246,6 +4258,17 @@ function doWarp(a){
   if(a.invis)AB.invisT=Math.max(AB.invisT,a.invis);
   return true;
 }
+/* the Psychopomp's ferry: only once the seal is broken (every ember gathered, the front door open) */
+const exitReady=()=>doorOpen&&got>=TOTAL_EMBERS;
+function exitSealedToast(){const left=Math.max(0,TOTAL_EMBERS-got);
+  toast(left?'THE SEAL HOLDS \u2014 '+left+' EMBER'+(left>1?'S':'')+' REMAIN':'THE DOOR IS NOT OPEN YET',2);}
+function ferryOut(col){
+  flash=settings.reduceFlash?0.4:1;
+  for(let i=0;i<40;i++)spawnPart(P.x,P.y+0.4+Math.random()*1.6,P.z,col,
+    {x:(Math.random()-.5)*1.2,y:1.5+Math.random()*2.5,z:(Math.random()-.5)*1.2},1.2,.4);
+  SFX.chime();
+  doWin();
+}
 function pullEmber(scope){
   let best=null,bs=1e9;
   embers.forEach(e=>{
@@ -4330,6 +4353,7 @@ function tryPower(){
   if(AB.cd>0){toast(a.n+' \u2014 '+Math.ceil(AB.cd)+'S',1.3);return;}
   if(P.ess<a.cost){toast('NOT ENOUGH ESSENCE',1.6);return;}
   if(a.k==='breach'&&!findBreach()){toast('NO WALL WITHIN REACH',2);return;}
+  if(a.k==='exit'&&!exitReady()){exitSealedToast();return;}
   if(a.k==='pull'){
     if(!pullEmber(a.scope))return;
     P.ess-=a.cost;AB.cd=AB.cdMax;AB.used++;SFX.chime();toast(a.n,2.2);
@@ -4419,6 +4443,7 @@ function fireAbility(c,a){
       DARK.t=a.t;SFX.thunder();
       subtitle('Every light in Hollowmere goes out at once.',3.4);
       break;
+    case'exit':ferryOut(col);break;
     case'foresight':
       AB.foreT=a.t;AB.revealT=Math.max(AB.revealT,a.t);
       M.slowT=a.t;M.slowMul=0.55;SFX.shard();
@@ -4530,7 +4555,7 @@ function updateReveal(t){
 
 /* --- HUD ------------------------------------------------------- */
 const RING_LEN=289.03;   /* 2*PI*46, the circle the outline is drawn on */
-const INSTANT_KINDS=['ward','heal','warp','pull','breach','lure'];
+const INSTANT_KINDS=['ward','heal','warp','pull','breach','lure','exit'];
 const btnHideEl=$('btnHide');
 function abInstant(){return INSTANT_KINDS.indexOf(curLegend().ab.k)>=0;}
 /* how long the ability is still doing something, in seconds */
@@ -4574,7 +4599,7 @@ function updateAbilityHUD(){
   const mode=act>0?'active'
     :(spent?'spent'
     :(AB.cd>0?'cool'
-    :(P.ess<a.cost?'nofuel':'ready')));
+    :(P.ess<a.cost||(a.k==='exit'&&!exitReady())?'nofuel':'ready')));
   /* an instant cast has no active phase, so the outline simply vanishes on
      use and the clock-sweep draws it back; a duration ability hides the
      outline and breathes an aura until its effect runs out */
@@ -4591,7 +4616,8 @@ function updateAbilityHUD(){
      act>0?((act>600?(a.k==='ward'?'HOLDING':'ACTIVE'):'ACTIVE \u00b7 '+Math.ceil(act)+'S')+(spent&&a.k!=='ward'?' \u00b7 SPENT':''))
     :spent?'SPENT'
     :AB.cd>0?('RECHARGING \u00b7 '+Math.ceil(AB.cd)+'S')
-    :(P.ess<a.cost?'NOT ENOUGH ESSENCE':'READY');
+    :(a.k==='exit'&&!exitReady()?'SEALED \u00b7 '+Math.max(0,TOTAL_EMBERS-got)+' EMBERS LEFT'
+    :P.ess<a.cost?'NOT ENOUGH ESSENCE':'READY');
   if(btnHideEl&&state!=='play')btnHideEl.style.display='none';
   let tags='';
   if(AB.invisT>0)tags+='UNSEEN ';
@@ -4659,7 +4685,7 @@ function vaultList(){
 }
 function renderVault(){
   $('vEther').textContent=save.ether;
-  $('vCount').textContent=save.unlocked.length;
+  $('vCount').textContent=save.unlocked.length;$('vTotal').textContent=BASE_COUNT;
   refreshClaims();
 
   /* --- filters --- */
@@ -4739,7 +4765,7 @@ function renderVault(){
         +' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   }
   $('vDossBody').innerHTML=
-     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':c.combo?'COMBINED \u00b7 '+c.p.length+' LEGENDS':pad2(ORD[c.id])+' / 40')+'</span><span>\u00b7</span>'
+     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':c.combo?'COMBINED \u00b7 '+c.p.length+' LEGENDS':pad2(ORD[c.id])+' / '+BASE_COUNT)+'</span><span>\u00b7</span>'
       +'<b>'+c.r+'</b></div>'
     +'<div class="vd-note">'+ROLE_NOTE[c.r]+'</div>'
     +'<div class="vd-name">'+c.n+'</div>'
@@ -6123,7 +6149,7 @@ function renderAcct(){
        :'<span class="aclink" data-act="rename">Change username</span>')
      +'<div class="acstats">'
      +'<div>Ether<b>'+save.ether+'</b></div>'
-     +'<div>Legends<b>'+save.unlocked.length+' / 40</b></div>'
+     +'<div>Legends<b>'+save.unlocked.length+' / '+BASE_COUNT+'</b></div>'
      +'<div>Escapes<b>'+save.escapes+'</b></div>'
      +'<div>Best night<b>'+(st.bestTime?fmtTime(st.bestTime):'\u2014')+'</b></div>'
      +'<div>Deaths<b>'+st.deaths+'</b></div>'
@@ -6982,7 +7008,7 @@ function specCamera(dt,t){
   el.addEventListener('click',e=>{e.stopPropagation();specNext(i?1:-1);});
   el.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});});
 addEventListener('keydown',e=>{
-  const m=/^Digit([1-4])$/.exec(e.code);
+  const m=/^Digit([1-5])$/.exec(e.code);
   if(m&&godActive()&&state==='play'&&!settingsOpen&&!vaultOpen&&!e.repeat){e.preventDefault();
     if(e.altKey)godToggle(+m[1]-1);else godFire(+m[1]-1,false);}});
 addEventListener('keydown',e=>{if(!SPEC.on)return;
