@@ -1421,9 +1421,9 @@ const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id
    admin (admins/{uid}, which only that account can read), so nobody else ever sees it. Choosing it does
    not change save.main; everyone else — co-op, the watch page, the leaderboards, the run history —
    sees the legend it is dressed as (pub). */
-const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true]};
+const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true,true]};
 /* which powers G / the power button fire together (the ticks on the boxes), remembered on this device */
-try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length===4)GOD.sel=v.map(Boolean);}catch(e){}
+try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length>=4)GOD.sel=v.slice(0,5).map(Boolean).concat(v.length<5?[true]:[]);}catch(e){}
 function godToggle(i){const ps=curLegend().ab.parts||[];if(!ps[i]||godIsAuto(ps[i]))return;GOD.sel[i]=!GOD.sel[i];try{localStorage.setItem('hm_gsel',JSON.stringify(GOD.sel));}catch(e){}
   const n=ps[i].n;toast((GOD.sel[i]?'\u2713 ':'\u2715 ')+n+(GOD.sel[i]?' \u2014 FIRES WITH THE OTHERS':' \u2014 LEFT OUT'),1.6);}
 /* the keeper's own legend */
@@ -1436,12 +1436,12 @@ function godReset(){const a=curLegend().ab;GOD.st=a.k==='multi'?a.parts.map(()=>
 /* after the legend changes: right HUD, fresh powers */
 function multiSync(){document.body.classList.toggle('godp',godActive());godReset();}
 function godBuild(){
-  const b=BYID.bountyhunter,parts=['legionary','bountyhunter','archer','outrider'].map(id=>BYID[id].ab);
+  const b=BYID.bountyhunter,parts=['legionary','bountyhunter','archer','outrider','psychopomp'].map(id=>BYID[id].ab);
   return {id:'god',n:'GOD',e:'Keeper of the House',c:'ADMIN',tier:4,pw:100,r:b.r,t:b.t,look:b.look,st:[100,100,100,100],pub:b.id,
     l:'Only the keeper of Hollowmere walks as this.',
     ab:{n:'EVERY HAND AT ONCE',k:'multi',cd:35,cost:30,parts,
-      p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. Unerring Arrow and Horseborn each have their own essence and cooldown: fire one (keys 3\u20134, or tap its icon) or the ticked ones together (G or ALL). Hold an icon (or Alt + 3\u20134) to tick or untick it.',
-      d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once.'}};}
+      p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. Unerring Arrow, Horseborn and Last Ferry each have their own essence and cooldown: fire one (keys 3\u20135, or tap its icon) or the ticked ones together (G or ALL). Last Ferry carries you straight out once every ember is gathered. Hold an icon (or Alt + 3\u20135) to tick or untick it.',
+      d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once \u2014 and, once the seal breaks, the ferry out.'}};}
 const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
 /* the legend everyone else sees you as */
 const pubLegend=()=>curLegend().pub||curLegend().id;
@@ -3071,7 +3071,7 @@ function godFireAll(){
 /* the admin legend's HUD: an icon per power (its ring is its cooldown, like every legend's) plus an ALL
    icon for the ticked ones together, and a thin essence bar per power under the main essence bar.
    Tap an icon: fire it alone. Hold it (half a second): tick / untick it for ALL. */
-const GOD_COL=['#ff9a8a','#ffcf8a','#d8c76a','#a8e8d8'];
+const GOD_COL=['#ff9a8a','#ffcf8a','#d8c76a','#a8e8d8','#9fe0ff'];
 function godWord(n){return n.replace(/^(THE|A|AN)\s+/,'').split(/[\s,]+/)[0].replace(/[^A-Z0-9]/g,'').slice(0,9);}
 function godIcon(i,label,col,combo){
   return '<div class="gpi tbtn abx'+(combo?' combo':'')+'" data-gp="'+i+'" style="--vt:'+col+'">'
@@ -3098,7 +3098,8 @@ function godArc(host){
     el.style.right=(cr0-R*Math.cos(a)-sz/2-offR).toFixed(1)+'px';
     el.style.bottom=(cb0+R*Math.sin(a)-sz/2-offB).toFixed(1)+'px';};
   place(host.children[n],100);
-  for(let i=n-1;i>=0;i--)place(host.children[i],100+17*(n-i));   /* last power next to ALL, the first at the end */
+  const step=n>4?14:17;   /* a fifth power squeezes the arc so it stays on screen */
+  for(let i=n-1;i>=0;i--)place(host.children[i],100+step*(n-i));   /* last power next to ALL, the first at the end */
 }
 function godHud(){
   const parts=curLegend().ab.parts;
@@ -3135,9 +3136,10 @@ function godHud(){
     const i=+ic.getAttribute('data-gp');if(i<0)return;
     const pa=parts[i],s=GOD.st[i];if(!pa||!s)return;
     const live=pa.k==='haste'?AB.hasteT>0:false;
-    const ready=!live&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
+    const sealed=pa.k==='exit'&&!exitReady();
+    const ready=!live&&!sealed&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
     const cdMax=Math.max(8,Math.round(pa.cd*PS.cdMul)),frac=s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
-    ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
+    ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost||sealed?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
     ic.querySelector('.ring').style.strokeDashoffset=live?RING_LEN:RING_LEN*(1-frac);
     const gt=ic.querySelector('.gt');if(gt)gt.textContent=GOD.sel[i]?'✓':'';});
   if(eb)Array.from(eb.children).forEach(row=>{const i=+row.getAttribute('data-ge'),s=GOD.st[i],pa=parts[i];if(!s)return;
@@ -7006,7 +7008,7 @@ function specCamera(dt,t){
   el.addEventListener('click',e=>{e.stopPropagation();specNext(i?1:-1);});
   el.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});});
 addEventListener('keydown',e=>{
-  const m=/^Digit([1-4])$/.exec(e.code);
+  const m=/^Digit([1-5])$/.exec(e.code);
   if(m&&godActive()&&state==='play'&&!settingsOpen&&!vaultOpen&&!e.repeat){e.preventDefault();
     if(e.altKey)godToggle(+m[1]-1);else godFire(+m[1]-1,false);}});
 addEventListener('keydown',e=>{if(!SPEC.on)return;
