@@ -15,6 +15,26 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-16-dread',
+    date: '2026-10-16',
+    tag: 'NEW',
+    title: 'The house is awake',
+    body: 'The thing hunts with burning red eyes now, and it shrieks as it comes. A sting plays the first time your light lands on its face.\n\n' +
+      'The house plays with you too. Something stands at the edge of your light and is gone when you look, or breathes right behind you. ' +
+      'Doors slam, something knocks inside the walls, a music box plays, someone runs across the floor above, and sometimes your light dies. ' +
+      'With PHOTOSENSITIVITY on, your light fades instead of flickering.'
+  },
+  {
+    id: '2026-10-16-trinkets-bounties',
+    date: '2026-10-16',
+    tag: 'NEW',
+    title: 'Trinkets, close calls and bounties',
+    body: 'Old bottles lie two to a floor. Walk over one to pocket it (you carry two), then press T or tap THROW to lob it. ' +
+      'It shatters, and the thing goes to look, even mid-hunt once it has lost sight of you.\n\n' +
+      'Let it pass within arm\'s reach while you hide or creep, and slip away unseen, for a close call worth 6 ether. ' +
+      'Every night also brings three bounties, shown at the top of the screen, each paid in ether the moment you finish it.'
+  },
+  {
     id: '2026-10-16-gifts',
     date: '2026-10-16',
     tag: 'NEW',
