@@ -240,6 +240,38 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // GIFTS — gifts/{id} { from, fromName, to, toName, kind, n, legend, at }
+    // A signed-in player (not a guest) may gift ether or a legend to another player's account. The gift
+    // must be PAID FOR in the same write that creates it: for ether, the giver's record goes down by
+    // exactly n; for a legend, it was in the giver's vault before and is gone after. So a gift can never
+    // create ether or a legend out of nothing, and only the giver's own record can pay. The recipient
+    // collects it by deleting it (in the same write that adds it to their own record); a gift can be
+    // deleted only once, so it can be collected only once. Nobody else can read or touch it.
+    function validGift() {
+      let g = request.resource.data;
+      let me = /databases/$(database)/documents/players/$(request.auth.uid);
+      return g.keys().hasOnly(['from','fromName','to','toName','kind','n','legend','at'])
+        && g.keys().hasAll(['from','fromName','to','toName','kind','n','legend','at'])
+        && g.from == request.auth.uid
+        && g.to is string && g.to != request.auth.uid
+        && exists(/databases/$(database)/documents/players/$(g.to))
+        && ownsName(g.fromName)
+        && g.toName is string && g.toName.size() <= 40
+        && g.n is int && g.legend is string
+        && g.at == request.time
+        && ((g.kind == 'ether' && g.legend == '' && g.n >= 1 && g.n <= 1000000
+             && getAfter(me).data.ether == get(me).data.ether - g.n)
+            || (g.kind == 'legend' && g.n == 0 && g.legend.size() >= 1 && g.legend.size() <= 40
+                && g.legend in get(me).data.unlocked
+                && !(g.legend in getAfter(me).data.unlocked)));
+    }
+    match /gifts/{id} {
+      allow read: if (signedIn() && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid)) || isAdmin();
+      allow create: if (realUser() && validGift()) || isAdmin();
+      allow update: if isAdmin();
+      allow delete: if (realUser() && resource.data.to == request.auth.uid) || isAdmin();
+    }
+
     // Players an admin has blocked from the leaderboards (set from admin.html).
     match /boardBans/{uid} {
       allow read: if isSelf(uid) || isAdmin();
