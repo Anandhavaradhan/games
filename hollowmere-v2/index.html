@@ -133,7 +133,7 @@
   .slab{display:flex;justify-content:space-between;font-size:13px;letter-spacing:2px;color:#8f8874;margin-bottom:7px}
   .slab .sv{color:#cfc8b8}
   input[type=range]{width:100%;accent-color:#9fc4ff;height:22px}
-  #invertBtn,#flashBtn{width:100%;padding:10px 12px;border:1px solid #3a3630;background:rgba(15,17,26,.7);color:#cfc8b8;
+  #invertBtn,#flashBtn,#scareBtn,#camBtn{width:100%;padding:10px 12px;border:1px solid #3a3630;background:rgba(15,17,26,.7);color:#cfc8b8;
     font-family:'IM Fell English',serif;font-size:14px;letter-spacing:1px;cursor:pointer;text-align:center}
   #setClose{margin-top:18px;width:100%;padding:11px;border:1px solid #4a4436;background:rgba(20,18,14,.7);
     color:#e5dcc2;font-family:'Cormorant SC',serif;font-size:14px;letter-spacing:4px;cursor:pointer;text-align:center}
@@ -466,9 +466,10 @@
   .vd-stats{margin-top:18px}
   .vd-stat{display:grid;grid-template-columns:54px 1fr 24px;gap:9px;align-items:center;font-size:9.5px;
     letter-spacing:2px;color:#8f8874;margin-bottom:3px}
-  .vd-track{height:3px;background:#161a24}
+  .vd-track{height:3px;background:#161a24;display:flex}
   .vd-fill{display:block;height:100%;background:var(--vt);box-shadow:0 0 8px var(--vt)}
   .vd-val{text-align:right;color:#cfc8b8}
+  .vd-fill.up{background:#fff3d6;box-shadow:0 0 8px #ffe2a0}
   .vd-mean{grid-column:1 / -1;font-size:9px;letter-spacing:1px;color:#4f5a6e;margin:-2px 0 7px}
   .vd-lore{font-size:12.5px;line-height:1.6;color:#8f8874;font-style:italic;margin-top:16px}
   .vd-act{margin-top:18px}
@@ -478,6 +479,18 @@
   .vbtn.dim{border-color:#3a3630;color:#6f6a5c;cursor:default}
   .vbtn .eg{font-size:13px}
   .vneed{font-size:11px;letter-spacing:2px;color:#8a7f60;margin-top:9px;text-align:center}
+  /* legend upgrades (ash) */
+  .ash{display:inline-block;width:.62em;height:.62em;border-radius:50%;vertical-align:.02em;
+    background:radial-gradient(circle at 35% 35%,#e9e2d4,#8c8478 55%,#3d3a36);box-shadow:0 0 6px rgba(233,226,212,.45)}
+  .vup-lv{display:flex;gap:4px;margin:8px 0 6px}
+  .vup-lv i{flex:1;height:5px;background:#161a24;border:1px solid #2a2a30}
+  .vup-lv i.on{background:#fff3d6;border-color:#ffe2a0;box-shadow:0 0 6px rgba(255,226,160,.55)}
+  .vup-txt{font-size:12.5px;line-height:1.55;color:#cfc8b8}
+  .vup-txt b{font-weight:normal;color:#fff3d6}
+  .vup .vbtn{margin-top:10px;border-color:#e9e2d4;color:#fff3d6}
+  .vup .vbtn.dim{border-color:#3a3630;color:#6f6a5c}
+  .claimash{font-size:12px;letter-spacing:2px;color:#cfc8b8;margin-top:8px}
+  .claimash b{font-weight:normal;color:#fff3d6}
   /* combining legends */
   .vchip.cmb{color:#ffcf8a;border-color:rgba(255,207,138,.5)}
   .vchip.cmb.on{background:rgba(255,207,138,.12)}
@@ -685,6 +698,21 @@
   /* on a touch screen the right side belongs to the thumbs: the list sits on the left, under the objective (and the team) */
   @media (pointer: coarse){#bountyHud{top:118px;right:auto;left:22px;text-align:left}}
   @media (max-width:700px){#bountyHud{font-size:9px;letter-spacing:1px}#bountyHud .bh{font-size:8px}}
+  /* ===== PHOTOSENSITIVITY (body.calm) & REDUCED MOTION =====
+     body.calm is the PHOTOSENSITIVITY setting: nothing on the page blinks or strobes. The face still
+     comes (unless JUMPSCARES is off), but it fades in and out instead of flickering. */
+  body.calm #jumpscare.go{animation:scareSoft 1.1s ease-out forwards}
+  @keyframes scareSoft{0%{opacity:0;transform:scale(1.04)}22%{opacity:.55;transform:scale(1)}65%{opacity:.45}100%{opacity:0;transform:scale(1.02)}}
+  body.calm .overlay h1,body.calm #vTitle,body.calm #essfill.low{animation:none}
+  body.calm #seen.on{animation:seenSoft 1.2s ease-out}
+  @keyframes seenSoft{0%{opacity:0}20%{opacity:1}75%{opacity:1}100%{opacity:0}}
+  #photoNote{margin-top:14px;max-width:560px;font-size:13px;line-height:1.5;color:#8f8874;font-style:italic}
+  #photoNote b{font-style:normal;font-weight:normal;color:#cfc8b8;letter-spacing:1px}
+  @media (prefers-reduced-motion: reduce){
+    #fx-grain,#vaultOv::after,#vaultOv::before,.overlay h1,#vTitle,.vsealseal,.eg,.egspin,.orb,.pulse,body.title #gearBtn{animation:none}
+    .pulse{opacity:.85}
+    .vcard,.vcard:hover{transition:none;transform:none}
+  }
 </style>
 </head>
 <body>
@@ -806,6 +834,15 @@
       <div id="flashBtn"></div>
     </div>
     <div class="srow">
+      <div class="slab"><span>JUMPSCARES</span></div>
+      <div id="scareBtn"></div>
+      <div class="gamnote">Off: the face and its scream never appear. On Nightmare the thing still finds you.</div>
+    </div>
+    <div class="srow">
+      <div class="slab"><span>CAMERA MOTION</span></div>
+      <div id="camBtn"></div>
+    </div>
+    <div class="srow">
       <div class="slab"><span>BRIGHTNESS</span><span class="sv" id="gamVal"></span></div>
       <input type="range" id="gamRange" min="0.6" max="1.8" step="0.05">
       <div class="gamnote">Turn it down until the house is dark, but you can still make out the walls a few steps away.</div>
@@ -835,6 +872,8 @@
     Fragments of your old memory are scattered too — not required, but worth finding.
     If it takes you, the embers you carried scatter back into the dark, the seal re-forms, and the Heart drags you back
     down to the cellar to begin again.</p>
+    <div id="photoNote"><b>PHOTOSENSITIVITY:</b> this game has lightning flashes, a flickering torch and a sudden face.
+      <b>⚙ SETTINGS</b> can soften the flashes, turn the face off and still the camera.</div>
     <div class="controls" id="ctrlDesktop">
       <b>W A S D</b> walk &nbsp;·&nbsp; <b>MOUSE</b> look (<b>Q / E</b> if mouse capture fails)<br>
       <b>SHIFT</b> run (loud, burns Essence) &nbsp;·&nbsp; <b>C / RIGHT MOUSE</b> creep — light cupped, silent, nearly unseen<br>
@@ -916,7 +955,7 @@
     <div id="vHead">
       <div id="vTitle">THE VAULT OF LEGENDS</div>
       <div id="vWallet"><svg class="eg" viewBox="0 0 24 24" aria-hidden="true"><use href="#ethglyph"/></svg>
-        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/<span id="vTotal">41</span></div>
+        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; <span class="ash"></span> ASH <b id="vAsh">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/<span id="vTotal">41</span></div>
       <div id="vClose">CLOSE</div>
     </div>
     <div id="vClaim" style="display:none"></div>
@@ -960,6 +999,7 @@ setTimeout(function(){
      BOOT ............ error reporting, three.js loaded from a CDN with fallbacks
      VAULT OF LEGENDS  the 41 legends: stats, looks, abilities
      SAVE ............ local save format, cleaning, league progression
+     LEGEND UPGRADES . ash (earned in the house) buys levels: higher stats, shorter cooldowns
      CONSTANTS & MAPS  the four floors as text maps, stairs, nav graph, pathfinding
      THREE SETUP ..... renderer + post pass, generated PBR surfaces, the house, furniture, light pool, flashlight
      LEGEND MANNEQUIN  the player's ghost model and its animation rig
@@ -996,7 +1036,10 @@ if(!THREE){fatal('Could not load three.js from any CDN. An internet connection i
 
 const isTouch=(window.matchMedia&&matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
-const settings={sens:isTouch?1.3:1.0, invertY:false, vol:0.8, reduceFlash:false, view:'fp', gamma:1.0, quality:isTouch?'medium':'high', diff:'normal', voiceVol:1};
+/* the OS "reduce motion" switch picks the calm defaults; the settings panel can still change them */
+const PREFERS_CALM=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+const settings={sens:isTouch?1.3:1.0, invertY:false, vol:0.8, reduceFlash:PREFERS_CALM, view:'fp', gamma:1.0, quality:isTouch?'medium':'high', diff:'normal', voiceVol:1,
+  scares:true, calmCam:PREFERS_CALM};
 /* ================= DIFFICULTY =================
    speed   the thing's walking / hunting speed          sight  how far it sees you
    hear    how far your footsteps carry                 notice how long it takes to be sure it saw you (lower = faster)
@@ -1025,7 +1068,12 @@ try{const ss=JSON.parse(localStorage.getItem(SET_KEY)||'null');
     if(['high','medium','low'].indexOf(ss.quality)>=0)settings.quality=ss.quality;
     if(DIFFS[ss.diff])settings.diff=ss.diff;
     if(typeof ss.voiceVol==='number'&&isFinite(ss.voiceVol))settings.voiceVol=Math.max(0,Math.min(1,ss.voiceVol));
+    if(typeof ss.scares==='boolean')settings.scares=ss.scares;
+    if(typeof ss.calmCam==='boolean')settings.calmCam=ss.calmCam;
   }}catch(e){}
+/* body.calm: no strobing anywhere in the page (see PHOTOSENSITIVITY in the CSS) */
+function applyCalm(){document.body.classList.toggle('calm',!!settings.reduceFlash);}
+applyCalm();
 function saveSettings(){try{localStorage.setItem(SET_KEY,JSON.stringify(settings));}catch(e){}}
 
 /* ================= CO-OP BOOT =================
@@ -1407,7 +1455,7 @@ addEventListener('pagehide',()=>guestFlush(true));
 const NEWS_ID_RE=/^[a-z0-9-]{1,60}$/,NEWS_KEEP=500;
 const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned','story'];
 function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
-function freshSave(){return {combos:[],newsRead:[],ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
+function freshSave(){return {combos:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
    new account. A signed-in account's local copy (LS_KEY:uid) stays in localStorage as before. */
@@ -1450,6 +1498,16 @@ function cleanSave(raw,isLocal){
   /* news notices this player has read (kept in the cloud inside stats, like the combined legends) */
   const nr=Array.isArray(src.newsRead)?src.newsRead:(src.stats&&Array.isArray(src.stats.newsRead))?src.stats.newsRead:[];
   out.newsRead=nr.filter((id,i,a)=>typeof id==='string'&&NEWS_ID_RE.test(id)&&a.indexOf(id)===i).slice(-NEWS_KEEP);
+  /* ash and legend upgrades (also kept in the cloud inside stats, like combined legends) */
+  const ash=typeof src.ash==='number'?src.ash:(src.stats&&typeof src.stats.ash==='number')?src.stats.ash:0;
+  if(isFinite(ash))out.ash=Math.max(0,Math.min(1e7,Math.floor(ash)));
+  let ups=(src.ups&&typeof src.ups==='object')?src.ups:(src.stats&&src.stats.ups&&typeof src.stats.ups==='object')?src.stats.ups:{};
+  /* the cloud keeps them as a list of 'id:level' (a list is replaced whole on save, so a level
+     dropped here — a legend gifted away — never comes back from an old copy of the map) */
+  if(Array.isArray(ups)){const o={};ups.forEach(x=>{const m=/^([a-z0-9_]{1,40}):(\d{1,2})$/.exec(String(x));if(m)o[m[1]]=+m[2];});ups=o;}
+  Object.keys(ups).forEach(id=>{const l=ups[id];
+    if(BYID[id]&&!BYID[id].combo&&id!=='god'&&out.unlocked.indexOf(id)>=0&&typeof l==='number'&&isFinite(l)&&l>=1)
+      out.ups[id]=Math.min(UP_MAX,Math.floor(l));});
   if(BYID[src.main]&&!BYID[src.main].combo&&out.unlocked.indexOf(src.main)>=0)out.main=src.main;
   else if(out.combos.some(x=>x.id===src.main))out.main=src.main;
   return out;
@@ -1462,6 +1520,25 @@ function cleanSave(raw,isLocal){
    Price: 10,000 ether for two, doubling for each one more.
    ========================================================= */
 const COMBO_MAX=5,COMBO_LIMIT=20;
+/* =========================================================
+   LEGEND UPGRADES — paid in ASH, which is only earned in the house (never bought with ether).
+   Each legend you own climbs UP_MAX levels. Every level adds UP_STAT to all four stats (up to 100)
+   and brings its power back UP_CD sooner (on top of what SPIRIT already does).
+   A combined legend has no levels of its own: it takes the highest upgraded stat of the legends it
+   was fused from, and each of its powers uses the cooldown cut of the legend that power came from.
+   The keeper's GOD legend is already at 100 everywhere and is never changed by upgrades.
+   ========================================================= */
+const UP_MAX=10,UP_STAT=3,UP_CD=0.03;
+const upCost=l=>20*(l+1);   /* ash to go from level l to l+1: 20, 40 … 200 (1,100 in all) */
+const ASH_PAY={'EMBERS RECLAIMED':2,'MEMORIES RECOVERED':3,'HUNTS SURVIVED':3,escape:20,clean:10};
+const upLevel=id=>(save.ups&&save.ups[id])|0;
+const canUpgrade=c=>!!c&&!c.combo&&c.id!=='god'&&save.unlocked.indexOf(c.id)>=0;
+/* a legend's stats with its upgrades in */
+function effSt(c){
+  if(c.id==='god')return c.st.slice();
+  if(c.combo)return [0,1,2,3].map(i=>Math.max.apply(null,c.p.map(id=>effSt(BYID[id])[i])));
+  const l=upLevel(c.id);return c.st.map(v=>Math.min(100,v+UP_STAT*l));
+}
 const comboCost=n=>10000*Math.pow(2,Math.max(0,n-2));
 const comboKey=p=>p.slice().sort().join('|');
 const shortName=c=>c.n.replace(/^THE\s+/,'');
@@ -1489,7 +1566,10 @@ let save=cleanSave(readLocal(LS_KEY),true);
 /* the news inbox (NEWS INBOX, near FRIENDS): what is open, and the notices themselves once news.js has loaded */
 let NEWS_UI={open:false,list:[],filter:'all',sort:'new',device:[]};
 comboSync(save.combos);
-function saveNow(){try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
+function saveNow(){
+  /* a legend that has left this save (gifted away) takes its upgrades with it: whoever owns it next starts at level 0 */
+  if(save.ups)Object.keys(save.ups).forEach(id=>{if(save.unlocked.indexOf(id)<0)delete save.ups[id];});
+  try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
 saveNow();
 const isUnlocked=id=>id==='god'?GOD.ok:(BYID[id]&&BYID[id].combo)?true:save.unlocked.indexOf(id)>=0;
 const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id);
@@ -1548,7 +1628,7 @@ function canBuy(c){
 const PS={walk:3.5,burst:5.6,veil:1.7,noise:3.3,noiseB:8.5,regen:15,
           veilCost:16,burstCost:30,pick:1.3,shard:0,cdMul:1,shake:1,nerve:1};
 function computePS(c){
-  const MI=c.st[0],GR=c.st[1],WI=c.st[2],SP=c.st[3];
+  const es=effSt(c),MI=es[0],GR=es[1],WI=es[2],SP=es[3];
   PS.walk      = 3.5*(0.88+GR*0.0026);
   PS.burst     = 5.6*(0.90+MI*0.0020);
   PS.veil      = 1.7*(0.85+GR*0.0035);
@@ -1562,6 +1642,17 @@ function computePS(c){
   PS.cdMul     = 1-SP*0.0025;
   PS.shake     = 1-SP*0.0050;
   PS.nerve     = 1+SP*0.0100;
+}
+/* which legend each power belongs to, so a combined legend's powers use their own legend's upgrades */
+const AB_OWNER=new Map(ROSTER.filter(c=>!c.combo&&c.id!=='god').map(c=>[c.ab,c.id]));
+const upCdMul=a=>{const id=AB_OWNER.get(a);return id&&!isRealGod()?1-UP_CD*upLevel(id):1;};
+/* a power's cooldown for the bound legend: SPIRIT and upgrades both shorten it, never below 8 s */
+function cdFor(a){return Math.max(8,Math.round(a.cd*PS.cdMul*upCdMul(a)));}
+/* the same, shown in the vault for any legend (not only the bound one) */
+function vaultCd(c){
+  const m=1-effSt(c)[3]*0.0025,up=a=>c.id==='god'?1:1-UP_CD*upLevel(AB_OWNER.get(a)||'');
+  const one=a=>Math.max(8,Math.round(a.cd*m*up(a)));
+  return c.ab.k==='multi'?Math.min.apply(null,c.ab.parts.map(one)):one(c.ab);
 }
 computePS(curLegend());
 multiSync();
@@ -3072,7 +3163,7 @@ function setLegend(id){
   ghost.g.scale.setScalar(0.92);
   ghost.mat.opacity=0.85;
   computePS(c);
-  AB.cd=0;AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));
+  AB.cd=0;AB.cdMax=cdFor(c.ab);
   if(typeof multiSync==='function')multiSync();
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
 }
@@ -3087,7 +3178,7 @@ function setGod(on,quiet){
   const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
   disposeLegend(ghost);ghost=buildLegend(c);ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
   ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
-  computePS(c);AB.cd=0;AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));
+  computePS(c);AB.cd=0;AB.cdMax=cdFor(c.ab);
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
 }
 async function godCheck(){
@@ -3137,7 +3228,7 @@ function godFire(i,quiet,auto){
   if(pa.k==='exit'&&!exitReady()){if(!quiet)exitSealedToast();return false;}
   if(pa.k==='pull'){if(!pullEmber(pa.scope))return false;SFX.chime();toast(pa.n,2.2);}
   else{fireAbility(c,pa);if(MP)mpPower(pa);}
-  if(!auto&&!isRealGod())s.ess-=pa.cost;s.cd=noCd?0:Math.max(8,Math.round(pa.cd*PS.cdMul));AB.used++;
+  if(!auto&&!isRealGod())s.ess-=pa.cost;s.cd=noCd?0:cdFor(pa);AB.used++;
   return true;
 }
 function godFireAll(){
@@ -3206,7 +3297,7 @@ function godHud(){
   Array.from(host.children).forEach(ic=>{
     const mi=ic.getAttribute('data-gm');
     if(mi!==null){const i=+mi,pa=parts[i],s=GOD.st[i];if(!s)return;
-      const cdMax=Math.max(8,Math.round(pa.cd*PS.cdMul));
+      const cdMax=cdFor(pa);
       const holding=AB.ward>0,frac=holding?1:s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
       ic.className='gpi tbtn abx mini '+(holding?'ready':'cool reload');
       ic.querySelector('.gl').textContent=holding?String(AB.ward):'⟳';
@@ -3217,7 +3308,7 @@ function godHud(){
     const live=pa.k==='haste'?AB.hasteT>0:false;
     const sealed=pa.k==='exit'&&!exitReady();
     const ready=!live&&!sealed&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
-    const cdMax=Math.max(8,Math.round(pa.cd*PS.cdMul)),frac=s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
+    const cdMax=cdFor(pa),frac=s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
     ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost||sealed?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
     ic.querySelector('.ring').style.strokeDashoffset=live?RING_LEN:RING_LEN*(1-frac);
     const gt=ic.querySelector('.gt');if(gt)gt.textContent=GOD.sel[i]?'✓':'';});
@@ -3641,33 +3732,38 @@ function heatNote(){const n=save.escapes|0;if(n<=0)return;
 function triggerJumpscare(){
   if(MP)return;   /* co-op: no jumpscares */
   if(AB.foreT>0||M.goneT>0||AB.invisT>0)return;
-  flickT=0.7;
-  const nv=Math.max(0.35,PS.shake);
-  jumpscareEl.classList.remove('go');void jumpscareEl.offsetWidth;jumpscareEl.classList.add('go');
-  SFX.jumpscare();flash=(settings.reduceFlash?0.6:1.4)*nv;scareShakeT=0.5*nv;
   /* Easy has none; Normal and Hard: only the face, the sound and the flash, and the thing stays
-     wherever it really is. NIGHTMARE: the teleporting jumpscare — it appears in front of you and hunts. */
-  if(DF().scare<2)return;
+     wherever it really is. NIGHTMARE: the teleporting jumpscare — it appears in front of you and hunts.
+     JUMPSCARES off in the settings: no face, no scream, no flash. On Normal / Hard that leaves nothing;
+     on Nightmare the thing still appears and hunts, announced by a sting instead of the face. */
+  const face=settings.scares,tele=DF().scare>=2;
+  if(!face&&!tele)return;
+  if(face){
+    flickT=0.7;
+    const nv=Math.max(0.35,PS.shake);
+    jumpscareEl.classList.remove('go');void jumpscareEl.offsetWidth;jumpscareEl.classList.add('go');
+    SFX.jumpscare();flash=(settings.reduceFlash?0.6:1.4)*nv;scareShakeT=0.5*nv;}
+  if(!tele)return;
+  /* where it lands: far enough away that turning and running always works */
   const fx=Math.sin(camYaw),fz=Math.cos(camYaw);
   let cx=null,cz=null;
-  for(let dist=4.6;dist>=3.2;dist-=0.3){
-    const[tcx,tcz]=cellOf(P.x+fx*dist,P.z+fz*dist);
-    if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break;}}
-  if(cx===null)for(let dist=2.8;dist>=1.6;dist-=0.3){
+  for(let dist=4.6;dist>=2.6;dist-=0.3){
     const[tcx,tcz]=cellOf(P.x+fx*dist,P.z+fz*dist);
     if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break;}}
   if(cx===null){
     const dirs=[[fz,-fx],[-fz,fx],[-fx,-fz]];
-    outer: for(const dist of [3.4,2.6,2.0]){
+    outer: for(const dist of [3.4,2.6]){
       for(const[dxn,dzn] of dirs){
         const[tcx,tcz]=cellOf(P.x+dxn*dist,P.z+dzn*dist);
         if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break outer;}}}}
-  if(cx===null)[cx,cz]=cellOf(P.x,P.z);
+  /* no room round you (it used to land in your own cell, a death nobody could dodge): it stays put */
+  if(cx===null)return;
+  if(!face)SFX.sting();
   M.floor=P.floor;M.x=(cx+.5)*CS;M.z=(cz+.5)*CS;M.y=P.floor*FH;
   M.nodeKey=nk(P.floor,cx,cz);M.path=null;M.pathI=0;M.repathT=0;M.stepPhase=0;
   M.yaw=camYaw+Math.PI;M.state='chase';M.losLostT=0;M.lastSeen={x:P.x,z:P.z,f:P.floor};scareSpeedT=3;
-  /* scripted: RUN.spotted is only set if it then actually sees you */
-  graceT=Math.max(graceT,(PS.nerve-1)*0.9);
+  /* scripted: RUN.spotted is only set if it then actually sees you. At least a second to react. */
+  graceT=Math.max(graceT,(PS.nerve-1)*0.9,1);
   seenEl.classList.remove('on');void seenEl.offsetWidth;seenEl.classList.add('on');}
 let settingsOpen=false,suppressPause=false;
 
@@ -3970,7 +4066,11 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyV'&&state!=='play'){e.preventDefault();if(vaultOpen)closeVault();else openVault();}
   if(['ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();});
 addEventListener('keyup',e=>keys[e.code]=false);
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')openSettings();});
+/* a key let go while the window was not looking never sends its keyup: forget every held key and
+   button, or you come back still running (and still burning essence, and still loud) */
+function releaseAll(){for(const k in keys)keys[k]=false;veilHeld=false;touchBurst=false;}
+addEventListener('blur',releaseAll);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){releaseAll();if(state==='play')openSettings();}});
 addEventListener('mousedown',e=>{if(e.button===2)veilHeld=true;});
 addEventListener('mouseup',e=>{if(e.button===2)veilHeld=false;});
 addEventListener('contextmenu',e=>e.preventDefault());
@@ -4027,7 +4127,13 @@ function toast(t,dur=3.4){toastEl.textContent=t;toastEl.style.opacity=1;
 let subT=null;
 function subtitle(t,dur=4){subEl.textContent=t;subEl.style.opacity=1;clearTimeout(subT);
   subT=setTimeout(()=>subEl.style.opacity=0,dur*1000);}
-function showOv(ov){[titleOv,deathOv,winOv,pauseOv].forEach(o=>o.classList.add('hidden'));
+/* the death and win screens ignore input for a moment after they appear, so a click or key
+   still meant for the night does not skip straight past them (see ovSettling) */
+let ovShownAt=0;
+const ovSettling=()=>(state==='dead'||state==='win')&&performance.now()-ovShownAt<900;
+function showOv(ov){
+  if(ov&&(ov===deathOv||ov===winOv)&&ov.classList.contains('hidden'))ovShownAt=performance.now();
+  [titleOv,deathOv,winOv,pauseOv].forEach(o=>o.classList.add('hidden'));
   if(ov)ov.classList.remove('hidden');}
 function setScreenState(){document.body.classList.toggle('title',state==='title');}
 {const c=document.createElement('canvas');c.width=c.height=140;const g=c.getContext('2d');
@@ -4050,7 +4156,9 @@ function syncSetUI(){
   sensRange.value=settings.sens;
   sensVal.textContent=settings.sens.toFixed(2);
   invertBtn.textContent=settings.invertY?'INVERTED \u2014 UP LOOKS DOWN':'NORMAL \u2014 UP LOOKS UP';
-  flashBtn.textContent=settings.reduceFlash?'REDUCED \u2014 DIMMER FLASHES':'NORMAL \u2014 FULL INTENSITY';
+  flashBtn.textContent=settings.reduceFlash?'REDUCED \u2014 NO STROBING, SOFT FLASHES':'NORMAL \u2014 FULL INTENSITY';
+  $('scareBtn').textContent=settings.scares?'ON \u2014 THE FACE CAN FIND YOU':'OFF \u2014 NO FACE, NO SCREAM';
+  $('camBtn').textContent=settings.calmCam?'REDUCED \u2014 NO BOB, SWAY OR SHAKE':'FULL \u2014 BOB, SWAY AND SHAKE';
   {const mb=document.getElementById('musicBtn');
    if(mb)mb.textContent=(save.music!==false)?'ON \u2014 THE HOUSE HUMS':'OFF \u2014 SILENCE IN THE MENUS';}
   $('setClose').textContent=(state==='play')?'RESUME':'CLOSE';
@@ -4066,7 +4174,9 @@ $('voiceRange').addEventListener('pointerdown',e=>e.stopPropagation());
 sensRange.addEventListener('input',()=>{settings.sens=parseFloat(sensRange.value);sensVal.textContent=settings.sens.toFixed(2);saveSettings();});
 sensRange.addEventListener('pointerdown',e=>e.stopPropagation());
 invertBtn.addEventListener('click',e=>{e.stopPropagation();settings.invertY=!settings.invertY;saveSettings();syncSetUI();});
-flashBtn.addEventListener('click',e=>{e.stopPropagation();settings.reduceFlash=!settings.reduceFlash;saveSettings();syncSetUI();});
+flashBtn.addEventListener('click',e=>{e.stopPropagation();settings.reduceFlash=!settings.reduceFlash;saveSettings();syncSetUI();applyCalm();});
+$('scareBtn').addEventListener('click',e=>{e.stopPropagation();settings.scares=!settings.scares;saveSettings();syncSetUI();});
+$('camBtn').addEventListener('click',e=>{e.stopPropagation();settings.calmCam=!settings.calmCam;saveSettings();syncSetUI();});
 $('gamRange').addEventListener('input',()=>{settings.gamma=parseFloat($('gamRange').value);$('gamVal').textContent=Math.round(settings.gamma*100)+'%';saveSettings();});
 $('gamRange').addEventListener('pointerdown',e=>e.stopPropagation());
 $('viewBtn').addEventListener('click',e=>{e.stopPropagation();settings.view=settings.view==='tp'?'fp':'tp';saveSettings();syncSetUI();
@@ -4171,19 +4281,20 @@ for(let i=0;i<15;i++){const s=glowSprite(0xffffff,1.0);
 function sightRange(){return DARK.t>0?4.2*DF().sight:(14+2.5*heat())*DF().sight;}
 
 /* --- run scoring: ether is earned by playing, not by menus --- */
-const RUN={ether:0,spotted:false,floors:{},done:false,tally:{}};
+const RUN={ether:0,ash:0,spotted:false,floors:{},done:false,tally:{}};
 function awardEther(n,key,shout){
   RUN.ether+=n;
+  RUN.ash+=ASH_PAY[key]||0;   /* a little ash comes with some of it (see LEGEND UPGRADES) */
   RUN.tally[key]=(RUN.tally[key]||0)+n;
   if(shout)toast('+'+n+' ETHER \u00b7 '+key,1.6);
 }
 function resetRun(){
   godReset();
-  RUN.ether=0;RUN.spotted=false;RUN.floors={[spawnDef[2]]:1};RUN.done=false;RUN.tally={};
+  RUN.ether=0;RUN.ash=0;RUN.spotted=false;RUN.floors={[spawnDef[2]]:1};RUN.done=false;RUN.tally={};
   RUN.title='';
   AB.cd=0;AB.used=0;AB.invisT=0;AB.after=0;AB.expose=0;AB.silentT=0;AB.hasteT=0;AB.hasteMul=1;
   AB.loudT=0;AB.quickT=0;AB.revealT=0;AB.regenT=0;AB.foreT=0;AB.ward=0;AB.wardWarp=false;AB.wardReveal=false;
-  AB.cdMax=Math.max(8,Math.round(curLegend().ab.cd*PS.cdMul));
+  AB.cdMax=cdFor(curLegend().ab);
   ZONE.t=0;zoneMesh.visible=false;
   DECOY.t=0;decoyMesh.visible=false;clearDecoyCopy();
   TRAP.t=0;trapMesh.visible=false;
@@ -4202,8 +4313,8 @@ function endRun(win){
   if(win){const nt=Math.round(elapsed*10)/10;if(SOLO_RANKED&&(!st.bestTime||nt<st.bestTime)){st.bestTime=nt;newBest=true;}}
   else st.deaths++;
   if(win){
-    RUN.ether+=PAY.escape;RUN.tally['ESCAPED THE HOUSE']=PAY.escape;
-    if(!RUN.spotted){RUN.ether+=PAY.clean;RUN.tally['NEVER ONCE SEEN']=PAY.clean;}
+    RUN.ether+=PAY.escape;RUN.tally['ESCAPED THE HOUSE']=PAY.escape;RUN.ash+=ASH_PAY.escape;
+    if(!RUN.spotted){RUN.ether+=PAY.clean;RUN.tally['NEVER ONCE SEEN']=PAY.clean;RUN.ash+=ASH_PAY.clean;}
     save.escapes++;
   }
   if(save.lastDay!==todayKey()){
@@ -4220,6 +4331,8 @@ function endRun(win){
     merged[e.l]+=e.n;});
   save.pending=order.map(function(k){return{l:k,n:merged[k]};});
   st.etherEarned+=RUN.ether;
+  /* ash is not claimed like ether: it settles into the vault the moment the night ends */
+  save.ash=Math.min(1e7,(save.ash||0)+RUN.ash);
   saveNow();
   refreshClaims();
   if(SOLO_RANKED){cloudLogRun(win);
@@ -4772,6 +4885,7 @@ function vaultList(){
 }
 function renderVault(){
   $('vEther').textContent=save.ether;
+  $('vAsh').textContent=save.ash||0;
   $('vCount').textContent=save.unlocked.length;$('vTotal').textContent=BASE_COUNT;
   refreshClaims();
 
@@ -4830,10 +4944,12 @@ function renderVault(){
   const KEYS=['MIGHT','GRACE','WITS','SPIRIT'];
   const MEAN=['force \u00b7 burst speed','quiet \u00b7 drift speed','reach \u00b7 memory','nerve \u00b7 essence'];
   let bars='';
+  const es=effSt(c),base=c.combo?es:c.st;
   KEYS.forEach(function(k,i){
     bars+='<div class="vd-stat"><span>'+k+'</span>'
-      +'<span class="vd-track"><span class="vd-fill" style="width:'+c.st[i]+'%"></span></span>'
-      +'<span class="vd-val">'+c.st[i]+'</span>'
+      +'<span class="vd-track"><span class="vd-fill" style="width:'+base[i]+'%"></span>'
+        +(es[i]>base[i]?'<span class="vd-fill up" style="width:'+(es[i]-base[i])+'%"></span>':'')+'</span>'
+      +'<span class="vd-val">'+es[i]+'</span>'
       +'<span class="vd-mean">'+MEAN[i]+'</span></div>';
   });
   let act;
@@ -4863,13 +4979,14 @@ function renderVault(){
     +'<div class="vd-plain">'+a.p+'</div>'
     +'<div class="vd-chips">'
       +'<span class="vd-chip">LASTS <b>'+abLasts(a)+'</b></span>'
-      +'<span class="vd-chip">BACK IN <b>'+Math.max(8,Math.round(a.cd*(1-c.st[3]*0.0025)))+'s</b></span>'
+      +'<span class="vd-chip">BACK IN <b>'+vaultCd(c)+'s</b></span>'
       +'<span class="vd-chip">COSTS <b>'+a.cost+'</b> ESSENCE</span>'
       +(a.once?'<span class="vd-chip">ONCE A NIGHT</span>':'')
     +'</div>'
     +'<div class="vd-flavour">'+a.d+'</div>'
     +'<div class="vd-label">IN THE MANOR</div>'
     +'<div class="vd-stats">'+bars+'</div>'
+    +upgradeHTML(c)
     +(un?'<div class="vd-lore">'+c.l+'</div>'
         :'<div class="vd-lore">Record sealed. Declassify this ghost to read its file.</div>')
     +'<div class="vd-act">'+act+'</div>';
@@ -4881,12 +4998,41 @@ function renderVault(){
   if(sel)sel.addEventListener('click',function(e){e.stopPropagation();
     if(c.id==='god')setGod(true);else{if(GOD.on)setGod(false,true);setLegend(c.id);}
     renderVault();toast(c.n+' \u2014 BOUND',2.4);});
+  const upb=$('vUp');
+  if(upb)upb.addEventListener('click',function(e){e.stopPropagation();
+    if(!upgradeLegend(c))return;
+    renderVault();SFX.chime();toast(c.n+' \u2014 LEVEL '+upLevel(c.id),2.4);});
   const unl=$('vUnl');
   if(unl)unl.addEventListener('click',function(e){e.stopPropagation();
     if(!canBuy(c))return;
     save.ether-=cost;save.unlocked.push(c.id);saveNow();
     setLegend(c.id);renderVault();
     SFX.chime();toast(c.n+' \u2014 DECLASSIFIED',2.8);});
+}
+/* the upgrade block in a legend's dossier */
+function upgradeHTML(c){
+  const AS='<span class="ash"></span>';
+  if(c.id==='god'||!isUnlocked(c.id))return '';
+  if(c.combo)return '<div class="vd-label">UPGRADES</div><div class="vup-txt">A combined legend grows with the legends it was fused from: '
+    +'upgrade '+c.p.map(id=>escHTML(shortName(BYID[id]))+' (level '+upLevel(id)+')').join(', ')+' and it takes their highest stats and each power\u2019s shorter cooldown.</div>';
+  const l=upLevel(c.id),pips=Array.from({length:UP_MAX},(_,i)=>'<i'+(i<l?' class="on"':'')+'></i>').join('');
+  let h='<div class="vd-label">UPGRADES \u2014 LEVEL '+l+' / '+UP_MAX+'</div><div class="vup"><div class="vup-lv">'+pips+'</div>';
+  h+='<div class="vup-txt">'+(l?'Now: <b>+'+l*UP_STAT+'</b> to every stat (up to 100), power back <b>'+Math.round(l*UP_CD*100)+'%</b> sooner.':'Every level adds <b>+'+UP_STAT+'</b> to every stat (up to 100) and brings the power back <b>'+Math.round(UP_CD*100)+'%</b> sooner.')+'</div>';
+  if(l>=UP_MAX)h+='<button class="vbtn dim" disabled>FULLY UPGRADED</button>';
+  else{const cost=upCost(l),ok=(save.ash||0)>=cost;
+    h+='<button class="vbtn'+(ok?'':' dim')+'" id="vUp"'+(ok?'':' disabled')+'>UPGRADE TO LEVEL '+(l+1)+' \u2014 '+cost+' '+AS+'</button>'
+      +(ok?'':'<div class="vneed">'+AS+' '+(cost-(save.ash||0))+' MORE ASH \u2014 GATHER EMBERS AND MEMORIES, SURVIVE HUNTS, ESCAPE</div>');}
+  return h+'</div>';
+}
+function upgradeLegend(c){
+  if(!canUpgrade(c))return false;
+  const l=upLevel(c.id),cost=upCost(l);
+  if(l>=UP_MAX||(save.ash||0)<cost)return false;
+  save.ash-=cost;save.ups[c.id]=l+1;saveNow();
+  /* the bound legend (or a combined one it is part of) feels it at once */
+  const cur=curLegend();
+  if(cur.id===c.id||(cur.combo&&cur.p.indexOf(c.id)>=0)){computePS(cur);AB.cdMax=cdFor(cur.ab);refreshLegendHUD();}
+  return true;
 }
 /* the combine panel (in the dossier's place) */
 function renderCombine(){
@@ -4900,7 +5046,7 @@ function renderCombine(){
   if(lead)pvShow(lead);else pvClear();
   const KEYS=['MIGHT','GRACE','WITS','SPIRIT'];
   let bars='';
-  if(n>=2)KEYS.forEach((k,i)=>{const v=Math.max.apply(null,ps.map(c=>c.st[i]));
+  if(n>=2)KEYS.forEach((k,i)=>{const v=Math.max.apply(null,ps.map(c=>effSt(c)[i]));
     bars+='<div class="vd-stat"><span>'+k+'</span><span class="vd-track"><span class="vd-fill" style="width:'+v+'%"></span></span><span class="vd-val">'+v+'</span><span class="vd-mean"></span></div>';});
   let act;
   if(n<2)act='<button class="vbtn dim" disabled>PICK '+(2-n)+' MORE</button>';
@@ -4975,6 +5121,10 @@ function countUp(el,from,to){
 function pendingTotal(){return (save.pending||[]).reduce((a,e)=>a+e.n,0);}
 
 function renderClaim(box){
+  renderClaimEther(box);
+  if(box&&box.id!=='vClaim')ashLine(box);
+}
+function renderClaimEther(box){
   if(!box)return;
   const pend=save.pending||[];
   if(!pend.length){
@@ -5047,6 +5197,11 @@ function claimAll(box){
       if(i===labels.length-1)setTimeout(function(){finishClaim(box);},500);
     },i*140);
   });
+}
+/* tonight's ash, under the ether on the death / escape screen */
+function ashLine(box){
+  if(!box||!RUN.done||!RUN.ash)return;
+  box.insertAdjacentHTML('beforeend','<div class="claimash"><span class="ash"></span> +<b>'+RUN.ash+'</b> ASH TONIGHT \u00b7 YOU HOLD <b>'+(save.ash||0)+'</b> \u2014 SPEND IT ON UPGRADES IN THE VAULT</div>');
 }
 function refreshClaims(){
   renderClaim($('runSum'));
@@ -5588,12 +5743,13 @@ function dreadTick(dt,t){
   if(DREAD.ph)phantomTick(dt,t);
   else{DREAD.next-=dt;
     if(DREAD.next<=0){DREAD.next=quiet&&!P.hiding&&M.state!=='chase'?dreadGap():8;
-      if(quiet&&!P.hiding&&M.state!=='chase')phantomStart();}}
+      /* JUMPSCARES off: no face, so no glimpses either */
+      if(quiet&&!P.hiding&&M.state!=='chase'&&settings.scares)phantomStart();}}
   DREAD.houseT-=dt;
   if(DREAD.houseT<=0){DREAD.houseT=(28+Math.random()*34)*DF().every;if(M.state!=='chase')houseScare();}
   if(M.goneT>0)return;
   /* the beam finds its face: a sting, the first time in a while */
-  if(DREAD.stingCool<=0&&M.state!=='chase'&&M.floor===P.floor&&FLASH.level>0.3){
+  if(settings.scares&&DREAD.stingCool<=0&&M.state!=='chase'&&M.floor===P.floor&&FLASH.level>0.3){
     mon.headG.getWorldPosition(_dv);
     const dx=_dv.x-FLASH.pos.x,dy=_dv.y-FLASH.pos.y,dz=_dv.z-FLASH.pos.z,dl=Math.hypot(dx,dy,dz)||1;
     if(dl<15&&(dx*FLASH.dir.x+dy*FLASH.dir.y+dz*FLASH.dir.z)/dl>0.93&&losClear(P.floor,P.x,P.z,M.x,M.z)){
@@ -5634,8 +5790,9 @@ function startGame(){ if(state!=='title')return;
   resetRun();refreshLegendHUD();
   skipFloorToast=true;toast('THE HEART OF HOLLOWMERE \u00b7 '+DF().n,3.5);
   cloudPush();
-  setTimeout(()=>subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor, never where they were before.'),3800);
-  setTimeout(()=>subtitle('Something else walks these floors. Listen to its steps.'),8200);
+  /* (only if the night is still going: not over the title screen after a quick quit) */
+  setTimeout(()=>{if(state==='play')subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor, never where they were before.');},3800);
+  setTimeout(()=>{if(state==='play')subtitle('Something else walks these floors. Listen to its steps.');},8200);
   heatNote();}
 /* ================= BACKSTORY =================
    backstory.js draws the opening cinematic. It plays as you wake for your first night:
@@ -5697,7 +5854,7 @@ function threatInfo(){
   return chase?'chase':near?'near':'';}
 function tryHeart(){
   if(vaultOpen)return;
-  if(state==='dead')riseOrRestart();
+  if(state==='dead'){if(!ovSettling())riseOrRestart();}
   else if(state==='play'){
     if(settingsOpen&&!MP)return;
     const th=threatInfo();
@@ -5808,6 +5965,7 @@ function mpTeamCheck(){
 }
 function advance(){
   if(vaultOpen)return;
+  if(ovSettling())return;
   if(lbOpen){closeBoard();return;}
   if(acctOpen){closeAcct();return;}
   if(settingsOpen){closeSettings();return;}
@@ -6112,8 +6270,9 @@ let flash=0,lightT=6,hbT=0,whT=18,dangerLevel=0,fireEmberT=0,lf=0;
 const _tint=new THREE.Color(),_white=new THREE.Color(0xdfe6f0),_v2=new THREE.Vector2();
 function updateFX(dt,t){
   flash*=Math.pow(0.001,dt);
-  /* lightning lights the rooms through the windows; the screen flash is only a touch now */
-  lf=flash>0.015?flash*(0.55+0.45*Math.abs(Math.sin(t*47)))*(Math.random()<0.1?0.3:1):0;
+  /* lightning lights the rooms through the windows; the screen flash is only a touch now.
+     Its shimmer is a ~15 Hz strobe, so with PHOTOSENSITIVITY reduced the light just rises and fades. */
+  lf=flash>0.015?(settings.reduceFlash?flash*0.45:flash*(0.55+0.45*Math.abs(Math.sin(t*47)))*(Math.random()<0.1?0.3:1)):0;
   flashEl.style.opacity=lf*(settings.reduceFlash?0.03:0.09);
   lightT-=dt;if(lightT<=0){lightT=10+Math.random()*16;flash=settings.reduceFlash?0.4:1;window.__thunderAt=t+0.7+Math.random()*1.8;}
   if(window.__thunderAt&&t>window.__thunderAt){window.__thunderAt=0;SFX.thunder();}
@@ -6200,8 +6359,8 @@ function updateCamera(dt,t){
     if(FP()){const d=Math.max(0.42,1.1-caughtT*0.55);_cp.set(_hd.x+fx*d,_hd.y-0.02,_hd.z+fz*d);}
     else _cp.copy(_hd).add(new THREE.Vector3(Math.sin(fy+2.6),0.25,Math.cos(fy+2.6)).multiplyScalar(1.6));
     camera.position.lerp(_cp,Math.min(1,dt*(FP()?9:6)));
-    const sh=FP()?0.02+caughtT*0.01:0;camera.position.x+=(Math.random()-.5)*sh;camera.position.y+=(Math.random()-.5)*sh;
-    camera.lookAt(_hd.x,_hd.y-0.03,_hd.z);camera.rotation.z+=Math.sin(t*3)*0.05;
+    const calm=settings.calmCam,sh=FP()&&!calm?0.02+caughtT*0.01:0;camera.position.x+=(Math.random()-.5)*sh;camera.position.y+=(Math.random()-.5)*sh;
+    camera.lookAt(_hd.x,_hd.y-0.03,_hd.z);if(!calm)camera.rotation.z+=Math.sin(t*3)*0.05;
     camera.fov+=((FP()?54:90)-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();
     FLASH.level+=((0.6+Math.random()*0.4)-FLASH.level)*Math.min(1,dt*10);updateFlashlight(dt,t);return;}
   /* a step every ~0.75 m, two per bob cycle — heard in either view */
@@ -6216,23 +6375,25 @@ function updateCamera(dt,t){
     if(updateCamera._lastPy===undefined)updateCamera._lastPy=P.y;
     if(updateCamera._lastPy-P.y>0.05&&state==='play'&&!P.hiding){updateCamera._landT=0.35;SFX.step(0.35*(P.dashing?1:0.6),0);}
     updateCamera._lastPy=P.y;
-    if(updateCamera._landT>0){updateCamera._landT-=dt;bobAmt+=updateCamera._landT*0.18;}
-    const ba=P.moving?(P.dashing?0.075:P.veiling?0.026:0.055):0;bobAmt+=(ba-bobAmt)*Math.min(1,dt*6);
+    /* CAMERA MOTION reduced: no head bob, sway, roll, shake or sprint zoom (steps still sound) */
+    const calm=settings.calmCam;
+    if(updateCamera._landT>0){updateCamera._landT-=dt;if(!calm)bobAmt+=updateCamera._landT*0.18;}
+    const ba=P.moving&&!calm?(P.dashing?0.075:P.veiling?0.026:0.055):0;bobAmt+=(ba-bobAmt)*Math.min(1,dt*6);
     const fx=Math.sin(camYaw),fz=Math.cos(camYaw),rx=-Math.cos(camYaw),rz=Math.sin(camYaw);
-    const lat=Math.sin(bobPh)*bobAmt*0.6,up=-Math.abs(Math.sin(bobPh))*bobAmt+Math.sin(t*1.7)*0.006;
+    const lat=Math.sin(bobPh)*bobAmt*0.6,up=-Math.abs(Math.sin(bobPh))*bobAmt+(calm?0:Math.sin(t*1.7)*0.006);
     _cp.set(P.x+rx*lat,P.y+eyeH+up,P.z+rz*lat);
     if(P.hiding)_cp.addScaledVector(new THREE.Vector3(fx,0,fz),-0.15);
     let jx=0,jy=0;
-    if(state==='play'&&dangerLevel>0.02){const sh=dangerLevel*(M.state==='chase'?0.012:0.004);jx=(Math.random()-.5)*sh;jy=(Math.random()-.5)*sh;}
-    if(scareShakeT>0){scareShakeT-=dt;const ss=Math.min(1,scareShakeT/0.5)*0.06;jx+=(Math.random()-.5)*ss;jy+=(Math.random()-.5)*ss;}
+    if(state==='play'&&dangerLevel>0.02&&!calm){const sh=dangerLevel*(M.state==='chase'?0.012:0.004);jx=(Math.random()-.5)*sh;jy=(Math.random()-.5)*sh;}
+    if(scareShakeT>0){scareShakeT-=dt;const ss=calm?0:Math.min(1,scareShakeT/0.5)*0.06;jx+=(Math.random()-.5)*ss;jy+=(Math.random()-.5)*ss;}
     camera.position.copy(_cp);camera.position.x+=jx;camera.position.y+=jy;
     const strafe=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+(stick.id!==null?stick.dx:0);
-    camRoll+=((P.moving?-strafe*0.028:0)+Math.sin(bobPh)*bobAmt*0.25+Math.sin(bobPh)*bobAmt*0.5-camRoll)*Math.min(1,dt*5);
+    camRoll+=((P.moving&&!calm?-strafe*0.028:0)+Math.sin(bobPh)*bobAmt*0.25+Math.sin(bobPh)*bobAmt*0.5-camRoll)*Math.min(1,dt*5);
     fpPitchS+=(fpPitch-fpPitchS)*Math.min(1,dt*25);
     const bobY=Math.cos(bobPh*2)*bobAmt*0.9;
     const yawLead=-Math.sin(bobPh)*bobAmt*0.35;
     camera.rotation.set(fpPitchS+bobY+jy*2,camYaw+Math.PI+jx*2+yawLead,camRoll);
-    const tf=P.dashing&&P.moving?82:70;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();
+    const tf=P.dashing&&P.moving&&!calm?82:70;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();
   }else{
     const tgt=new THREE.Vector3(P.x,P.y+1.3,P.z);
     const fwd=new THREE.Vector3(Math.sin(camYaw),0,Math.cos(camYaw));
@@ -6243,14 +6404,15 @@ function updateCamera(dt,t){
       const px=tgt.x+(cp.x-tgt.x)*f,py=tgt.y+(cp.y-tgt.y)*f,pz=tgt.z+(cp.z-tgt.z)*f;
       if(blocksSight(P.floor,Math.floor(px/CS),Math.floor(pz/CS))||(py>P.floor*FH+LINTEL-0.1&&DOORSET.has(nk(P.floor,Math.floor(px/CS),Math.floor(pz/CS))))){best=(i-1)/steps*0.92;break;}}
     cp=tgt.clone().lerp(cp,best);
-    if(state==='play'&&dangerLevel>0.02){const sh=dangerLevel*(M.state==='chase'?0.06:0.025);
+    const calm=settings.calmCam;
+    if(state==='play'&&dangerLevel>0.02&&!calm){const sh=dangerLevel*(M.state==='chase'?0.06:0.025);
       cp.x+=(Math.random()-.5)*sh;cp.y+=(Math.random()-.5)*sh;}
-    if(scareShakeT>0){scareShakeT-=dt;const ss=Math.min(1,scareShakeT/0.5)*0.14;
+    if(scareShakeT>0){scareShakeT-=dt;const ss=calm?0:Math.min(1,scareShakeT/0.5)*0.14;
       cp.x+=(Math.random()-.5)*ss;cp.y+=(Math.random()-.5)*ss;}
     camera.position.lerp(cp,Math.min(1,dt*14));
     const look=tgt.clone().addScaledVector(fwd,1.6);look.y+=0.1;
     camera.lookAt(look);
-    const tf=P.dashing?70:62;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();}
+    const tf=P.dashing&&!calm?70:62;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();}
   /* your light: off while you hide, cupped while you creep, and it does not like the thing */
   let lv=P.hiding?0:(P.veiling?0.12:1);if(state==='dead'||state==='win')lv=0;
   FLASH.level+=(lv-FLASH.level)*Math.min(1,dt*(lv<FLASH.level?10:5));
@@ -6269,9 +6431,10 @@ function updateFlashlight(dt,t){
   /* flicker when it is close, when it hunts, in the jumpscare, in the dark */
   let fl=1;
   if(state==='play'||state==='caught'){
-    if(flickT>0){flickT-=dt;fl=Math.random()<0.5?0.05:1;}
+    /* (PHOTOSENSITIVITY reduced: the torch browns out instead of strobing on and off every frame) */
+    if(flickT>0){flickT-=dt;fl=settings.reduceFlash?0.5:(Math.random()<0.5?0.05:1);}
     else if(dangerLevel>0.35&&Math.random()<dt*dangerLevel*(M.state==='chase'?7:2.5))flickT=0.05+Math.random()*0.18;}
-  if(scareShakeT>0.3)fl=Math.random()<0.6?0.08:1;
+  if(scareShakeT>0.3)fl=settings.reduceFlash?0.5:(Math.random()<0.6?0.08:1);
   if(DARK.t>0)fl*=0.55;
   /* the house's dead-torch scare: stutters out and back (a smooth fade with reduced flashing) */
   if(DREAD.darkT>0)fl*=settings.reduceFlash?Math.max(0.02,Math.abs(DREAD.darkT-0.85)/0.85):(DREAD.darkT>1.45||DREAD.darkT<0.2?(Math.random()<0.5?0.05:0.6):0.02);
@@ -6335,7 +6498,7 @@ applyQuality();
 requestAnimationFrame(loop);
 showOv(titleOv);setScreenState();
 const abhudEl=$('abhud');
-AB.cdMax=Math.max(8,Math.round(curLegend().ab.cd*PS.cdMul));
+AB.cdMax=cdFor(curLegend().ab);
 resetRun();refreshLegendHUD();dressVault();refreshClaims();
 if(pendingTotal()>0)setTimeout(function(){
   toast(pendingTotal()+' ETHER STILL HANGS UNCLAIMED — OPEN THE VAULT',4.5);},1200);
@@ -6368,7 +6531,7 @@ function cloudPush(create){
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
     pending:save.pending.map(e=>({l:e.l,n:e.n})),music:save.music,lastDay:save.lastDay,v:SAVE_V,
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
-      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice()}),
+      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id])}),
     live:liveNow()};
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
     .then(()=>{lastSync=Date.now();syncBad=false;updateAcctLive();})
@@ -6394,7 +6557,7 @@ function replaceSave(next){
   if(typeof vSel==='number'&&vSel>=ROSTER.length)vSel=0;
   const c=curLegend();
   if(ghost&&ghost.legend&&ghost.legend.id!==c.id)setLegend(c.id);
-  else{computePS(c);AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));refreshLegendHUD();}
+  else{computePS(c);AB.cdMax=cdFor(c.ab);refreshLegendHUD();}
   refreshClaims();
   if(vaultOpen)renderVault();
   if(settingsOpen)syncSetUI();
@@ -8111,7 +8274,8 @@ if(WATCH)watchInit();
 /* ?debug=1 — a handle for automated tests */
 if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return state;},get got(){return got;},get doorOpen(){return doorOpen;},
   get MP(){return MP;},embers,stairs,nodes,adj,findPath,nk,NF,CS,FH,PATROL,maps,entAt,TOTAL_EMBERS,startGame,warpTo,openDoor,camera,scene,get REMOTE(){return typeof REMOTE!=='undefined'?REMOTE:null;},
-  get PUP(){return typeof PUP!=='undefined'?PUP:null;}};
+  get PUP(){return typeof PUP!=='undefined'?PUP:null;},
+  get graceT(){return graceT;},triggerJumpscare,doDeath,settings,keys,setDiff(d){runDiff=d;}};
 if(DEBUG)Object.assign(window.__hm,{ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare});
 window.__HM_BOOTED=true;
 </script>

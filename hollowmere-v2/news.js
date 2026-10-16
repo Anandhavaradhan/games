@@ -22,7 +22,7 @@ export const NEWS = [
     body: 'The thing hunts with burning red eyes now, and it shrieks as it comes. A sting plays the first time your light lands on its face.\n\n' +
       'The house plays with you too. Something stands at the edge of your light and is gone when you look, or breathes right behind you. ' +
       'Doors slam, something knocks inside the walls, a music box plays, someone runs across the floor above, and sometimes your light dies. ' +
-      'With PHOTOSENSITIVITY on, your light fades instead of flickering.'
+      'With PHOTOSENSITIVITY on, your light fades instead of flickering, and with JUMPSCARES off the shape at the edge of your light never comes.'
   },
   {
     id: '2026-10-16-trinkets-bounties',
@@ -33,6 +33,17 @@ export const NEWS = [
       'It shatters, and the thing goes to look, even mid-hunt once it has lost sight of you.\n\n' +
       'Let it pass within arm\'s reach while you hide or creep, and slip away unseen, for a close call worth 6 ether. ' +
       'Every night also brings three bounties, shown at the top of the screen, each paid in ether the moment you finish it.'
+  },
+  {
+    id: '2026-10-16-ash-upgrades',
+    date: '2026-10-16',
+    tag: 'NEW',
+    title: 'Ash and legend upgrades',
+    body: 'A new currency, ASH, gathers as you play: from embers, memories, surviving a hunt and escaping (more if it never saw you). ' +
+      'It settles into the vault when the night ends; it cannot be bought with ether.\n\n' +
+      'Spend it in the vault to upgrade any legend you own, up to level 10. Every level adds 3 to all four stats (up to 100) ' +
+      'and brings its power back 3% sooner. A combined legend grows with the legends it was fused from. ' +
+      'A legend you gift away leaves its upgrades behind.'
   },
   {
     id: '2026-10-16-gifts',
