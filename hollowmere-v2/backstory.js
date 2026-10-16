@@ -384,7 +384,7 @@ function motes(g,cx,cy,r,t,n,seed,rgb,a){/* dust hanging in a pool of light */
 /* post-processing shared by every scene: letterbox, grain, vignette */
 function post(g,A,w,h,T){
   g.fillStyle=rgrad(g,w/2,h/2,Math.max(w,h)*0.75,[[0,'rgba(0,0,0,0)'],[0.55,'rgba(0,0,0,0.12)'],[1,'rgba(0,0,0,0.78)']]);g.fillRect(0,0,w,h);
-  const fi=Math.floor(T*24),gimg=A.grain[fi%3],ox=hash(fi)*256,oy=hash(fi+1)*256;
+  const fi=Math.floor(Math.max(0,T)*24),gimg=A.grain[fi%3],ox=hash(fi)*256,oy=hash(fi+1)*256;
   g.save();g.globalAlpha=0.07;g.globalCompositeOperation='overlay';
   for(let x=-ox;x<w;x+=256)for(let y=-oy;y<h;y+=256)g.drawImage(gimg,x,y);
   g.restore();
@@ -1009,12 +1009,22 @@ function makeSound(ac,out,S){
 
 /* ================= PLAYER ================= */
 let playing=null;
+/* the story is never allowed to stand between the player and the game: if it
+   can't start, it ends at once and hands over */
 function play(opt){
   opt=opt||{};
   if(playing)return playing.stop;
+  try{return start(opt);}catch(e){
+    console.warn('Story could not start:',e);
+    const ov=document.getElementById('storyOv');if(ov)ov.remove();
+    playing=null;setTimeout(()=>{try{if(opt.onEnd)opt.onEnd();}catch(e2){console.warn(e2);}},0);
+    return ()=>{};
+  }
+}
+function start(opt){
   if(!document.getElementById('storyCss')){const st=document.createElement('style');st.id='storyCss';st.textContent=css;document.head.appendChild(st);}
   const A=assets(),SC=scenes(A),starts=[];let total=0;SC.forEach(s=>{starts.push(total);total+=s.dur;});
-  const motion=!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const motion=!opt.reduceMotion&&!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
   const o={flash:!opt.reduceFlash,motion,base:[1,0,0]};
 
   const ov=document.createElement('div');ov.id='storyOv';ov.setAttribute('role','dialog');ov.setAttribute('aria-label','The backstory of Hollowmere');
@@ -1034,11 +1044,17 @@ function play(opt){
   const p0=performance.now();
   const now=opt.time||(()=>useAudioClock?opt.ac.currentTime-snd.t0:(performance.now()-p0)/1000);   /* opt.time: for recording */
 
-  let curLine='',done=false,raf=0,holdT=null;
+  let curLine='',done=false,raf=0,holdT=null;const warned=new Set();
+  const warnOnce=e=>{const k=String(e&&e.message||e);if(!warned.has(k)){warned.add(k);console.warn('Story frame:',e);}};
   function frame(){
     if(done)return;
-    const T=now();
-    if(T>=total){finish();return;}
+    const T=Math.max(0,now());   /* the audio clock starts a moment in the future: never draw at a negative time */
+    if(!(T<total)){finish();return;}   /* also ends on a NaN clock */
+    raf=requestAnimationFrame(frame);
+    try{draw(T);}catch(e){warnOnce(e);}
+  }
+  function draw(T){
+    if(!(w>=1&&h>=1)||!cvs.width||!cvs.height)return;   /* hidden or zero-size window: nothing to draw */
     const pn=performance.now();if(lastF&&!opt.time){ema=ema*0.9+Math.min(200,pn-lastF)*0.1;
       if(ema>40&&q>0.5&&++slowN>45){q-=0.25;slowN=0;ema=16;size();}}lastF=pn;
     let i=0;while(i<SC.length-1&&T>=starts[i+1])i++;
@@ -1047,7 +1063,7 @@ function play(opt){
     const s=Math.max(w/SW,h/SH)*dpr,ox=(w*dpr-SW*s)/2,oy=(h*dpr-SH*s)/2;o.base=[s,ox,oy];o.vw=Math.min(SW,w*dpr/s);
     g.setTransform(1,0,0,1,0,0);g.fillStyle='#000';g.fillRect(0,0,cvs.width,cvs.height);
     g.setTransform(s,0,0,s,ox,oy);
-    g.save();try{sc.draw(g,t,o);}catch(e){console.warn(e);}g.restore();
+    g.save();try{sc.draw(g,t,o);}catch(e){warnOnce(e);}g.restore();
     g.setTransform(dpr,0,0,dpr,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';g.shadowBlur=0;
     /* fade between scenes */
     const edge=Math.min(1,t/0.9,(sc.dur-t)/0.9);
@@ -1058,7 +1074,6 @@ function play(opt){
     if(ln!==curLine){curLine=ln;lineEl.classList.remove('on');
       clearTimeout(frame._t);frame._t=setTimeout(()=>{lineEl.textContent=curLine;if(curLine)lineEl.classList.add('on');},curLine?380:0);}
     barEl.style.width=(T/total*100).toFixed(2)+'%';
-    raf=requestAnimationFrame(frame);
   }
   function stopEvt(e){e.stopPropagation();}
   function onKey(e){
