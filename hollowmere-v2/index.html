@@ -430,9 +430,10 @@
   .vd-stats{margin-top:18px}
   .vd-stat{display:grid;grid-template-columns:54px 1fr 24px;gap:9px;align-items:center;font-size:9.5px;
     letter-spacing:2px;color:#8f8874;margin-bottom:3px}
-  .vd-track{height:3px;background:#161a24}
+  .vd-track{height:3px;background:#161a24;display:flex}
   .vd-fill{display:block;height:100%;background:var(--vt);box-shadow:0 0 8px var(--vt)}
   .vd-val{text-align:right;color:#cfc8b8}
+  .vd-fill.up{background:#fff3d6;box-shadow:0 0 8px #ffe2a0}
   .vd-mean{grid-column:1 / -1;font-size:9px;letter-spacing:1px;color:#4f5a6e;margin:-2px 0 7px}
   .vd-lore{font-size:12.5px;line-height:1.6;color:#8f8874;font-style:italic;margin-top:16px}
   .vd-act{margin-top:18px}
@@ -442,6 +443,18 @@
   .vbtn.dim{border-color:#3a3630;color:#6f6a5c;cursor:default}
   .vbtn .eg{font-size:13px}
   .vneed{font-size:11px;letter-spacing:2px;color:#8a7f60;margin-top:9px;text-align:center}
+  /* legend upgrades (ash) */
+  .ash{display:inline-block;width:.62em;height:.62em;border-radius:50%;vertical-align:.02em;
+    background:radial-gradient(circle at 35% 35%,#e9e2d4,#8c8478 55%,#3d3a36);box-shadow:0 0 6px rgba(233,226,212,.45)}
+  .vup-lv{display:flex;gap:4px;margin:8px 0 6px}
+  .vup-lv i{flex:1;height:5px;background:#161a24;border:1px solid #2a2a30}
+  .vup-lv i.on{background:#fff3d6;border-color:#ffe2a0;box-shadow:0 0 6px rgba(255,226,160,.55)}
+  .vup-txt{font-size:12.5px;line-height:1.55;color:#cfc8b8}
+  .vup-txt b{font-weight:normal;color:#fff3d6}
+  .vup .vbtn{margin-top:10px;border-color:#e9e2d4;color:#fff3d6}
+  .vup .vbtn.dim{border-color:#3a3630;color:#6f6a5c}
+  .claimash{font-size:12px;letter-spacing:2px;color:#cfc8b8;margin-top:8px}
+  .claimash b{font-weight:normal;color:#fff3d6}
   /* combining legends */
   .vchip.cmb{color:#ffcf8a;border-color:rgba(255,207,138,.5)}
   .vchip.cmb.on{background:rgba(255,207,138,.12)}
@@ -847,7 +860,7 @@
     <div id="vHead">
       <div id="vTitle">THE VAULT OF LEGENDS</div>
       <div id="vWallet"><svg class="eg" viewBox="0 0 24 24" aria-hidden="true"><use href="#ethglyph"/></svg>
-        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/40</div>
+        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; <span class="ash"></span> ASH <b id="vAsh">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/40</div>
       <div id="vClose">CLOSE</div>
     </div>
     <div id="vClaim" style="display:none"></div>
@@ -890,6 +903,7 @@ setTimeout(function(){
      BOOT ............ error reporting, three.js loaded from a CDN with fallbacks
      VAULT OF LEGENDS  the 40 legends: stats, looks, abilities
      SAVE ............ local save format, cleaning, league progression
+     LEGEND UPGRADES . ash (earned in the house) buys levels: higher stats, shorter cooldowns
      CONSTANTS & MAPS  the four floors as text maps, stairs, nav graph, pathfinding
      THREE SETUP ..... renderer + post pass, generated PBR surfaces, the house, furniture, light pool, flashlight
      LEGEND MANNEQUIN  the player's ghost model and its animation rig
@@ -1327,7 +1341,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)guestFlush(
 addEventListener('pagehide',()=>guestFlush(true));
 const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned'];
 function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,legendRuns:{}};}
-function freshSave(){return {combos:[],ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
+function freshSave(){return {combos:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
    new account. A signed-in account's local copy (LS_KEY:uid) stays in localStorage as before. */
@@ -1367,6 +1381,13 @@ function cleanSave(raw,isLocal){
     .slice(0,COMBO_LIMIT).map(x=>({id:x.id,p:x.p.slice()}));
   if(st.legendRuns&&typeof st.legendRuns==='object')
     out.combos.forEach(x=>{if(typeof st.legendRuns[x.id]==='number')out.stats.legendRuns[x.id]=st.legendRuns[x.id];});
+  /* ash and legend upgrades (also kept in the cloud inside stats, like combined legends) */
+  const ash=typeof src.ash==='number'?src.ash:(src.stats&&typeof src.stats.ash==='number')?src.stats.ash:0;
+  if(isFinite(ash))out.ash=Math.max(0,Math.min(1e7,Math.floor(ash)));
+  const ups=(src.ups&&typeof src.ups==='object')?src.ups:(src.stats&&src.stats.ups&&typeof src.stats.ups==='object')?src.stats.ups:{};
+  Object.keys(ups).forEach(id=>{const l=ups[id];
+    if(BYID[id]&&!BYID[id].combo&&id!=='god'&&out.unlocked.indexOf(id)>=0&&typeof l==='number'&&isFinite(l)&&l>=1)
+      out.ups[id]=Math.min(UP_MAX,Math.floor(l));});
   if(BYID[src.main]&&!BYID[src.main].combo&&out.unlocked.indexOf(src.main)>=0)out.main=src.main;
   else if(out.combos.some(x=>x.id===src.main))out.main=src.main;
   return out;
@@ -1379,6 +1400,25 @@ function cleanSave(raw,isLocal){
    Price: 10,000 ether for two, doubling for each one more.
    ========================================================= */
 const COMBO_MAX=4,COMBO_LIMIT=20;
+/* =========================================================
+   LEGEND UPGRADES — paid in ASH, which is only earned in the house (never bought with ether).
+   Each legend you own climbs UP_MAX levels. Every level adds UP_STAT to all four stats (up to 100)
+   and brings its power back UP_CD sooner (on top of what SPIRIT already does).
+   A combined legend has no levels of its own: it takes the highest upgraded stat of the legends it
+   was fused from, and each of its powers uses the cooldown cut of the legend that power came from.
+   The keeper's GOD legend is already at 100 everywhere and is never changed by upgrades.
+   ========================================================= */
+const UP_MAX=10,UP_STAT=3,UP_CD=0.03;
+const upCost=l=>20*(l+1);   /* ash to go from level l to l+1: 20, 40 … 200 (1,100 in all) */
+const ASH_PAY={'EMBERS RECLAIMED':2,'MEMORIES RECOVERED':3,'HUNTS SURVIVED':3,escape:20,clean:10};
+const upLevel=id=>(save.ups&&save.ups[id])|0;
+const canUpgrade=c=>!!c&&!c.combo&&c.id!=='god'&&save.unlocked.indexOf(c.id)>=0;
+/* a legend's stats with its upgrades in */
+function effSt(c){
+  if(c.id==='god')return c.st.slice();
+  if(c.combo)return [0,1,2,3].map(i=>Math.max.apply(null,c.p.map(id=>effSt(BYID[id])[i])));
+  const l=upLevel(c.id);return c.st.map(v=>Math.min(100,v+UP_STAT*l));
+}
 const comboCost=n=>10000*Math.pow(2,Math.max(0,n-2));
 const comboKey=p=>p.slice().sort().join('|');
 const shortName=c=>c.n.replace(/^THE\s+/,'');
@@ -1463,7 +1503,7 @@ function canBuy(c){
 const PS={walk:3.5,burst:5.6,veil:1.7,noise:3.3,noiseB:8.5,regen:15,
           veilCost:16,burstCost:30,pick:1.3,shard:0,cdMul:1,shake:1,nerve:1};
 function computePS(c){
-  const MI=c.st[0],GR=c.st[1],WI=c.st[2],SP=c.st[3];
+  const es=effSt(c),MI=es[0],GR=es[1],WI=es[2],SP=es[3];
   PS.walk      = 3.5*(0.88+GR*0.0026);
   PS.burst     = 5.6*(0.90+MI*0.0020);
   PS.veil      = 1.7*(0.85+GR*0.0035);
@@ -1477,6 +1517,17 @@ function computePS(c){
   PS.cdMul     = 1-SP*0.0025;
   PS.shake     = 1-SP*0.0050;
   PS.nerve     = 1+SP*0.0100;
+}
+/* which legend each power belongs to, so a combined legend's powers use their own legend's upgrades */
+const AB_OWNER=new Map(ROSTER.filter(c=>!c.combo&&c.id!=='god').map(c=>[c.ab,c.id]));
+const upCdMul=a=>{const id=AB_OWNER.get(a);return id&&!isRealGod()?1-UP_CD*upLevel(id):1;};
+/* a power's cooldown for the bound legend: SPIRIT and upgrades both shorten it, never below 8 s */
+function cdFor(a){return Math.max(8,Math.round(a.cd*PS.cdMul*upCdMul(a)));}
+/* the same, shown in the vault for any legend (not only the bound one) */
+function vaultCd(c){
+  const m=1-effSt(c)[3]*0.0025,up=a=>c.id==='god'?1:1-UP_CD*upLevel(AB_OWNER.get(a)||'');
+  const one=a=>Math.max(8,Math.round(a.cd*m*up(a)));
+  return c.ab.k==='multi'?Math.min.apply(null,c.ab.parts.map(one)):one(c.ab);
 }
 computePS(curLegend());
 multiSync();
@@ -2987,7 +3038,7 @@ function setLegend(id){
   ghost.g.scale.setScalar(0.92);
   ghost.mat.opacity=0.85;
   computePS(c);
-  AB.cd=0;AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));
+  AB.cd=0;AB.cdMax=cdFor(c.ab);
   if(typeof multiSync==='function')multiSync();
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
 }
@@ -3002,7 +3053,7 @@ function setGod(on,quiet){
   const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
   disposeLegend(ghost);ghost=buildLegend(c);ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
   ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
-  computePS(c);AB.cd=0;AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));
+  computePS(c);AB.cd=0;AB.cdMax=cdFor(c.ab);
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
 }
 async function godCheck(){
@@ -3049,7 +3100,7 @@ function godFire(i,quiet,auto){
   if(pa.k==='reveal'&&AB.revealT>1000){say(pa.n+' \u2014 THE HOUSE IS ALREADY MARKED');return false;}
   if(pa.k==='pull'){if(!pullEmber(pa.scope))return false;SFX.chime();toast(pa.n,2.2);}
   else{fireAbility(c,pa);if(MP)mpPower(pa);}
-  if(!auto)s.ess-=pa.cost;s.cd=Math.max(8,Math.round(pa.cd*PS.cdMul));AB.used++;
+  if(!auto)s.ess-=pa.cost;s.cd=cdFor(pa);AB.used++;
   return true;
 }
 function godFireAll(){
@@ -3116,7 +3167,7 @@ function godHud(){
   Array.from(host.children).forEach(ic=>{
     const mi=ic.getAttribute('data-gm');
     if(mi!==null){const i=+mi,pa=parts[i],s=GOD.st[i];if(!s)return;
-      const cdMax=Math.max(8,Math.round(pa.cd*PS.cdMul));
+      const cdMax=cdFor(pa);
       const holding=AB.ward>0,frac=holding?1:s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
       ic.className='gpi tbtn abx mini '+(holding?'ready':'cool reload');
       ic.querySelector('.gl').textContent=holding?String(AB.ward):'⟳';
@@ -3126,7 +3177,7 @@ function godHud(){
     const pa=parts[i],s=GOD.st[i];if(!pa||!s)return;
     const live=pa.k==='haste'?AB.hasteT>0:false;
     const ready=!live&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
-    const cdMax=Math.max(8,Math.round(pa.cd*PS.cdMul)),frac=s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
+    const cdMax=cdFor(pa),frac=s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
     ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
     ic.querySelector('.ring').style.strokeDashoffset=live?RING_LEN:RING_LEN*(1-frac);
     const gt=ic.querySelector('.gt');if(gt)gt.textContent=GOD.sel[i]?'✓':'';});
@@ -4073,19 +4124,20 @@ for(let i=0;i<15;i++){const s=glowSprite(0xffffff,1.0);
 function sightRange(){return DARK.t>0?4.2*DF().sight:(14+2.5*heat())*DF().sight;}
 
 /* --- run scoring: ether is earned by playing, not by menus --- */
-const RUN={ether:0,spotted:false,floors:{},done:false,tally:{}};
+const RUN={ether:0,ash:0,spotted:false,floors:{},done:false,tally:{}};
 function awardEther(n,key,shout){
   RUN.ether+=n;
+  RUN.ash+=ASH_PAY[key]||0;   /* a little ash comes with some of it (see LEGEND UPGRADES) */
   RUN.tally[key]=(RUN.tally[key]||0)+n;
   if(shout)toast('+'+n+' ETHER \u00b7 '+key,1.6);
 }
 function resetRun(){
   godReset();
-  RUN.ether=0;RUN.spotted=false;RUN.floors={[spawnDef[2]]:1};RUN.done=false;RUN.tally={};
+  RUN.ether=0;RUN.ash=0;RUN.spotted=false;RUN.floors={[spawnDef[2]]:1};RUN.done=false;RUN.tally={};
   RUN.title='';
   AB.cd=0;AB.used=0;AB.invisT=0;AB.after=0;AB.expose=0;AB.silentT=0;AB.hasteT=0;AB.hasteMul=1;
   AB.loudT=0;AB.quickT=0;AB.revealT=0;AB.regenT=0;AB.foreT=0;AB.ward=0;AB.wardWarp=false;AB.wardReveal=false;
-  AB.cdMax=Math.max(8,Math.round(curLegend().ab.cd*PS.cdMul));
+  AB.cdMax=cdFor(curLegend().ab);
   ZONE.t=0;zoneMesh.visible=false;
   DECOY.t=0;decoyMesh.visible=false;clearDecoyCopy();
   TRAP.t=0;trapMesh.visible=false;
@@ -4103,8 +4155,8 @@ function endRun(win){
   if(win){const nt=Math.round(elapsed*10)/10;if(SOLO_RANKED&&(!st.bestTime||nt<st.bestTime)){st.bestTime=nt;newBest=true;}}
   else st.deaths++;
   if(win){
-    RUN.ether+=PAY.escape;RUN.tally['ESCAPED THE HOUSE']=PAY.escape;
-    if(!RUN.spotted){RUN.ether+=PAY.clean;RUN.tally['NEVER ONCE SEEN']=PAY.clean;}
+    RUN.ether+=PAY.escape;RUN.tally['ESCAPED THE HOUSE']=PAY.escape;RUN.ash+=ASH_PAY.escape;
+    if(!RUN.spotted){RUN.ether+=PAY.clean;RUN.tally['NEVER ONCE SEEN']=PAY.clean;RUN.ash+=ASH_PAY.clean;}
     save.escapes++;
   }
   if(save.lastDay!==todayKey()){
@@ -4121,6 +4173,8 @@ function endRun(win){
     merged[e.l]+=e.n;});
   save.pending=order.map(function(k){return{l:k,n:merged[k]};});
   st.etherEarned+=RUN.ether;
+  /* ash is not claimed like ether: it settles into the vault the moment the night ends */
+  save.ash=Math.min(1e7,(save.ash||0)+RUN.ash);
   saveNow();
   refreshClaims();
   if(SOLO_RANKED){cloudLogRun(win);
@@ -4659,6 +4713,7 @@ function vaultList(){
 }
 function renderVault(){
   $('vEther').textContent=save.ether;
+  $('vAsh').textContent=save.ash||0;
   $('vCount').textContent=save.unlocked.length;
   refreshClaims();
 
@@ -4717,10 +4772,12 @@ function renderVault(){
   const KEYS=['MIGHT','GRACE','WITS','SPIRIT'];
   const MEAN=['force \u00b7 burst speed','quiet \u00b7 drift speed','reach \u00b7 memory','nerve \u00b7 essence'];
   let bars='';
+  const es=effSt(c),base=c.combo?es:c.st;
   KEYS.forEach(function(k,i){
     bars+='<div class="vd-stat"><span>'+k+'</span>'
-      +'<span class="vd-track"><span class="vd-fill" style="width:'+c.st[i]+'%"></span></span>'
-      +'<span class="vd-val">'+c.st[i]+'</span>'
+      +'<span class="vd-track"><span class="vd-fill" style="width:'+base[i]+'%"></span>'
+        +(es[i]>base[i]?'<span class="vd-fill up" style="width:'+(es[i]-base[i])+'%"></span>':'')+'</span>'
+      +'<span class="vd-val">'+es[i]+'</span>'
       +'<span class="vd-mean">'+MEAN[i]+'</span></div>';
   });
   let act;
@@ -4750,13 +4807,14 @@ function renderVault(){
     +'<div class="vd-plain">'+a.p+'</div>'
     +'<div class="vd-chips">'
       +'<span class="vd-chip">LASTS <b>'+abLasts(a)+'</b></span>'
-      +'<span class="vd-chip">BACK IN <b>'+Math.max(8,Math.round(a.cd*(1-c.st[3]*0.0025)))+'s</b></span>'
+      +'<span class="vd-chip">BACK IN <b>'+vaultCd(c)+'s</b></span>'
       +'<span class="vd-chip">COSTS <b>'+a.cost+'</b> ESSENCE</span>'
       +(a.once?'<span class="vd-chip">ONCE A NIGHT</span>':'')
     +'</div>'
     +'<div class="vd-flavour">'+a.d+'</div>'
     +'<div class="vd-label">IN THE MANOR</div>'
     +'<div class="vd-stats">'+bars+'</div>'
+    +upgradeHTML(c)
     +(un?'<div class="vd-lore">'+c.l+'</div>'
         :'<div class="vd-lore">Record sealed. Declassify this ghost to read its file.</div>')
     +'<div class="vd-act">'+act+'</div>';
@@ -4768,12 +4826,41 @@ function renderVault(){
   if(sel)sel.addEventListener('click',function(e){e.stopPropagation();
     if(c.id==='god')setGod(true);else{if(GOD.on)setGod(false,true);setLegend(c.id);}
     renderVault();toast(c.n+' \u2014 BOUND',2.4);});
+  const upb=$('vUp');
+  if(upb)upb.addEventListener('click',function(e){e.stopPropagation();
+    if(!upgradeLegend(c))return;
+    renderVault();SFX.chime();toast(c.n+' \u2014 LEVEL '+upLevel(c.id),2.4);});
   const unl=$('vUnl');
   if(unl)unl.addEventListener('click',function(e){e.stopPropagation();
     if(!canBuy(c))return;
     save.ether-=cost;save.unlocked.push(c.id);saveNow();
     setLegend(c.id);renderVault();
     SFX.chime();toast(c.n+' \u2014 DECLASSIFIED',2.8);});
+}
+/* the upgrade block in a legend's dossier */
+function upgradeHTML(c){
+  const AS='<span class="ash"></span>';
+  if(c.id==='god'||!isUnlocked(c.id))return '';
+  if(c.combo)return '<div class="vd-label">UPGRADES</div><div class="vup-txt">A combined legend grows with the legends it was fused from: '
+    +'upgrade '+c.p.map(id=>escHTML(shortName(BYID[id]))+' (level '+upLevel(id)+')').join(', ')+' and it takes their highest stats and each power\u2019s shorter cooldown.</div>';
+  const l=upLevel(c.id),pips=Array.from({length:UP_MAX},(_,i)=>'<i'+(i<l?' class="on"':'')+'></i>').join('');
+  let h='<div class="vd-label">UPGRADES \u2014 LEVEL '+l+' / '+UP_MAX+'</div><div class="vup"><div class="vup-lv">'+pips+'</div>';
+  h+='<div class="vup-txt">'+(l?'Now: <b>+'+l*UP_STAT+'</b> to every stat (up to 100), power back <b>'+Math.round(l*UP_CD*100)+'%</b> sooner.':'Every level adds <b>+'+UP_STAT+'</b> to every stat (up to 100) and brings the power back <b>'+Math.round(UP_CD*100)+'%</b> sooner.')+'</div>';
+  if(l>=UP_MAX)h+='<button class="vbtn dim" disabled>FULLY UPGRADED</button>';
+  else{const cost=upCost(l),ok=(save.ash||0)>=cost;
+    h+='<button class="vbtn'+(ok?'':' dim')+'" id="vUp"'+(ok?'':' disabled')+'>UPGRADE TO LEVEL '+(l+1)+' \u2014 '+cost+' '+AS+'</button>'
+      +(ok?'':'<div class="vneed">'+AS+' '+(cost-(save.ash||0))+' MORE ASH \u2014 GATHER EMBERS AND MEMORIES, SURVIVE HUNTS, ESCAPE</div>');}
+  return h+'</div>';
+}
+function upgradeLegend(c){
+  if(!canUpgrade(c))return false;
+  const l=upLevel(c.id),cost=upCost(l);
+  if(l>=UP_MAX||(save.ash||0)<cost)return false;
+  save.ash-=cost;save.ups[c.id]=l+1;saveNow();
+  /* the bound legend (or a combined one it is part of) feels it at once */
+  const cur=curLegend();
+  if(cur.id===c.id||(cur.combo&&cur.p.indexOf(c.id)>=0)){computePS(cur);AB.cdMax=cdFor(cur.ab);refreshLegendHUD();}
+  return true;
 }
 /* the combine panel (in the dossier's place) */
 function renderCombine(){
@@ -4787,7 +4874,7 @@ function renderCombine(){
   if(lead)pvShow(lead);else pvClear();
   const KEYS=['MIGHT','GRACE','WITS','SPIRIT'];
   let bars='';
-  if(n>=2)KEYS.forEach((k,i)=>{const v=Math.max.apply(null,ps.map(c=>c.st[i]));
+  if(n>=2)KEYS.forEach((k,i)=>{const v=Math.max.apply(null,ps.map(c=>effSt(c)[i]));
     bars+='<div class="vd-stat"><span>'+k+'</span><span class="vd-track"><span class="vd-fill" style="width:'+v+'%"></span></span><span class="vd-val">'+v+'</span><span class="vd-mean"></span></div>';});
   let act;
   if(n<2)act='<button class="vbtn dim" disabled>PICK '+(2-n)+' MORE</button>';
@@ -4862,6 +4949,10 @@ function countUp(el,from,to){
 function pendingTotal(){return (save.pending||[]).reduce((a,e)=>a+e.n,0);}
 
 function renderClaim(box){
+  renderClaimEther(box);
+  if(box&&box.id!=='vClaim')ashLine(box);
+}
+function renderClaimEther(box){
   if(!box)return;
   const pend=save.pending||[];
   if(!pend.length){
@@ -4934,6 +5025,11 @@ function claimAll(box){
       if(i===labels.length-1)setTimeout(function(){finishClaim(box);},500);
     },i*140);
   });
+}
+/* tonight's ash, under the ether on the death / escape screen */
+function ashLine(box){
+  if(!box||!RUN.done||!RUN.ash)return;
+  box.insertAdjacentHTML('beforeend','<div class="claimash"><span class="ash"></span> +<b>'+RUN.ash+'</b> ASH TONIGHT \u00b7 YOU HOLD <b>'+(save.ash||0)+'</b> \u2014 SPEND IT ON UPGRADES IN THE VAULT</div>');
 }
 function refreshClaims(){
   renderClaim($('runSum'));
@@ -5898,7 +5994,7 @@ applyQuality();
 requestAnimationFrame(loop);
 showOv(titleOv);setScreenState();
 const abhudEl=$('abhud');
-AB.cdMax=Math.max(8,Math.round(curLegend().ab.cd*PS.cdMul));
+AB.cdMax=cdFor(curLegend().ab);
 resetRun();refreshLegendHUD();dressVault();refreshClaims();
 if(pendingTotal()>0)setTimeout(function(){
   toast(pendingTotal()+' ETHER STILL HANGS UNCLAIMED — OPEN THE VAULT',4.5);},1200);
@@ -5929,7 +6025,7 @@ function cloudPush(create){
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
     pending:save.pending.map(e=>({l:e.l,n:e.n})),music:save.music,lastDay:save.lastDay,v:SAVE_V,
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
-      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()}))}),
+      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),ash:save.ash||0,ups:Object.assign({},save.ups)}),
     live:liveNow()};
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
     .then(()=>{lastSync=Date.now();syncBad=false;updateAcctLive();})
@@ -5955,7 +6051,7 @@ function replaceSave(next){
   if(typeof vSel==='number'&&vSel>=ROSTER.length)vSel=0;
   const c=curLegend();
   if(ghost&&ghost.legend&&ghost.legend.id!==c.id)setLegend(c.id);
-  else{computePS(c);AB.cdMax=Math.max(8,Math.round(c.ab.cd*PS.cdMul));refreshLegendHUD();}
+  else{computePS(c);AB.cdMax=cdFor(c.ab);refreshLegendHUD();}
   refreshClaims();
   if(vaultOpen)renderVault();
   if(settingsOpen)syncSetUI();
