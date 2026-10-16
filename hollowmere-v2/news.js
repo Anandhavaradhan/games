@@ -15,6 +15,33 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-16-gifts',
+    date: '2026-10-16',
+    tag: 'NEW',
+    title: 'Send gifts to other players',
+    body: 'You can now give ether or a legend to any player with a username. Open FRIENDS and press GIFT next to a friend, ' +
+      'or SEND A GIFT to find anyone by their username.\n\n' +
+      'What you give leaves your vault. You can gift any legend you bought, but not the free five, a combined legend, ' +
+      'or a legend fused into one of your combined legends. If they already own the legend, they get its price in ether instead. ' +
+      'Gifts need an account; guests cannot send or receive them.'
+  },
+  {
+    id: '2026-10-16-backstory',
+    date: '2026-10-16',
+    tag: 'NEW',
+    title: 'The backstory',
+    body: 'A painted, animated cinematic with narration and score now tells how you came to be caught in the house. ' +
+      'It plays as you wake for your first night, and THE BACKSTORY on the title screen replays it any time. ' +
+      'Press ESC or SKIP, or hold a tap, to skip it. With PHOTOSENSITIVITY on it plays without flashes.'
+  },
+  {
+    id: '2026-10-16-version-switch',
+    date: '2026-10-16',
+    tag: 'NEW',
+    title: 'Play the original Hollowmere',
+    body: 'SWITCH VERSION on the title screen takes you to the original Hollowmere, and back again from its own title screen.'
+  },
+  {
     id: '2026-10-16-news-inbox',
     date: '2026-10-16',
     tag: 'NEW',

@@ -329,6 +329,39 @@ export function addGuestStats(seconds, active, escapes) {
   }, { merge: true });
 }
 
+/* ---------- GIFTS: gifts/{id} { from, fromName, to, toName, kind, n, legend, at } ----------
+   A player can gift ether or a legend to another account. The giver pays in the SAME write that
+   creates the gift (ether goes down by exactly n, or the legend leaves their vault), and firestore.rules
+   refuse a gift that was not paid for. The gift then waits until the recipient's game picks it up:
+   it adds the ether or legend to their record and deletes the gift in one write, so a gift can only
+   ever be collected once. */
+export function sendGift(me, myName, to, toName, kind, n, legend) {
+  const b = F.writeBatch(db);
+  const p = F.doc(db, 'players', me);
+  if (kind === 'ether') b.update(p, { ether: F.increment(-n), lastSeen: F.serverTimestamp() });
+  else b.update(p, { unlocked: F.arrayRemove(legend), lastSeen: F.serverTimestamp() });
+  b.set(F.doc(F.collection(db, 'gifts')), {
+    from: me, fromName: String(myName || '').slice(0, 40), to, toName: String(toName || '').slice(0, 40),
+    kind, n: kind === 'ether' ? n : 0, legend: kind === 'legend' ? legend : '', at: F.serverTimestamp()
+  });
+  return b.commit();
+}
+/* collect a gift sent to me: `ether` added and/or `legend` unlocked, and the gift removed, together */
+export function claimGift(me, id, ether, legend) {
+  const b = F.writeBatch(db);
+  const up = { lastSeen: F.serverTimestamp() };
+  if (ether > 0) up.ether = F.increment(ether);
+  if (legend) up.unlocked = F.arrayUnion(legend);
+  b.update(F.doc(db, 'players', me), up);
+  b.delete(F.doc(db, 'gifts', id));
+  return b.commit();
+}
+/* gifts waiting for me; cb gets an array. Returns an unsubscribe function. */
+export function watchGifts(me, cb) {
+  return F.onSnapshot(F.query(F.collection(db, 'gifts'), F.where('to', '==', me)),
+    s => cb(s.docs.map(d => Object.assign({ id: d.id }, d.data()))), e => console.warn('Gifts read failed:', e));
+}
+
 /* true when this account is listed in admins/{uid} (only the account itself can read that) */
 export async function isAdmin(uid) {
   try { return (await F.getDoc(F.doc(db, 'admins', uid))).exists(); } catch (e) { return false; }
