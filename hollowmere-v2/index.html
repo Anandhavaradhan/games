@@ -181,6 +181,30 @@
   .fradd{display:flex;gap:8px;align-items:center}.fradd input{flex:1;min-width:0}
   .frnote{font-size:13px;color:#7d7663;font-style:italic;margin-top:8px}
   .frmsg{font-size:13px;margin-top:8px;color:#d98b7a}.frmsg.ok{color:#9fd18a}
+  /* ===== NEWS INBOX ===== */
+  #newsPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:27;width:min(480px,94vw);
+    max-height:88vh;overflow-y:auto;display:none;background:rgba(10,10,14,.96);border:1px solid rgba(160,150,130,.25);padding:22px 20px 16px}
+  #newsPanel h3{font-family:'Cormorant SC',serif;letter-spacing:4px;font-size:17px;color:#d8cfb6;margin-bottom:14px;text-align:center}
+  #newsPanel .lbtabs{flex-wrap:wrap}
+  #newsClose{margin-top:14px;text-align:center;cursor:pointer;font-family:'Cormorant SC',serif;letter-spacing:3px;color:#8f8874;font-size:13px}
+  .nwtools{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 6px;font-size:12px;color:#6f6a5c}
+  .nwitem{border-bottom:1px solid rgba(160,150,130,.1)}
+  .nwhead{display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 2px;background:none;border:0;color:inherit;text-align:left;cursor:pointer;font:inherit}
+  .nwhead:focus-visible{outline:1px solid #8a7f60}
+  .nwdot{flex:none;width:8px;height:8px;margin-top:7px;border-radius:50%;background:transparent;border:1px solid rgba(160,150,130,.3)}
+  .nwitem.unread .nwdot{background:#ffbe6f;border-color:#ffbe6f;box-shadow:0 0 8px rgba(255,190,111,.7)}
+  .nwhead .t{display:block;flex:1;min-width:0}
+  .nwhead b{display:block;font-weight:normal;font-size:16px;color:#a89f8a}
+  .nwitem.unread .nwhead b{color:#f1e7cc}
+  .nwhead .t>span{display:block;font-family:'Cormorant SC',serif;font-size:11px;letter-spacing:2px;color:#6f6a5c;margin-top:2px}
+  .nwhead .t>span i{font-style:normal;color:#9fc4ff}
+  .nwbody{display:none;padding:0 4px 12px 20px;font-size:14px;line-height:1.55;color:#bdb4a0}
+  .nwbody p+p{margin-top:8px}
+  .nwitem.open .nwbody{display:block}
+  .nwunread{margin-top:8px;font-size:11px}
+  #newsBadge{display:none;margin-left:8px;padding:1px 7px;border-radius:9px;background:#ffbe6f;color:#140f08;font-size:12px;letter-spacing:0;
+    box-shadow:0 0 10px rgba(255,190,111,.6)}
+  #newsBadge.on{display:inline-block}
   /* gifting ether and legends */
   #gfPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:27;width:min(460px,94vw);
     max-height:88vh;overflow-y:auto;display:none;background:rgba(10,10,14,.96);border:1px solid rgba(160,150,130,.25);padding:22px 20px 16px}
@@ -735,6 +759,13 @@
     <div id="frBody"></div>
     <div id="frClose">CLOSE</div>
   </div>
+  <div id="newsPanel" role="dialog" aria-label="News">
+    <h3>NEWS FROM THE MANOR</h3>
+    <div class="lbtabs" id="newsTabs"><span data-nwf="all" class="on">ALL</span><span data-nwf="unread">UNREAD</span><span data-nwf="read">READ</span></div>
+    <div class="lbtabs sub" id="newsSort"><span data-nws="new" class="on">NEWEST FIRST</span><span data-nws="old">OLDEST FIRST</span><span data-nws="unread">UNREAD FIRST</span></div>
+    <div id="newsBody"></div>
+    <div id="newsClose">CLOSE</div>
+  </div>
   <div id="gfPanel" role="dialog" aria-label="Send a gift">
     <h3>SEND A GIFT</h3>
     <div id="gfBody"></div>
@@ -819,6 +850,7 @@
     <button id="titleAccount" class="ovbtn">ACCOUNT</button>
     <button id="titleBoard" class="ovbtn">LEADERBOARD</button>
     <button id="titleFriends" class="ovbtn">FRIENDS</button>
+    <button id="titleNews" class="ovbtn" style="display:none">NEWS<span id="newsBadge"></span></button>
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
     <button id="titleStory" class="ovbtn">THE BACKSTORY</button>
     <button id="titleCoop" class="ovbtn">CO-OP — PLAY WITH FRIENDS</button>
@@ -1368,9 +1400,10 @@ async function guestFlush(force){
 setInterval(()=>guestFlush(false),60000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)guestFlush(true);});
 addEventListener('pagehide',()=>guestFlush(true));
+const NEWS_ID_RE=/^[a-z0-9-]{1,60}$/,NEWS_KEEP=500;
 const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned','story'];
 function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
-function freshSave(){return {combos:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
+function freshSave(){return {combos:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
    new account. A signed-in account's local copy (LS_KEY:uid) stays in localStorage as before. */
@@ -1410,6 +1443,9 @@ function cleanSave(raw,isLocal){
     .slice(0,COMBO_LIMIT).map(x=>({id:x.id,p:x.p.slice()}));
   if(st.legendRuns&&typeof st.legendRuns==='object')
     out.combos.forEach(x=>{if(typeof st.legendRuns[x.id]==='number')out.stats.legendRuns[x.id]=st.legendRuns[x.id];});
+  /* news notices this player has read (kept in the cloud inside stats, like the combined legends) */
+  const nr=Array.isArray(src.newsRead)?src.newsRead:(src.stats&&Array.isArray(src.stats.newsRead))?src.stats.newsRead:[];
+  out.newsRead=nr.filter((id,i,a)=>typeof id==='string'&&NEWS_ID_RE.test(id)&&a.indexOf(id)===i).slice(-NEWS_KEEP);
   /* ash and legend upgrades (also kept in the cloud inside stats, like combined legends) */
   const ash=typeof src.ash==='number'?src.ash:(src.stats&&typeof src.stats.ash==='number')?src.stats.ash:0;
   if(isFinite(ash))out.ash=Math.max(0,Math.min(1e7,Math.floor(ash)));
@@ -1475,6 +1511,8 @@ function comboSync(list){
     const c=comboBuild(x);ROSTER.push(c);BYID[c.id]=c;ORDER.splice(at,0,c);});
 }
 let save=cleanSave(readLocal(LS_KEY),true);
+/* the news inbox (NEWS INBOX, near FRIENDS): what is open, and the notices themselves once news.js has loaded */
+let NEWS_UI={open:false,list:[],filter:'all',sort:'new',device:[]};
 comboSync(save.combos);
 function saveNow(){
   /* a legend that has left this save (gifted away) takes its upgrades with it: whoever owns it next starts at level 0 */
@@ -3953,6 +3991,8 @@ addEventListener('keydown',e=>{
   if(acctOpen){if(e.code==='Escape'){e.preventDefault();closeAcct();}return;}
   /* leaderboard open: Esc / Enter / Space close it, nothing else reaches the game */
   if(lbOpen){if(e.code==='Escape'||e.code==='Enter'||e.code==='Space'){e.preventDefault();closeBoard();}return;}
+  /* news open: Esc closes it, nothing else reaches the game (Enter / Space work its buttons) */
+  if(NEWS_UI.open){if(e.code==='Escape'){e.preventDefault();closeNews();}return;}
   keys[e.code]=true;
   if(e.code==='Space'||e.code==='Enter'||e.code==='NumpadEnter'){
     e.preventDefault();
@@ -4124,7 +4164,7 @@ if(isTouch){
 }
 addEventListener('touchstart',()=>actInput(),{passive:true});
 addEventListener('touchmove',()=>actInput(),{passive:true});
-document.addEventListener('touchmove',e=>{if(!e.target.closest('.overlay,#vaultOv,#setPanel,#acctPanel,#lbPanel,#acctScrim,#gfPanel'))e.preventDefault();},{passive:false});
+document.addEventListener('touchmove',e=>{if(!e.target.closest('.overlay,#vaultOv,#setPanel,#acctPanel,#lbPanel,#acctScrim,#gfPanel,#newsPanel'))e.preventDefault();},{passive:false});
 
 
 /* =========================================================
@@ -6111,7 +6151,7 @@ function cloudPush(create){
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
     pending:save.pending.map(e=>({l:e.l,n:e.n})),music:save.music,lastDay:save.lastDay,v:SAVE_V,
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
-      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id])}),
+      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id])}),
     live:liveNow()};
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
     .then(()=>{lastSync=Date.now();syncBad=false;updateAcctLive();})
@@ -6167,7 +6207,7 @@ async function applyUser(u){
     if(cloudUser){
       clearTimeout(cloudTimer);cloudTimer=null;
       socialStop();giftStop();godDisable();cloudUser=null;saveKey=LS_KEY;ptReset();
-      replaceSave(cleanSave(readLocal(LS_KEY),true));
+      replaceSave(cleanSave(readLocal(LS_KEY),true));newsBadge();
       toast('SIGNED OUT \u2014 PLAYING AS A GUEST',2.6);
     }
     renderAcct();return;
@@ -6187,6 +6227,8 @@ async function applyUser(u){
   loadFailed=false;acctRetried=false;
   const isNew=!data;
   const next=data?cleanSave(data,false):cleanSave(JSON.parse(JSON.stringify(cleanSave(readLocal(LS_KEY),true))),false);
+  /* news read before signing in stays read */
+  newsReadIds().forEach(id=>{if(next.newsRead.indexOf(id)<0)next.newsRead.push(id);});
   if(wantName&&wantName.uid===u.uid)u.name=wantName.name;
   else if(data&&data.name)u.name=String(data.name).slice(0,40);
   /* progress moves, it is not copied: the guest slot in this browser starts fresh */
@@ -6194,6 +6236,7 @@ async function applyUser(u){
   cloudUser=u;saveKey=LS_KEY+':'+u.uid;
   replaceSave(next);
   try{localStorage.setItem(saveKey,JSON.stringify(save));}catch(e){}
+  newsBadge();
   await cloudPush(isNew);
   await ensureUsername();   /* every account has one unique username before it can post anywhere */
   ptLoad();      /* this player's entry on the most-time-played board */
@@ -6335,7 +6378,7 @@ function renderAcct(){
   updateAcctLive();
 }
 function setAcctMsg(t,ok){acctMsg=t||'';acctMsgOk=!!ok;const el=$('acMsg');if(el){el.textContent=acctMsg;el.classList.toggle('ok',acctMsgOk);}}
-function openAcct(){if(acctOpen)return;
+function openAcct(){if(acctOpen)return;closeNews();
   if(cloudUser&&cloudUser.unameOk===false&&unameWhy==='failed'){unameTries=0;ensureUsername();}if(settingsOpen)closeSettings();acctOpen=true;acctMsg='';acctPanel.style.display='block';$('acctScrim').style.display='block';renderAcct();}
 function closeAcct(){if(!acctOpen)return;acctOpen=false;acctRenaming=false;acctPanel.style.display='none';$('acctScrim').style.display='none';acctMsg='';}
 $('acctScrim').addEventListener('click',e=>{e.stopPropagation();closeAcct();closeBoard();});
@@ -6521,6 +6564,7 @@ const LB_SUB={esc:'Every escape from Hollowmere, fastest first, on its own board
   time:'Time spent actually playing. Standing still, hiding too long, idling or repeating the same moves does not count.'};
 function openBoard(){
   if(lbOpen)return;
+  closeNews();
   if(acctOpen)closeAcct();
   if(settingsOpen)closeSettings();
   lbOpen=true;
@@ -7270,7 +7314,7 @@ function socialTick(now){
 /* ---- the panel ---- */
 function openFriends(){
   if(SOC.open)return;
-  if(acctOpen)closeAcct();if(lbOpen)closeBoard();if(settingsOpen)closeSettings();
+  if(acctOpen)closeAcct();if(lbOpen)closeBoard();if(settingsOpen)closeSettings();closeNews();
   SOC.open=true;SOC.msg='';$('frPanel').style.display='block';$('acctScrim').style.display='block';renderFriends();}
 function closeFriends(){if(!SOC.open)return;SOC.open=false;$('frPanel').style.display='none';
   if(!acctOpen&&!lbOpen)$('acctScrim').style.display='none';}
@@ -7361,6 +7405,110 @@ $('titleFriends').addEventListener('click',e=>{e.stopPropagation();openFriends()
 $('acctScrim').addEventListener('click',()=>closeFriends());
 
 /* =========================================================
+   NEWS INBOX — the NEWS button on the title screen.
+   The notices live in news.js (public updates only; see the rules at its top). Which ones a player
+   has read is kept in their save: for an account it syncs with the rest of their progress (inside
+   stats, so the account rules need no change); a guest's also stays on this device, so it is still
+   read the next time they play as a guest.
+   ========================================================= */
+const NEWS_DEV_KEY='hm_news_read';
+try{const d=JSON.parse(localStorage.getItem(NEWS_DEV_KEY)||'[]');
+  if(Array.isArray(d))NEWS_UI.device=d.filter(id=>typeof id==='string'&&NEWS_ID_RE.test(id)).slice(-NEWS_KEEP);}catch(e){}
+function newsReadIds(){
+  const ids=(save.newsRead||[]).slice();
+  if(!cloudUser)NEWS_UI.device.forEach(id=>{if(ids.indexOf(id)<0)ids.push(id);});
+  return ids;
+}
+const newsIsRead=id=>newsReadIds().indexOf(id)>=0;
+const newsUnread=()=>NEWS_UI.list.filter(n=>!newsIsRead(n.id)).length;
+function newsSetRead(ids,read){
+  if(!save.newsRead)save.newsRead=[];
+  const known=NEWS_UI.list.map(n=>n.id);
+  ids.forEach(id=>{
+    const i=save.newsRead.indexOf(id);
+    if(read&&i<0)save.newsRead.push(id);
+    if(!read&&i>=0)save.newsRead.splice(i,1);
+    if(!cloudUser){const j=NEWS_UI.device.indexOf(id);
+      if(read&&j<0)NEWS_UI.device.push(id);
+      if(!read&&j>=0)NEWS_UI.device.splice(j,1);}
+  });
+  /* only remember notices that still exist */
+  if(known.length){save.newsRead=save.newsRead.filter(id=>known.indexOf(id)>=0);NEWS_UI.device=NEWS_UI.device.filter(id=>known.indexOf(id)>=0);}
+  save.newsRead=save.newsRead.slice(-NEWS_KEEP);
+  if(!cloudUser)try{localStorage.setItem(NEWS_DEV_KEY,JSON.stringify(NEWS_UI.device.slice(-NEWS_KEEP)));}catch(e){}
+  saveNow();newsBadge();
+}
+function newsBadge(){
+  const b=$('newsBadge');if(!b)return;
+  const n=newsUnread();
+  b.textContent=n>99?'99+':String(n);b.classList.toggle('on',n>0);
+  $('titleNews').setAttribute('aria-label',n?'News, '+n+' unread':'News');
+}
+function newsDate(d){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');if(!m)return '';
+  return (+m[3])+' '+['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][+m[2]-1]+' '+m[1];
+}
+function openNews(){
+  if(NEWS_UI.open)return;
+  if(acctOpen)closeAcct();if(lbOpen)closeBoard();if(settingsOpen)closeSettings();closeFriends();closeGift();
+  NEWS_UI.open=true;NEWS_UI.expanded={};
+  $('newsPanel').style.display='block';$('acctScrim').style.display='block';renderNews();
+}
+function closeNews(){
+  if(!NEWS_UI.open)return;
+  NEWS_UI.open=false;$('newsPanel').style.display='none';
+  if(!acctOpen&&!lbOpen&&!SOC.open&&!GIFT.open)$('acctScrim').style.display='none';
+}
+function renderNews(){
+  if(!NEWS_UI.open)return;
+  document.querySelectorAll('#newsTabs [data-nwf]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-nwf')===NEWS_UI.filter));
+  document.querySelectorAll('#newsSort [data-nws]').forEach(s=>s.classList.toggle('on',s.getAttribute('data-nws')===NEWS_UI.sort));
+  const all=NEWS_UI.list.map((n,i)=>({n,i,read:newsIsRead(n.id)}));
+  const unread=all.filter(x=>!x.read).length;
+  let rows=all.filter(x=>NEWS_UI.filter==='all'||(NEWS_UI.filter==='read')===x.read);
+  /* news.js lists the newest first; ties keep that order */
+  const byNew=(a,b)=>(a.n.date<b.n.date?1:a.n.date>b.n.date?-1:a.i-b.i);
+  rows.sort(NEWS_UI.sort==='old'?(a,b)=>-byNew(a,b):NEWS_UI.sort==='unread'?(a,b)=>(a.read-b.read)||byNew(a,b):byNew);
+  let h='<div class="nwtools"><span>'+(NEWS_UI.list.length?unread+' unread of '+NEWS_UI.list.length:'')+'</span>'
+    +(unread?'<span class="frbtn" data-nwact="all">MARK ALL READ</span>':'')+'</div>';
+  if(!NEWS_UI.list.length)h+='<p class="acnote" style="text-align:center">No news yet.</p>';
+  else if(!rows.length)h+='<p class="acnote" style="text-align:center">'+(NEWS_UI.filter==='unread'?'You are all caught up.':'Nothing read yet. Open a notice to read it.')+'</p>';
+  rows.forEach(({n,read})=>{
+    const open=!!NEWS_UI.expanded[n.id];
+    h+='<div class="nwitem'+(read?'':' unread')+(open?' open':'')+'">'
+      +'<button class="nwhead" data-nwid="'+escHTML(n.id)+'" aria-expanded="'+open+'"><span class="nwdot"></span><span class="t">'
+      +'<b>'+escHTML(n.title)+'</b><span><i>'+escHTML(n.tag||'NEWS')+'</i> \u00b7 '+escHTML(newsDate(n.date))+(read?'':' \u00b7 UNREAD')+'</span></span></button>'
+      +'<div class="nwbody">'+String(n.body||'').split(/\n\s*\n/).map(p=>'<p>'+escHTML(p.trim())+'</p>').join('')
+      +(read?'<span class="frbtn nwunread" data-nwact="unread" data-nwid="'+escHTML(n.id)+'">MARK UNREAD</span>':'')+'</div></div>';
+  });
+  $('newsBody').innerHTML=h;
+}
+$('newsPanel').addEventListener('click',e=>{e.stopPropagation();
+  const f=e.target.closest('[data-nwf]');if(f){NEWS_UI.filter=f.getAttribute('data-nwf');renderNews();return;}
+  const s=e.target.closest('[data-nws]');if(s){NEWS_UI.sort=s.getAttribute('data-nws');renderNews();return;}
+  const a=e.target.closest('[data-nwact]');
+  if(a){const act=a.getAttribute('data-nwact');
+    if(act==='all')newsSetRead(NEWS_UI.list.map(n=>n.id),true);
+    else if(act==='unread'){const id=a.getAttribute('data-nwid');newsSetRead([id],false);NEWS_UI.expanded[id]=false;}
+    renderNews();return;}
+  const h=e.target.closest('.nwhead');
+  if(h){const id=h.getAttribute('data-nwid');NEWS_UI.expanded[id]=!NEWS_UI.expanded[id];
+    if(NEWS_UI.expanded[id]&&!newsIsRead(id))newsSetRead([id],true);
+    renderNews();}
+});
+$('newsClose').addEventListener('click',e=>{e.stopPropagation();closeNews();});
+$('titleNews').addEventListener('click',e=>{e.stopPropagation();openNews();});
+$('acctScrim').addEventListener('click',()=>closeNews());
+/* the button stays hidden until news.js has loaded; a missing or broken one leaves the game as it was */
+import('./news.js').then(m=>{
+  const seen={};
+  NEWS_UI.list=(Array.isArray(m.NEWS)?m.NEWS:[]).filter(n=>n&&typeof n.id==='string'&&NEWS_ID_RE.test(n.id)&&!seen[n.id]&&(seen[n.id]=1)
+    &&typeof n.title==='string'&&typeof n.body==='string');
+  if(!NEWS_UI.list.length)return;
+  $('titleNews').style.display='';newsBadge();renderNews();
+}).catch(e=>console.warn('News unavailable:',e));
+
+/* =========================================================
    GIFTS — give ether or a legend to another player. If you gift it, you lose it.
    Signed-in players with a username only (guests are temporary). The recipient is found by username.
    Sending: your record pays (ether down by exactly the amount, or the legend out of your vault) in the
@@ -7417,13 +7565,13 @@ async function giftCollect(){
   setTimeout(giftCollect,300);
 }
 function openGift(to){
-  if(acctOpen)closeAcct();if(lbOpen)closeBoard();if(settingsOpen)closeSettings();if(SOC.open)closeFriends();
+  if(acctOpen)closeAcct();if(lbOpen)closeBoard();if(settingsOpen)closeSettings();if(SOC.open)closeFriends();closeNews();
   GIFT.open=true;GIFT.msg='';GIFT.to=to||GIFT.to||'';
   $('gfPanel').style.display='block';$('acctScrim').style.display='block';renderGift();
 }
 function closeGift(){
   if(!GIFT.open)return;GIFT.open=false;$('gfPanel').style.display='none';
-  if(!acctOpen&&!lbOpen&&!SOC.open)$('acctScrim').style.display='none';
+  if(!acctOpen&&!lbOpen&&!SOC.open&&!NEWS_UI.open)$('acctScrim').style.display='none';
 }
 function renderGift(){
   if(!GIFT.open)return;
