@@ -1384,7 +1384,10 @@ function cleanSave(raw,isLocal){
   /* ash and legend upgrades (also kept in the cloud inside stats, like combined legends) */
   const ash=typeof src.ash==='number'?src.ash:(src.stats&&typeof src.stats.ash==='number')?src.stats.ash:0;
   if(isFinite(ash))out.ash=Math.max(0,Math.min(1e7,Math.floor(ash)));
-  const ups=(src.ups&&typeof src.ups==='object')?src.ups:(src.stats&&src.stats.ups&&typeof src.stats.ups==='object')?src.stats.ups:{};
+  let ups=(src.ups&&typeof src.ups==='object')?src.ups:(src.stats&&src.stats.ups&&typeof src.stats.ups==='object')?src.stats.ups:{};
+  /* the cloud keeps them as a list of 'id:level' (a list is replaced whole on save, so a level
+     dropped here — a legend gifted away — never comes back from an old copy of the map) */
+  if(Array.isArray(ups)){const o={};ups.forEach(x=>{const m=/^([a-z0-9_]{1,40}):(\d{1,2})$/.exec(String(x));if(m)o[m[1]]=+m[2];});ups=o;}
   Object.keys(ups).forEach(id=>{const l=ups[id];
     if(BYID[id]&&!BYID[id].combo&&id!=='god'&&out.unlocked.indexOf(id)>=0&&typeof l==='number'&&isFinite(l)&&l>=1)
       out.ups[id]=Math.min(UP_MAX,Math.floor(l));});
@@ -1444,7 +1447,10 @@ function comboSync(list){
 }
 let save=cleanSave(readLocal(LS_KEY),true);
 comboSync(save.combos);
-function saveNow(){try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
+function saveNow(){
+  /* a legend that has left this save (gifted away) takes its upgrades with it: whoever owns it next starts at level 0 */
+  if(save.ups)Object.keys(save.ups).forEach(id=>{if(save.unlocked.indexOf(id)<0)delete save.ups[id];});
+  try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
 saveNow();
 const isUnlocked=id=>id==='god'?GOD.ok:(BYID[id]&&BYID[id].combo)?true:save.unlocked.indexOf(id)>=0;
 const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id);
@@ -6025,7 +6031,7 @@ function cloudPush(create){
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
     pending:save.pending.map(e=>({l:e.l,n:e.n})),music:save.music,lastDay:save.lastDay,v:SAVE_V,
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
-      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),ash:save.ash||0,ups:Object.assign({},save.ups)}),
+      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id])}),
     live:liveNow()};
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
     .then(()=>{lastSync=Date.now();syncBad=false;updateAcctLive();})
