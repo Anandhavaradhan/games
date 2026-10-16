@@ -15,6 +15,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-16-backstory-freeze',
+    date: '2026-10-16',
+    tag: 'FIX',
+    title: 'Backstory no longer freezes',
+    body: 'The backstory could stop on its first picture while the sound carried on. It now plays through. ' +
+      'It also follows your Camera motion setting: with it set to reduced, the camera holds still.'
+  },
+  {
     id: '2026-10-16-ash-upgrades',
     date: '2026-10-16',
     tag: 'NEW',
