@@ -5,6 +5,7 @@
     cloud.js            accounts, cloud saves, live status and the leaderboard (Firebase)
     multiplayer.js      CO-OP: rooms, presence and live sync over Firebase Realtime Database
     lobby.html          CO-OP: make / join a room before the night starts (index.html?room=CODE)
+    backstory.js        the opening cinematic (see BACKSTORY below for when it plays)
     firebase-config.js  which Firebase project to talk to
   Without those two files (or opened straight from disk) the game still runs, as a guest.
 
@@ -108,6 +109,7 @@
   /* on a tablet the icons sit on an arc round the bottom-right buttons (positions set in godArc) */
   body.godp #trowGod{display:block;position:absolute;right:0;bottom:0;width:0;height:0;pointer-events:none}
   #trowGod .gpi{position:absolute}
+  #trowGod.n5 .gpi.tbtn:not(.combo):not(.mini){width:52px;height:52px;font-size:8px}
   #godess{display:none;margin-top:6px}
   body.godp #godess{display:block}
   .ge{display:flex;align-items:center;gap:6px;margin-top:3px}
@@ -153,6 +155,7 @@
   #mpBanner{margin-top:18px;max-width:560px;padding:12px 18px;border:1px solid #3a3630;background:rgba(10,12,18,.6);font-size:15px;line-height:1.6;color:#a89f8a}
   #mpBanner b{font-weight:normal;color:#ffbe6f;letter-spacing:3px}
   body.mp #titleCoop,body.mp #titleBoard{display:none}
+  body.mp #titleVersion{display:none}
   /* ===== ACCOUNT PANEL ===== */
   #frPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:27;width:min(460px,94vw);
     max-height:88vh;overflow-y:auto;display:none;background:rgba(10,10,14,.96);border:1px solid rgba(160,150,130,.25);padding:22px 20px 16px}
@@ -178,6 +181,15 @@
   .fradd{display:flex;gap:8px;align-items:center}.fradd input{flex:1;min-width:0}
   .frnote{font-size:13px;color:#7d7663;font-style:italic;margin-top:8px}
   .frmsg{font-size:13px;margin-top:8px;color:#d98b7a}.frmsg.ok{color:#9fd18a}
+  /* gifting ether and legends */
+  #gfPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:27;width:min(460px,94vw);
+    max-height:88vh;overflow-y:auto;display:none;background:rgba(10,10,14,.96);border:1px solid rgba(160,150,130,.25);padding:22px 20px 16px}
+  #gfPanel h3{font-family:'Cormorant SC',serif;letter-spacing:4px;font-size:17px;color:#d8cfb6;margin-bottom:14px;text-align:center}
+  #gfClose{margin-top:14px;text-align:center;cursor:pointer;font-family:'Cormorant SC',serif;letter-spacing:3px;color:#8f8874;font-size:13px}
+  .gftabs{display:flex;gap:8px}.gftabs .frbtn{flex:1;text-align:center}.gftabs .frbtn.on{color:#ffbe6f;border-color:rgba(255,190,111,.55);background:rgba(255,190,111,.08)}
+  .gflist{max-height:240px;overflow-y:auto}
+  .gflist .frrow{cursor:pointer}.gflist .frrow.on{background:rgba(255,190,111,.1)}
+  .gfwarn{font-size:13px;color:#ffbe6f;margin-top:10px;text-align:center}
   #specBar,#watchBar{display:none;position:absolute;left:50%;transform:translateX(-50%);z-index:20;align-items:center;gap:10px;
     background:rgba(8,8,12,.78);border:1px solid rgba(160,150,130,.25);padding:8px 12px;max-width:94vw}
   #specBar{bottom:22px}#watchBar{top:14px}
@@ -727,6 +739,11 @@
     <div id="frBody"></div>
     <div id="frClose">CLOSE</div>
   </div>
+  <div id="gfPanel" role="dialog" aria-label="Send a gift">
+    <h3>SEND A GIFT</h3>
+    <div id="gfBody"></div>
+    <div id="gfClose">CLOSE</div>
+  </div>
   <!-- spectating: a teammate after you are taken (co-op), or a friend (index.html?watch=UID) -->
   <div id="specBar"><span class="sbtn" id="specPrev">&#9664;</span><div class="stext"><b id="specName"></b><span id="specSub"></span></div><span class="sbtn" id="specNext">&#9654;</span></div>
   <div id="watchBar"><div class="stext"><b id="watchName"></b><span id="watchSub"></span></div><span class="sbtn wide" id="watchLeave">LEAVE</span></div>
@@ -803,12 +820,14 @@
       <b>HIDE</b> tucks you into a nearby wardrobe or crate — safe, but you can't move until you tap it again<br>
       <b>HEART</b> shifts only you back to the Heart (blocked while the thing is near) &nbsp;·&nbsp; <b>⚙</b> settings
     </div>
-    <button id="btnVault" class="ovbtn">THE VAULT — 40 LEGENDS</button>
+    <button id="btnVault" class="ovbtn">THE VAULT — 41 LEGENDS</button>
     <button id="titleAccount" class="ovbtn">ACCOUNT</button>
     <button id="titleBoard" class="ovbtn">LEADERBOARD</button>
     <button id="titleFriends" class="ovbtn">FRIENDS</button>
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
+    <button id="titleStory" class="ovbtn">THE BACKSTORY</button>
     <button id="titleCoop" class="ovbtn">CO-OP — PLAY WITH FRIENDS</button>
+    <button id="titleVersion" class="ovbtn" onclick="event.stopPropagation();location.href='../HOLLOWMERE/index.html'">SWITCH VERSION — PLAY THE ORIGINAL (V1)</button>
     <button id="titleLeave" class="ovbtn" style="display:none">LEAVE CO-OP — BACK TO THE TITLE</button>
     <div class="diffRow" data-where="title"></div>
     <div id="mpBanner" style="display:none"></div>
@@ -865,7 +884,7 @@
     <div id="vHead">
       <div id="vTitle">THE VAULT OF LEGENDS</div>
       <div id="vWallet"><svg class="eg" viewBox="0 0 24 24" aria-hidden="true"><use href="#ethglyph"/></svg>
-        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/40</div>
+        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/<span id="vTotal">41</span></div>
       <div id="vClose">CLOSE</div>
     </div>
     <div id="vClaim" style="display:none"></div>
@@ -902,11 +921,12 @@ setTimeout(function(){
   }
 },8000);
 </script>
+<script src="backstory.js"></script>
 <script type="module">
 /* =====================================================================
    FILE MAP  (search for the banner text to jump to a section)
      BOOT ............ error reporting, three.js loaded from a CDN with fallbacks
-     VAULT OF LEGENDS  the 40 legends: stats, looks, abilities
+     VAULT OF LEGENDS  the 41 legends: stats, looks, abilities
      SAVE ............ local save format, cleaning, league progression
      CONSTANTS & MAPS  the four floors as text maps, stairs, nav graph, pathfinding
      THREE SETUP ..... renderer + post pass, generated PBR surfaces, the house, furniture, light pool, flashlight
@@ -1010,7 +1030,7 @@ const DF=()=>DIFFS[runDiff]||DIFFS.normal;
 const SOLO_RANKED=!MP&&NF_WANT===4;
 
 /* =========================================================
-   THE VAULT OF LEGENDS  —  40 ghosts, ported into the manor
+   THE VAULT OF LEGENDS  —  41 ghosts, ported into the manor
    st   = [MIGHT, GRACE, WITS, SPIRIT] (remapped in computePS)
    look = how the spectral mannequin is dressed
    ab.k = which ability primitive it fires in the manor
@@ -1299,7 +1319,14 @@ const ROSTER=[
  l:'The poster says dead or alive. He rarely checks which.',
  ab:{n:'DEAD OR ALIVE',k:'reveal',cd:90,cost:30,t:-1,once:1,
  p:'Marks every ember, memory and the monster for the rest of the night. Once only.',
- d:'Tag the house once. Every ember, every memory and the thing itself stay marked for the rest of the night.'}}
+ d:'Tag the house once. Every ember, every memory and the thing itself stay marked for the rest of the night.'}},
+
+{id:'psychopomp',n:'THE PSYCHOPOMP',e:'The Last Ferry',c:'GUIDE',tier:4,pw:64.0,r:'ESCAPE',t:'#9fe0ff',
+ look:{hat:'hood',wpn:'staff',cape:1},st:[50,72,80,92],
+ l:'She has walked ten thousand souls to the door. None of them looked back.',
+ ab:{n:'LAST FERRY',k:'exit',cd:30,cost:30,
+ p:'Once every ember is gathered, carries you straight out of the house. Useless until then.',
+ d:'Pay the ferryman once the seal is broken. You are out in the rain before the thing can turn its head.'}}
 ];
 
 const BYID={};ROSTER.forEach(function(c){BYID[c.id]=c;});
@@ -1309,6 +1336,8 @@ const BYID={};ROSTER.forEach(function(c){BYID[c.id]=c;});
 const ORDER=ROSTER.slice().sort(function(a,b){
   return (a.tier-b.tier)||(a.pw-b.pw)||(ROSTER.indexOf(a)-ROSTER.indexOf(b));});
 const ORD={};ORDER.forEach(function(c,i){ORD[c.id]=i+1;});
+/* how many legends the vault holds (before combined ones and the keeper's are added) */
+const BASE_COUNT=ROSTER.length;
 /* of the free five, start on the quickest and quietest — the kindest to learn on */
 const FIRST_GHOST=FREE.slice().sort(function(a,b){return BYID[b].st[1]-BYID[a].st[1];})[0];
 const pad2=n=>String(n).padStart(2,'0');
@@ -1343,8 +1372,8 @@ async function guestFlush(force){
 setInterval(()=>guestFlush(false),60000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)guestFlush(true);});
 addEventListener('pagehide',()=>guestFlush(true));
-const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned'];
-function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,legendRuns:{}};}
+const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned','story'];
+function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
 function freshSave(){return {combos:[],ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
@@ -1390,13 +1419,13 @@ function cleanSave(raw,isLocal){
   return out;
 }
 /* =========================================================
-   COMBINED LEGENDS — fuse 2, 3 or 4 legends you own into one.
+   COMBINED LEGENDS — fuse 2 to 5 legends you own into one.
    It carries every one of their powers (each with its own essence and cooldown, fired alone or
    together, like the keeper's legend), the highest of each stat, and the look of the first one picked.
    Everyone else — co-op, the watch page, the leaderboards — sees that first legend.
    Price: 10,000 ether for two, doubling for each one more.
    ========================================================= */
-const COMBO_MAX=4,COMBO_LIMIT=20;
+const COMBO_MAX=5,COMBO_LIMIT=20;
 const comboCost=n=>10000*Math.pow(2,Math.max(0,n-2));
 const comboKey=p=>p.slice().sort().join('|');
 const shortName=c=>c.n.replace(/^THE\s+/,'');
@@ -1430,9 +1459,9 @@ const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id
    admin (admins/{uid}, which only that account can read), so nobody else ever sees it. Choosing it does
    not change save.main; everyone else — co-op, the watch page, the leaderboards, the run history —
    sees the legend it is dressed as (pub). */
-const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true]};
+const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true,true]};
 /* which powers G / the power button fire together (the ticks on the boxes), remembered on this device */
-try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length===4)GOD.sel=v.map(Boolean);}catch(e){}
+try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length>=4)GOD.sel=v.slice(0,5).map(Boolean).concat(v.length<5?[true]:[]);}catch(e){}
 function godToggle(i){const ps=curLegend().ab.parts||[];if(!ps[i]||godIsAuto(ps[i]))return;GOD.sel[i]=!GOD.sel[i];try{localStorage.setItem('hm_gsel',JSON.stringify(GOD.sel));}catch(e){}
   const n=ps[i].n;toast((GOD.sel[i]?'\u2713 ':'\u2715 ')+n+(GOD.sel[i]?' \u2014 FIRES WITH THE OTHERS':' \u2014 LEFT OUT'),1.6);}
 /* the keeper's own legend */
@@ -1445,12 +1474,12 @@ function godReset(){const a=curLegend().ab;GOD.st=a.k==='multi'?a.parts.map(()=>
 /* after the legend changes: right HUD, fresh powers */
 function multiSync(){document.body.classList.toggle('godp',godActive());godReset();}
 function godBuild(){
-  const b=BYID.bountyhunter,parts=['legionary','bountyhunter','archer','outrider'].map(id=>BYID[id].ab);
+  const b=BYID.bountyhunter,parts=['legionary','bountyhunter','archer','outrider','psychopomp'].map(id=>BYID[id].ab);
   return {id:'god',n:'GOD',e:'Keeper of the House',c:'ADMIN',tier:4,pw:100,r:b.r,t:b.t,look:b.look,st:[100,100,100,100],pub:b.id,
     l:'Only the keeper of Hollowmere walks as this.',
     ab:{n:'EVERY HAND AT ONCE',k:'multi',cd:35,cost:30,parts,
-      p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. Unerring Arrow and Horseborn each have their own essence and cooldown: fire one (keys 3\u20134, or tap its icon) or the ticked ones together (G or ALL). Hold an icon (or Alt + 3\u20134) to tick or untick it.',
-      d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once.'}};}
+      p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. The keeper\u2019s essence never runs out, so veil and burst as long as you like. Horseborn has no cooldown at all; Unerring Arrow and Last Ferry each have their own: fire one (keys 3\u20135, or tap its icon) or the ticked ones together (G or ALL). Last Ferry carries you straight out once every ember is gathered. Hold an icon (or Alt + 3\u20135) to tick or untick it.',
+      d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once \u2014 and, once the seal breaks, the ferry out.'}};}
 const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
 /* the legend everyone else sees you as */
 const pubLegend=()=>curLegend().pub||curLegend().id;
@@ -3060,14 +3089,17 @@ function godFire(i,quiet,auto){
   if(!pa||!s||state!=='play')return false;
   const say=t=>{if(!quiet)toast(t,1.5);};
   if(godIsAuto(pa)&&!auto){say(pa.n+' \u2014 AUTOMATIC');return false;}
+  /* the keeper's Horseborn has no cooldown: fire it again any time, even to top it back up while it runs */
+  const noCd=isRealGod()&&pa===BYID.outrider.ab;
   if(s.cd>0){say(pa.n+' \u2014 '+Math.ceil(s.cd)+'S');return false;}
   if(!auto&&s.ess<pa.cost){say(pa.n+' \u2014 NOT ENOUGH ESSENCE');return false;}
   if(pa.k==='ward'&&AB.ward>0){say(pa.n+' \u2014 STILL HOLDING');return false;}
-  if(pa.k==='haste'&&AB.hasteT>0){say(pa.n+' \u2014 STILL ACTIVE');return false;}
+  if(pa.k==='haste'&&AB.hasteT>0&&!noCd){say(pa.n+' \u2014 STILL ACTIVE');return false;}
   if(pa.k==='reveal'&&AB.revealT>1000){say(pa.n+' \u2014 THE HOUSE IS ALREADY MARKED');return false;}
+  if(pa.k==='exit'&&!exitReady()){if(!quiet)exitSealedToast();return false;}
   if(pa.k==='pull'){if(!pullEmber(pa.scope))return false;SFX.chime();toast(pa.n,2.2);}
   else{fireAbility(c,pa);if(MP)mpPower(pa);}
-  if(!auto)s.ess-=pa.cost;s.cd=Math.max(8,Math.round(pa.cd*PS.cdMul));AB.used++;
+  if(!auto&&!isRealGod())s.ess-=pa.cost;s.cd=noCd?0:Math.max(8,Math.round(pa.cd*PS.cdMul));AB.used++;
   return true;
 }
 function godFireAll(){
@@ -3079,7 +3111,7 @@ function godFireAll(){
 /* the admin legend's HUD: an icon per power (its ring is its cooldown, like every legend's) plus an ALL
    icon for the ticked ones together, and a thin essence bar per power under the main essence bar.
    Tap an icon: fire it alone. Hold it (half a second): tick / untick it for ALL. */
-const GOD_COL=['#ff9a8a','#ffcf8a','#d8c76a','#a8e8d8'];
+const GOD_COL=['#ff9a8a','#ffcf8a','#d8c76a','#a8e8d8','#9fe0ff'];
 function godWord(n){return n.replace(/^(THE|A|AN)\s+/,'').split(/[\s,]+/)[0].replace(/[^A-Z0-9]/g,'').slice(0,9);}
 function godIcon(i,label,col,combo){
   return '<div class="gpi tbtn abx'+(combo?' combo':'')+'" data-gp="'+i+'" style="--vt:'+col+'">'
@@ -3096,17 +3128,19 @@ function godBind(el){
       if(held){clearTimeout(held);held=null;}if(t0){t0=0;fire();}},{passive:false});
     ch.addEventListener('touchcancel',()=>{if(held){clearTimeout(held);held=null;}t0=0;});
     ch.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(e.altKey&&i>=0)godToggle(i);else fire();});});}
-/* place the icons on a quarter-circle round the bottom-right corner, ALL at the top, the four powers
-   sweeping down to the left of VEIL — clear of HEART, VEIL and BURST */
+/* place the icons on a quarter-circle round the bottom-right corner, ALL at the top, the powers
+   sweeping down to the left of VEIL — clear of HEART, VEIL and BURST. Up to four sit 17° apart;
+   five share the same sweep, a little smaller, on a slightly wider arc so they don't touch */
 function godArc(host){
   const tb=$('tbtns'),cs=getComputedStyle(tb),offR=parseFloat(cs.right)||14,offB=parseFloat(cs.bottom)||20;
-  const R=222,cr0=7,cb0=6;                       /* arc radius and centre, from the screen's bottom-right corner */
   const n=host.children.length-1;              /* the powers; ALL is the last child */
-  const place=(el,deg)=>{const a=deg*Math.PI/180,sz=el.classList.contains('combo')?64:el.classList.contains('mini')?40:58;
+  host.classList.toggle('n5',n>4);
+  const step=n>4?13:17,gap=n>4?3:0,R=n>4?246:222,cr0=7,cb0=6;   /* arc radius and centre, from the screen's bottom-right corner */
+  const place=(el,deg)=>{const a=deg*Math.PI/180,sz=el.offsetWidth||58;
     el.style.right=(cr0-R*Math.cos(a)-sz/2-offR).toFixed(1)+'px';
     el.style.bottom=(cb0+R*Math.sin(a)-sz/2-offB).toFixed(1)+'px';};
   place(host.children[n],100);
-  for(let i=n-1;i>=0;i--)place(host.children[i],100+17*(n-i));   /* last power next to ALL, the first at the end */
+  for(let i=n-1;i>=0;i--)place(host.children[i],100+gap+step*(n-i));   /* last power next to ALL, the first at the end */
 }
 function godHud(){
   const parts=curLegend().ab.parts;
@@ -3143,9 +3177,10 @@ function godHud(){
     const i=+ic.getAttribute('data-gp');if(i<0)return;
     const pa=parts[i],s=GOD.st[i];if(!pa||!s)return;
     const live=pa.k==='haste'?AB.hasteT>0:false;
-    const ready=!live&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
+    const sealed=pa.k==='exit'&&!exitReady();
+    const ready=!live&&!sealed&&s.cd<=0&&s.ess>=pa.cost;if(ready&&GOD.sel[i])anyReady=true;
     const cdMax=Math.max(8,Math.round(pa.cd*PS.cdMul)),frac=s.cd>0?Math.max(0,Math.min(1,1-s.cd/cdMax)):1;
-    ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
+    ic.className='gpi tbtn abx '+(live?'active':s.cd>0?'cool':s.ess<pa.cost||sealed?'nofuel':'ready')+(GOD.sel[i]?' pick':'');
     ic.querySelector('.ring').style.strokeDashoffset=live?RING_LEN:RING_LEN*(1-frac);
     const gt=ic.querySelector('.gt');if(gt)gt.textContent=GOD.sel[i]?'✓':'';});
   if(eb)Array.from(eb.children).forEach(row=>{const i=+row.getAttribute('data-ge'),s=GOD.st[i],pa=parts[i];if(!s)return;
@@ -4008,6 +4043,7 @@ gearBtn.addEventListener('click',e=>{e.stopPropagation();toggleSettings();});
 gearBtn.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});
 $('setClose').addEventListener('click',e=>{e.stopPropagation();closeSettings();});
 $('titleSettings').addEventListener('click',e=>{e.stopPropagation();openSettings();});
+$('titleStory').addEventListener('click',e=>{e.stopPropagation();if(state==='title')playStory(null);});
 /* clicks inside the panel (sliders included) must not fall through to advance() */
 setPanel.addEventListener('click',e=>e.stopPropagation());
 
@@ -4053,7 +4089,7 @@ if(isTouch){
 }
 addEventListener('touchstart',()=>actInput(),{passive:true});
 addEventListener('touchmove',()=>actInput(),{passive:true});
-document.addEventListener('touchmove',e=>{if(!e.target.closest('.overlay,#vaultOv,#setPanel,#acctPanel,#lbPanel,#acctScrim'))e.preventDefault();},{passive:false});
+document.addEventListener('touchmove',e=>{if(!e.target.closest('.overlay,#vaultOv,#setPanel,#acctPanel,#lbPanel,#acctScrim,#gfPanel'))e.preventDefault();},{passive:false});
 
 
 /* =========================================================
@@ -4269,6 +4305,17 @@ function doWarp(a){
   if(a.invis)AB.invisT=Math.max(AB.invisT,a.invis);
   return true;
 }
+/* the Psychopomp's ferry: only once the seal is broken (every ember gathered, the front door open) */
+const exitReady=()=>doorOpen&&got>=TOTAL_EMBERS;
+function exitSealedToast(){const left=Math.max(0,TOTAL_EMBERS-got);
+  toast(left?'THE SEAL HOLDS \u2014 '+left+' EMBER'+(left>1?'S':'')+' REMAIN':'THE DOOR IS NOT OPEN YET',2);}
+function ferryOut(col){
+  flash=settings.reduceFlash?0.4:1;
+  for(let i=0;i<40;i++)spawnPart(P.x,P.y+0.4+Math.random()*1.6,P.z,col,
+    {x:(Math.random()-.5)*1.2,y:1.5+Math.random()*2.5,z:(Math.random()-.5)*1.2},1.2,.4);
+  SFX.chime();
+  doWin();
+}
 function pullEmber(scope){
   let best=null,bs=1e9;
   embers.forEach(e=>{
@@ -4353,6 +4400,7 @@ function tryPower(){
   if(AB.cd>0){toast(a.n+' \u2014 '+Math.ceil(AB.cd)+'S',1.3);return;}
   if(P.ess<a.cost){toast('NOT ENOUGH ESSENCE',1.6);return;}
   if(a.k==='breach'&&!findBreach()){toast('NO WALL WITHIN REACH',2);return;}
+  if(a.k==='exit'&&!exitReady()){exitSealedToast();return;}
   if(a.k==='pull'){
     if(!pullEmber(a.scope))return;
     P.ess-=a.cost;AB.cd=AB.cdMax;AB.used++;SFX.chime();toast(a.n,2.2);
@@ -4442,6 +4490,7 @@ function fireAbility(c,a){
       DARK.t=a.t;SFX.thunder();
       subtitle('Every light in Hollowmere goes out at once.',3.4);
       break;
+    case'exit':ferryOut(col);break;
     case'foresight':
       AB.foreT=a.t;AB.revealT=Math.max(AB.revealT,a.t);
       M.slowT=a.t;M.slowMul=0.55;SFX.shard();
@@ -4553,7 +4602,7 @@ function updateReveal(t){
 
 /* --- HUD ------------------------------------------------------- */
 const RING_LEN=289.03;   /* 2*PI*46, the circle the outline is drawn on */
-const INSTANT_KINDS=['ward','heal','warp','pull','breach','lure'];
+const INSTANT_KINDS=['ward','heal','warp','pull','breach','lure','exit'];
 const btnHideEl=$('btnHide');
 function abInstant(){return INSTANT_KINDS.indexOf(curLegend().ab.k)>=0;}
 /* how long the ability is still doing something, in seconds */
@@ -4597,7 +4646,7 @@ function updateAbilityHUD(){
   const mode=act>0?'active'
     :(spent?'spent'
     :(AB.cd>0?'cool'
-    :(P.ess<a.cost?'nofuel':'ready')));
+    :(P.ess<a.cost||(a.k==='exit'&&!exitReady())?'nofuel':'ready')));
   /* an instant cast has no active phase, so the outline simply vanishes on
      use and the clock-sweep draws it back; a duration ability hides the
      outline and breathes an aura until its effect runs out */
@@ -4614,7 +4663,8 @@ function updateAbilityHUD(){
      act>0?((act>600?(a.k==='ward'?'HOLDING':'ACTIVE'):'ACTIVE \u00b7 '+Math.ceil(act)+'S')+(spent&&a.k!=='ward'?' \u00b7 SPENT':''))
     :spent?'SPENT'
     :AB.cd>0?('RECHARGING \u00b7 '+Math.ceil(AB.cd)+'S')
-    :(P.ess<a.cost?'NOT ENOUGH ESSENCE':'READY');
+    :(a.k==='exit'&&!exitReady()?'SEALED \u00b7 '+Math.max(0,TOTAL_EMBERS-got)+' EMBERS LEFT'
+    :P.ess<a.cost?'NOT ENOUGH ESSENCE':'READY');
   if(btnHideEl&&state!=='play')btnHideEl.style.display='none';
   let tags='';
   if(AB.invisT>0)tags+='UNSEEN ';
@@ -4682,7 +4732,7 @@ function vaultList(){
 }
 function renderVault(){
   $('vEther').textContent=save.ether;
-  $('vCount').textContent=save.unlocked.length;
+  $('vCount').textContent=save.unlocked.length;$('vTotal').textContent=BASE_COUNT;
   refreshClaims();
 
   /* --- filters --- */
@@ -4762,7 +4812,7 @@ function renderVault(){
         +' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   }
   $('vDossBody').innerHTML=
-     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':c.combo?'COMBINED \u00b7 '+c.p.length+' LEGENDS':pad2(ORD[c.id])+' / 40')+'</span><span>\u00b7</span>'
+     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':c.combo?'COMBINED \u00b7 '+c.p.length+' LEGENDS':pad2(ORD[c.id])+' / '+BASE_COUNT)+'</span><span>\u00b7</span>'
       +'<b>'+c.r+'</b></div>'
     +'<div class="vd-note">'+ROLE_NOTE[c.r]+'</div>'
     +'<div class="vd-name">'+c.n+'</div>'
@@ -4822,7 +4872,7 @@ function renderCombine(){
      '<div class="vd-tag"><span>\u2726 THE FORGE</span></div>'
     +'<div class="vd-name">COMBINE LEGENDS</div>'
     +'<div class="vd-plain">Fuse 2 to '+COMBO_MAX+' legends you own into a new one. It keeps <b>every</b> power \u2014 each with its own essence and cooldown, fired alone or together \u2014 and the highest of each stat. It looks like the first legend you pick, and that is the legend everyone else sees. Your originals stay yours.</div>'
-    +'<div class="vcmb-price">'+[2,3,4].slice(0,COMBO_MAX-1).map(k=>'<span class="'+(n===k?'on':'')+'">'+k+' LEGENDS \u2014 '+comboCost(k).toLocaleString('en-IN')+'</span>').join('')+'</div>'
+    +'<div class="vcmb-price">'+[2,3,4,5].slice(0,COMBO_MAX-1).map(k=>'<span class="'+(n===k?'on':'')+'">'+k+' LEGENDS \u2014 '+comboCost(k).toLocaleString('en-IN')+'</span>').join('')+'</div>'
     +'<div class="vd-label">YOUR LEGENDS \u2014 TAP TO PICK, IN ORDER</div>'
     +'<div class="vcmb-list">'+owned.map(c=>{const k=vCmbPick.indexOf(c.id);
         return '<span class="vcmb-pick'+(k>=0?' on':(n>=COMBO_MAX?' full':''))+'" data-cp="'+c.id+'" style="--pt:'+c.t+'">'+(k>=0?'<b>'+(k+1)+'</b>':'')+escHTML(shortName(c))+'</span>';}).join('')+'</div>'
@@ -5081,7 +5131,7 @@ function uiMusicSet(on){
   if(!UIM.on&&UIM.timer){clearInterval(UIM.timer);UIM.timer=null;}
 }
 function uiMusicTick(){
-  const want=save.music!==false&&
+  const want=save.music!==false&&!(window.HMStory&&HMStory.playing)&&
     (vaultOpen||settingsOpen||state==='title'||state==='dead'||state==='win');
   if(want!==UIM.want){UIM.want=want;uiMusicSet(want);}
 }
@@ -5536,6 +5586,7 @@ document.addEventListener('click',e=>{
 ['touchstart','touchend'].forEach(t=>document.addEventListener(t,e=>{if(e.target.closest&&e.target.closest('.diffRow'))e.stopPropagation();},{capture:true,passive:true}));
 
 function startGame(){ if(state!=='title')return;
+  if(storyDue()){playStory(startGame);return;}
   if(!MP)runDiff=settings.diff;
   try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){console.warn(e);}
   closeSettings();
@@ -5546,6 +5597,32 @@ function startGame(){ if(state!=='title')return;
   setTimeout(()=>subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor, never where they were before.'),3800);
   setTimeout(()=>subtitle('Something else walks these floors. Listen to its steps.'),8200);
   heatNote();}
+/* ================= BACKSTORY =================
+   backstory.js draws the opening cinematic. It plays as you wake for your first night:
+   - a signed-in account sees it once (stats.story, kept in the cloud with the rest of stats);
+     accounts made before it existed have no stats.story, so they see it once on their next open
+   - a guest sees it on every visit (once per page load)
+   - THE BACKSTORY on the title screen replays it at any time
+   Co-op nights start on a shared clock, so it never plays automatically there. */
+let storyThisVisit=false;
+function storyDue(){
+  if(MP||storyThisVisit||!window.HMStory)return false;
+  return !cloudUser||!(save.stats.story>0);
+}
+function playStory(then){
+  if(!window.HMStory||HMStory.playing)return;
+  storyThisVisit=true;
+  try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){}
+  closeSettings();
+  try{document.exitPointerLock();}catch(e){}
+  HMStory.play({ac:AC,out:master,reduceFlash:settings.reduceFlash,onEnd(){
+    /* seen: a guest's mark goes with their progress if they make an account this visit */
+    if(!(save.stats.story>0)){save.stats.story=1;saveNow();}
+    UIM.want=null;uiMusicTick();
+    if(then)then();
+  }});
+  UIM.want=null;uiMusicTick();
+}
 function resetProgress(){
   got=0;shardsFound=0;hudEmbers();
   if(doorOpen){doorOpen=false;sealDoorCell();setDoorSealed(true);}
@@ -5926,6 +6003,7 @@ function updatePlayer(dt,t){
   else if(P.hiding)P.ess+=(PS.regen*3.2+(AB.regenT>0?14:0))*dt;
   else P.ess+=(PS.regen+(AB.regenT>0?14:0))*dt;
   P.ess=Math.max(0,Math.min(100,P.ess));
+  if(isRealGod())P.ess=100;   /* the keeper's essence never runs out */
   const sp=(P.veiling?PS.veil:P.dashing?PS.burst:PS.walk)*(AB.hasteT>0?AB.hasteMul:1);
   if(P.moving)moveEnt(P,mx*sp,mz*sp,dt);
   if(dashGain)dashGain.gain.value+=((P.dashing?0.05:0)-dashGain.gain.value)*0.15;
@@ -6243,6 +6321,8 @@ function liveNow(){
 function cloudPush(create){
   if(!cloud||!cloudUser)return Promise.resolve();
   clearTimeout(cloudTimer);cloudTimer=null;
+  /* a gift is being sent or collected: its own write changes ether / legends, so wait for it */
+  if(typeof GIFT!=='undefined'&&GIFT.busy){cloudSaveSoon();return Promise.resolve();}
   const st=save.stats;
   const data={name:cloudUser.name,email:cloudUser.email||'',provider:cloudUser.provider||'',
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
@@ -6303,7 +6383,7 @@ async function applyUser(u){
     loadFailed=false;
     if(cloudUser){
       clearTimeout(cloudTimer);cloudTimer=null;
-      socialStop();godDisable();cloudUser=null;saveKey=LS_KEY;ptReset();
+      socialStop();giftStop();godDisable();cloudUser=null;saveKey=LS_KEY;ptReset();
       replaceSave(cleanSave(readLocal(LS_KEY),true));
       toast('SIGNED OUT \u2014 PLAYING AS A GUEST',2.6);
     }
@@ -6335,6 +6415,7 @@ async function applyUser(u){
   await ensureUsername();   /* every account has one unique username before it can post anywhere */
   ptLoad();      /* this player's entry on the most-time-played board */
   socialStart(); /* friends, and what they can see of you */
+  giftStart();   /* gifts other players sent while you were away */
   godCheck();
   toast((isNew?'ACCOUNT CREATED \u2014 ':'WELCOME BACK \u2014 ')+u.name.toUpperCase(),2.8);
   renderAcct();
@@ -6442,7 +6523,7 @@ function renderAcct(){
        :'<span class="aclink" data-act="rename">Change username</span>')
      +'<div class="acstats">'
      +'<div>Ether<b>'+save.ether+'</b></div>'
-     +'<div>Legends<b>'+save.unlocked.length+' / 40</b></div>'
+     +'<div>Legends<b>'+save.unlocked.length+' / '+BASE_COUNT+'</b></div>'
      +'<div>Escapes<b>'+save.escapes+'</b></div>'
      +'<div>Best night<b>'+(st.bestTime?fmtTime(st.bestTime):'\u2014')+'</b></div>'
      +'<div>Deaths<b>'+st.deaths+'</b></div>'
@@ -7301,7 +7382,7 @@ function specCamera(dt,t){
   el.addEventListener('click',e=>{e.stopPropagation();specNext(i?1:-1);});
   el.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});});
 addEventListener('keydown',e=>{
-  const m=/^Digit([1-4])$/.exec(e.code);
+  const m=/^Digit([1-5])$/.exec(e.code);
   if(m&&godActive()&&state==='play'&&!settingsOpen&&!vaultOpen&&!e.repeat){e.preventDefault();
     if(e.altKey)godToggle(+m[1]-1);else godFire(+m[1]-1,false);}});
 addEventListener('keydown',e=>{if(!SPEC.on)return;
@@ -7437,8 +7518,10 @@ function renderFriends(){
       return '<div class="frrow"><div class="who"><b>'+escHTML(f.name)+'</b><span class="'+cls+'">'+escHTML(txt)+'</span></div>'
         +(v&&!MP?'<span class="frbtn go" data-fr="invite" data-u="'+escHTML(f.uid)+'">INVITE</span>':'')
         +(v&&v.st==='night'?'<span class="frbtn go" data-fr="watch" data-u="'+escHTML(f.uid)+'">WATCH</span>':'')
+        +'<span class="frbtn go" data-fr="gift" data-u="'+escHTML(f.uid)+'">GIFT</span>'
         +'<span class="frbtn no" data-fr="remove" data-u="'+escHTML(f.uid)+'">REMOVE</span></div>';}).join('')
       :'<p class="frnote">No friends yet. Add someone by their username above.</p>';
+    h+='<div class="frsec">GIFTS</div><div class="fradd"><span class="frnote" style="flex:1;margin:0">Give ether or a legend to any player. What you give leaves your vault.</span><span class="frbtn go" data-fr="gift">SEND A GIFT</span></div>';
     h+='<p class="frnote">Friends can see when you are online, watch your nights live and invite you into their co-op room. Only your friends can. INVITE makes a room and asks them in.</p>';
   }
   const keep=$('frName')?$('frName').value:'';
@@ -7476,6 +7559,9 @@ async function frAction(act,u){
       if(MP){frMsg('You are already in a co-op night.');return;}
       if(state==='play'||state==='caught'){frMsg('Finish or leave your own night first.');return;}
       (window.hmKeepTab&&window.hmKeepTab()),location.href='lobby.html?invite='+encodeURIComponent(u)+(DEBUG?'&debug=1':'');
+    }else if(act==='gift'){
+      const f=u?SOC.friends.find(x=>x.uid===u):null;
+      openGift(f?f.name:'');
     }else if(act==='watch'){
       const v=SOC.pres[u];if(!v)return;
       if(state==='play'||state==='caught'){frMsg('Finish or leave your own night first.');return;}
@@ -7490,6 +7576,147 @@ $('frPanel').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Ente
 $('frClose').addEventListener('click',e=>{e.stopPropagation();closeFriends();});
 $('titleFriends').addEventListener('click',e=>{e.stopPropagation();openFriends();});
 $('acctScrim').addEventListener('click',()=>closeFriends());
+
+/* =========================================================
+   GIFTS — give ether or a legend to another player. If you gift it, you lose it.
+   Signed-in players with a username only (guests are temporary). The recipient is found by username.
+   Sending: your record pays (ether down by exactly the amount, or the legend out of your vault) in the
+   same write that creates gifts/{id}; firestore.rules refuse any gift that was not paid for.
+   Collecting: the recipient's game watches gifts sent to it and adds each one to its own record in the
+   same write that deletes the gift, so a gift is collected once and only once.
+   What can be gifted: ether, and any legend you bought. Not the free five (everyone has them), not the
+   keeper's GOD legend, not a combined legend, and not a legend fused into one of your combined legends
+   (giving it away would break the combined legend you paid for).
+   A legend the recipient already has turns into its price in ether instead.
+   ========================================================= */
+/* var, not const: cloudPush (earlier in the file) checks it before this line has run */
+var GIFT={unsub:null,uid:'',busy:false,open:false,kind:'ether',to:'',amt:'',legend:'',msg:'',msgOk:false,done:{}};
+const GIFT_MAX=1000000;
+function giftStart(){
+  if(!cloud||!cloudUser||cloudUser.anon||WATCH||typeof cloud.watchGifts!=='function')return;
+  if(GIFT.uid===cloudUser.uid)return;
+  giftStop();
+  GIFT.uid=cloudUser.uid;
+  GIFT.unsub=cloud.watchGifts(GIFT.uid,list=>{GIFT.waiting=list;giftCollect();});
+}
+function giftStop(){
+  if(GIFT.unsub){try{GIFT.unsub();}catch(e){}GIFT.unsub=null;}
+  GIFT.uid='';GIFT.waiting=[];GIFT.done={};closeGift();
+}
+/* legends you may give away right now */
+function giftable(){
+  const fused={};(save.combos||[]).forEach(x=>x.p.forEach(id=>{fused[id]=1;}));
+  return ORDER.filter(c=>!c.combo&&c.id!=='god'&&FREE.indexOf(c.id)<0&&!fused[c.id]&&save.unlocked.indexOf(c.id)>=0);
+}
+async function giftCollect(){
+  if(GIFT.busy||!cloudUser||GIFT.uid!==cloudUser.uid)return;
+  const g=(GIFT.waiting||[]).find(x=>!GIFT.done[x.id]);
+  if(!g)return;
+  const me=cloudUser.uid;
+  GIFT.busy=true;GIFT.done[g.id]=1;
+  let ether=0,legend='',what='';
+  if(g.kind==='legend'&&BYID[g.legend]&&!BYID[g.legend].combo&&g.legend!=='god'){
+    if(save.unlocked.indexOf(g.legend)<0){legend=g.legend;what=BYID[g.legend].n;}
+    else{ether=TIER_COST[BYID[g.legend].tier]||0;what=BYID[g.legend].n+' (already yours — '+ether+' ether instead)';}
+  }else if(g.kind==='ether'&&g.n>0){ether=Math.floor(g.n);what=ether+' ether';}
+  try{
+    await cloud.claimGift(me,g.id,ether,legend);
+    if(cloudUser&&cloudUser.uid===me){
+      if(ether)save.ether+=ether;
+      if(legend&&save.unlocked.indexOf(legend)<0)save.unlocked.push(legend);
+      saveNow();if(vaultOpen)renderVault();
+      if(what){SFX.chime();toast('✦ '+String(g.fromName||'A PLAYER').toUpperCase()+' GIFTED YOU '+what.toUpperCase(),4.5);}
+    }
+  }catch(e){console.warn('Gift not collected:',e);   /* already collected (another tab) or offline: try again later */
+    setTimeout(()=>{delete GIFT.done[g.id];giftCollect();},30000);}
+  finally{GIFT.busy=false;}
+  if(GIFT.open)renderGift();
+  setTimeout(giftCollect,300);
+}
+function openGift(to){
+  if(acctOpen)closeAcct();if(lbOpen)closeBoard();if(settingsOpen)closeSettings();if(SOC.open)closeFriends();
+  GIFT.open=true;GIFT.msg='';GIFT.to=to||GIFT.to||'';
+  $('gfPanel').style.display='block';$('acctScrim').style.display='block';renderGift();
+}
+function closeGift(){
+  if(!GIFT.open)return;GIFT.open=false;$('gfPanel').style.display='none';
+  if(!acctOpen&&!lbOpen&&!SOC.open)$('acctScrim').style.display='none';
+}
+function renderGift(){
+  if(!GIFT.open)return;
+  const el=$('gfBody');let h='';
+  if(!cloud)h='<p class="acnote">Gifts need accounts switched on for this copy of the game.</p>';
+  else if(!cloudUser)h='<p class="acnote">Sign in (the ACCOUNT button) to send gifts. Guests are temporary and cannot gift or receive.</p>';
+  else if(!canPost())h='<p class="acnote">Choose a username in your account first.</p>';
+  else{
+    const list=giftable();
+    if(GIFT.legend&&!list.some(c=>c.id===GIFT.legend))GIFT.legend='';
+    h+='<div class="frsec">TO</div><input class="acin" id="gfTo" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Their username" value="'+escHTML(GIFT.to)+'">';
+    h+='<div class="frsec">WHAT</div><div class="gftabs"><span class="frbtn'+(GIFT.kind==='ether'?' on':'')+'" data-gf="kind" data-k="ether">ETHER</span>'
+      +'<span class="frbtn'+(GIFT.kind==='legend'?' on':'')+'" data-gf="kind" data-k="legend">A LEGEND</span></div>';
+    if(GIFT.kind==='ether'){
+      h+='<input class="acin" id="gfAmt" type="number" inputmode="numeric" min="1" max="'+Math.min(GIFT_MAX,save.ether)+'" placeholder="How much ether" value="'+escHTML(GIFT.amt)+'">'
+        +'<p class="frnote">You have <b>'+save.ether+'</b> ether.</p>';
+    }else{
+      h+=list.length?'<div class="gflist">'+list.map(c=>'<div class="frrow'+(GIFT.legend===c.id?' on':'')+'" data-gf="pick" data-l="'+c.id+'"><div class="who"><b>'+escHTML(c.n)+'</b><span>'
+          +escHTML(c.r)+(save.main===c.id&&!(GOD.on&&GOD.ok)?' · bound now':'')+'</span></div>'+(GIFT.legend===c.id?'<span class="frbtn go">✓</span>':'')+'</div>').join('')+'</div>'
+        :'<p class="frnote">You have no legend you can give. The free five, combined legends and legends fused into one cannot be gifted.</p>';
+    }
+    h+='<p class="gfwarn">If you gift it, you lose it. It leaves your vault for good.</p>'
+      +'<div class="fradd" style="justify-content:center;margin-top:10px"><span class="frbtn go" data-gf="send">'+(GIFT.busy?'SENDING…':'SEND GIFT')+'</span></div>'
+      +'<div class="frmsg'+(GIFT.msgOk?' ok':'')+'" id="gfMsg">'+escHTML(GIFT.msg)+'</div>';
+  }
+  el.innerHTML=h;
+}
+function gfMsg(t,ok){GIFT.msg=t||'';GIFT.msgOk=!!ok;const m=$('gfMsg');if(m){m.textContent=GIFT.msg;m.classList.toggle('ok',GIFT.msgOk);}}
+async function giftSend(){
+  if(GIFT.busy||!canPost())return;
+  if(state==='play'||state==='caught'){gfMsg('Finish or leave your night first.');return;}
+  const nm=(GIFT.to||'').replace(/\s+/g,' ').trim();
+  if(!nm){gfMsg('Type their username.');return;}
+  let n=0,c=null;
+  if(GIFT.kind==='ether'){
+    n=Math.floor(Number(GIFT.amt));
+    if(!(n>=1)){gfMsg('Type how much ether to send.');return;}
+    if(n>GIFT_MAX){gfMsg('At most '+GIFT_MAX+' ether in one gift.');return;}
+    if(n>save.ether){gfMsg('You only have '+save.ether+' ether.');return;}
+  }else{
+    c=BYID[GIFT.legend];
+    if(!c||!giftable().some(x=>x.id===c.id)){gfMsg('Pick a legend to send.');return;}
+  }
+  const me=cloudUser.uid,my=cloudUser.name;
+  GIFT.busy=true;renderGift();
+  try{
+    const own=await cloud.usernameOwner(nm);
+    if(!own){gfMsg('No player has the username "'+nm+'".');return;}
+    if(own.uid===me){gfMsg('You cannot gift yourself.');return;}
+    const what=c?c.n:n+' ether';
+    if(!confirm('Give '+what+' to '+own.name+'?\n\nIf you gift it, you lose it. This cannot be undone.'))return;
+    /* make sure the account holds what this device holds before paying from it */
+    GIFT.busy=false;await cloudPush();GIFT.busy=true;
+    if(syncBad){gfMsg('Your account is not synced yet. Try again in a moment.');return;}
+    await cloud.sendGift(me,my,own.uid,own.name,c?'legend':'ether',n,c?c.id:'');
+    if(c){
+      const i=save.unlocked.indexOf(c.id);if(i>=0)save.unlocked.splice(i,1);
+      if(save.main===c.id)setLegend(FIRST_GHOST);
+      GIFT.legend='';
+    }else{save.ether-=n;GIFT.amt='';}
+    saveNow();if(vaultOpen)renderVault();
+    SFX.chime();
+    gfMsg(what+' is on its way to '+own.name+'.',true);
+  }catch(e){console.warn('Gift:',e);gfMsg(cloud.friendlyError(e));}
+  finally{GIFT.busy=false;renderGift();}
+}
+$('gfPanel').addEventListener('click',e=>{e.stopPropagation();
+  const b=e.target.closest('[data-gf]');if(!b)return;
+  const a=b.getAttribute('data-gf');
+  if(a==='kind'){GIFT.kind=b.getAttribute('data-k');GIFT.msg='';renderGift();}
+  else if(a==='pick'){GIFT.legend=b.getAttribute('data-l');renderGift();}
+  else if(a==='send')giftSend();});
+$('gfPanel').addEventListener('input',e=>{if(e.target.id==='gfTo')GIFT.to=e.target.value;else if(e.target.id==='gfAmt')GIFT.amt=e.target.value;});
+$('gfPanel').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&(e.target.id==='gfTo'||e.target.id==='gfAmt')){e.preventDefault();giftSend();}});
+$('gfClose').addEventListener('click',e=>{e.stopPropagation();closeGift();});
+$('acctScrim').addEventListener('click',()=>closeGift());
 
 /* =========================================================
    WATCH — index.html?watch=UID&floors=N : spectating a friend's night, live.
