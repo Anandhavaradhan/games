@@ -5,6 +5,7 @@
     cloud.js            accounts, cloud saves, live status and the leaderboard (Firebase)
     multiplayer.js      CO-OP: rooms, presence and live sync over Firebase Realtime Database
     lobby.html          CO-OP: make / join a room before the night starts (index.html?room=CODE)
+    backstory.js        the opening cinematic (see BACKSTORY below for when it plays)
     firebase-config.js  which Firebase project to talk to
   Without those two files (or opened straight from disk) the game still runs, as a guest.
 
@@ -791,6 +792,7 @@
     <button id="titleBoard" class="ovbtn">LEADERBOARD</button>
     <button id="titleFriends" class="ovbtn">FRIENDS</button>
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
+    <button id="titleStory" class="ovbtn">THE BACKSTORY</button>
     <button id="titleCoop" class="ovbtn">CO-OP — PLAY WITH FRIENDS</button>
     <button id="titleLeave" class="ovbtn" style="display:none">LEAVE CO-OP — BACK TO THE TITLE</button>
     <div class="diffRow" data-where="title"></div>
@@ -885,6 +887,7 @@ setTimeout(function(){
   }
 },8000);
 </script>
+<script src="backstory.js"></script>
 <script type="module">
 /* =====================================================================
    FILE MAP  (search for the banner text to jump to a section)
@@ -1335,8 +1338,8 @@ async function guestFlush(force){
 setInterval(()=>guestFlush(false),60000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)guestFlush(true);});
 addEventListener('pagehide',()=>guestFlush(true));
-const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned'];
-function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,legendRuns:{}};}
+const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned','story'];
+function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
 function freshSave(){return {combos:[],ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
@@ -4002,6 +4005,7 @@ gearBtn.addEventListener('click',e=>{e.stopPropagation();toggleSettings();});
 gearBtn.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});
 $('setClose').addEventListener('click',e=>{e.stopPropagation();closeSettings();});
 $('titleSettings').addEventListener('click',e=>{e.stopPropagation();openSettings();});
+$('titleStory').addEventListener('click',e=>{e.stopPropagation();if(state==='title')playStory(null);});
 /* clicks inside the panel (sliders included) must not fall through to advance() */
 setPanel.addEventListener('click',e=>e.stopPropagation());
 
@@ -5088,7 +5092,7 @@ function uiMusicSet(on){
   if(!UIM.on&&UIM.timer){clearInterval(UIM.timer);UIM.timer=null;}
 }
 function uiMusicTick(){
-  const want=save.music!==false&&
+  const want=save.music!==false&&!(window.HMStory&&HMStory.playing)&&
     (vaultOpen||settingsOpen||state==='title'||state==='dead'||state==='win');
   if(want!==UIM.want){UIM.want=want;uiMusicSet(want);}
 }
@@ -5250,6 +5254,7 @@ document.addEventListener('click',e=>{
 ['touchstart','touchend'].forEach(t=>document.addEventListener(t,e=>{if(e.target.closest&&e.target.closest('.diffRow'))e.stopPropagation();},{capture:true,passive:true}));
 
 function startGame(){ if(state!=='title')return;
+  if(storyDue()){playStory(startGame);return;}
   if(!MP)runDiff=settings.diff;
   try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){console.warn(e);}
   closeSettings();
@@ -5260,6 +5265,32 @@ function startGame(){ if(state!=='title')return;
   setTimeout(()=>subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor, never where they were before.'),3800);
   setTimeout(()=>subtitle('Something else walks these floors. Listen to its steps.'),8200);
   heatNote();}
+/* ================= BACKSTORY =================
+   backstory.js draws the opening cinematic. It plays as you wake for your first night:
+   - a signed-in account sees it once (stats.story, kept in the cloud with the rest of stats);
+     accounts made before it existed have no stats.story, so they see it once on their next open
+   - a guest sees it on every visit (once per page load)
+   - THE BACKSTORY on the title screen replays it at any time
+   Co-op nights start on a shared clock, so it never plays automatically there. */
+let storyThisVisit=false;
+function storyDue(){
+  if(MP||storyThisVisit||!window.HMStory)return false;
+  return !cloudUser||!(save.stats.story>0);
+}
+function playStory(then){
+  if(!window.HMStory||HMStory.playing)return;
+  storyThisVisit=true;
+  try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){}
+  closeSettings();
+  try{document.exitPointerLock();}catch(e){}
+  HMStory.play({ac:AC,out:master,reduceFlash:settings.reduceFlash,onEnd(){
+    /* seen: a guest's mark goes with their progress if they make an account this visit */
+    if(!(save.stats.story>0)){save.stats.story=1;saveNow();}
+    UIM.want=null;uiMusicTick();
+    if(then)then();
+  }});
+  UIM.want=null;uiMusicTick();
+}
 function resetProgress(){
   got=0;shardsFound=0;hudEmbers();
   if(doorOpen){doorOpen=false;sealDoorCell();setDoorSealed(true);}
