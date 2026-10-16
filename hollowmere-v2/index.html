@@ -133,7 +133,7 @@
   .slab{display:flex;justify-content:space-between;font-size:13px;letter-spacing:2px;color:#8f8874;margin-bottom:7px}
   .slab .sv{color:#cfc8b8}
   input[type=range]{width:100%;accent-color:#9fc4ff;height:22px}
-  #invertBtn,#flashBtn{width:100%;padding:10px 12px;border:1px solid #3a3630;background:rgba(15,17,26,.7);color:#cfc8b8;
+  #invertBtn,#flashBtn,#scareBtn,#camBtn{width:100%;padding:10px 12px;border:1px solid #3a3630;background:rgba(15,17,26,.7);color:#cfc8b8;
     font-family:'IM Fell English',serif;font-size:14px;letter-spacing:1px;cursor:pointer;text-align:center}
   #setClose{margin-top:18px;width:100%;padding:11px;border:1px solid #4a4436;background:rgba(20,18,14,.7);
     color:#e5dcc2;font-family:'Cormorant SC',serif;font-size:14px;letter-spacing:4px;cursor:pointer;text-align:center}
@@ -681,6 +681,21 @@
   #toast{white-space:normal;width:max-content;max-width:92vw;line-height:1.35}
   #subtitle{width:max-content;max-width:86vw;text-align:center}
   @media (pointer: coarse){ #esswrap{right:70px} }
+  /* ===== PHOTOSENSITIVITY (body.calm) & REDUCED MOTION =====
+     body.calm is the PHOTOSENSITIVITY setting: nothing on the page blinks or strobes. The face still
+     comes (unless JUMPSCARES is off), but it fades in and out instead of flickering. */
+  body.calm #jumpscare.go{animation:scareSoft 1.1s ease-out forwards}
+  @keyframes scareSoft{0%{opacity:0;transform:scale(1.04)}22%{opacity:.55;transform:scale(1)}65%{opacity:.45}100%{opacity:0;transform:scale(1.02)}}
+  body.calm .overlay h1,body.calm #vTitle,body.calm #essfill.low{animation:none}
+  body.calm #seen.on{animation:seenSoft 1.2s ease-out}
+  @keyframes seenSoft{0%{opacity:0}20%{opacity:1}75%{opacity:1}100%{opacity:0}}
+  #photoNote{margin-top:14px;max-width:560px;font-size:13px;line-height:1.5;color:#8f8874;font-style:italic}
+  #photoNote b{font-style:normal;font-weight:normal;color:#cfc8b8;letter-spacing:1px}
+  @media (prefers-reduced-motion: reduce){
+    #fx-grain,#vaultOv::after,#vaultOv::before,.overlay h1,#vTitle,.vsealseal,.eg,.egspin,.orb,.pulse,body.title #gearBtn{animation:none}
+    .pulse{opacity:.85}
+    .vcard,.vcard:hover{transition:none;transform:none}
+  }
 </style>
 </head>
 <body>
@@ -802,6 +817,15 @@
       <div id="flashBtn"></div>
     </div>
     <div class="srow">
+      <div class="slab"><span>JUMPSCARES</span></div>
+      <div id="scareBtn"></div>
+      <div class="gamnote">Off: the face and its scream never appear. On Nightmare the thing still finds you.</div>
+    </div>
+    <div class="srow">
+      <div class="slab"><span>CAMERA MOTION</span></div>
+      <div id="camBtn"></div>
+    </div>
+    <div class="srow">
       <div class="slab"><span>BRIGHTNESS</span><span class="sv" id="gamVal"></span></div>
       <input type="range" id="gamRange" min="0.6" max="1.8" step="0.05">
       <div class="gamnote">Turn it down until the house is dark, but you can still make out the walls a few steps away.</div>
@@ -831,6 +855,8 @@
     Fragments of your old memory are scattered too — not required, but worth finding.
     If it takes you, the embers you carried scatter back into the dark, the seal re-forms, and the Heart drags you back
     down to the cellar to begin again.</p>
+    <div id="photoNote"><b>PHOTOSENSITIVITY:</b> this game has lightning flashes, a flickering torch and a sudden face.
+      <b>⚙ SETTINGS</b> can soften the flashes, turn the face off and still the camera.</div>
     <div class="controls" id="ctrlDesktop">
       <b>W A S D</b> walk &nbsp;·&nbsp; <b>MOUSE</b> look (<b>Q / E</b> if mouse capture fails)<br>
       <b>SHIFT</b> run (loud, burns Essence) &nbsp;·&nbsp; <b>C / RIGHT MOUSE</b> creep — light cupped, silent, nearly unseen<br>
@@ -992,7 +1018,10 @@ if(!THREE){fatal('Could not load three.js from any CDN. An internet connection i
 
 const isTouch=(window.matchMedia&&matchMedia('(pointer: coarse)').matches)||('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
-const settings={sens:isTouch?1.3:1.0, invertY:false, vol:0.8, reduceFlash:false, view:'fp', gamma:1.0, quality:isTouch?'medium':'high', diff:'normal', voiceVol:1};
+/* the OS "reduce motion" switch picks the calm defaults; the settings panel can still change them */
+const PREFERS_CALM=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+const settings={sens:isTouch?1.3:1.0, invertY:false, vol:0.8, reduceFlash:PREFERS_CALM, view:'fp', gamma:1.0, quality:isTouch?'medium':'high', diff:'normal', voiceVol:1,
+  scares:true, calmCam:PREFERS_CALM};
 /* ================= DIFFICULTY =================
    speed   the thing's walking / hunting speed          sight  how far it sees you
    hear    how far your footsteps carry                 notice how long it takes to be sure it saw you (lower = faster)
@@ -1021,7 +1050,12 @@ try{const ss=JSON.parse(localStorage.getItem(SET_KEY)||'null');
     if(['high','medium','low'].indexOf(ss.quality)>=0)settings.quality=ss.quality;
     if(DIFFS[ss.diff])settings.diff=ss.diff;
     if(typeof ss.voiceVol==='number'&&isFinite(ss.voiceVol))settings.voiceVol=Math.max(0,Math.min(1,ss.voiceVol));
+    if(typeof ss.scares==='boolean')settings.scares=ss.scares;
+    if(typeof ss.calmCam==='boolean')settings.calmCam=ss.calmCam;
   }}catch(e){}
+/* body.calm: no strobing anywhere in the page (see PHOTOSENSITIVITY in the CSS) */
+function applyCalm(){document.body.classList.toggle('calm',!!settings.reduceFlash);}
+applyCalm();
 function saveSettings(){try{localStorage.setItem(SET_KEY,JSON.stringify(settings));}catch(e){}}
 
 /* ================= CO-OP BOOT =================
@@ -3677,33 +3711,38 @@ function heatNote(){const n=save.escapes|0;if(n<=0)return;
 function triggerJumpscare(){
   if(MP)return;   /* co-op: no jumpscares */
   if(AB.foreT>0||M.goneT>0||AB.invisT>0)return;
-  flickT=0.7;
-  const nv=Math.max(0.35,PS.shake);
-  jumpscareEl.classList.remove('go');void jumpscareEl.offsetWidth;jumpscareEl.classList.add('go');
-  SFX.jumpscare();flash=(settings.reduceFlash?0.6:1.4)*nv;scareShakeT=0.5*nv;
   /* Easy has none; Normal and Hard: only the face, the sound and the flash, and the thing stays
-     wherever it really is. NIGHTMARE: the teleporting jumpscare — it appears in front of you and hunts. */
-  if(DF().scare<2)return;
+     wherever it really is. NIGHTMARE: the teleporting jumpscare — it appears in front of you and hunts.
+     JUMPSCARES off in the settings: no face, no scream, no flash. On Normal / Hard that leaves nothing;
+     on Nightmare the thing still appears and hunts, announced by a sting instead of the face. */
+  const face=settings.scares,tele=DF().scare>=2;
+  if(!face&&!tele)return;
+  if(face){
+    flickT=0.7;
+    const nv=Math.max(0.35,PS.shake);
+    jumpscareEl.classList.remove('go');void jumpscareEl.offsetWidth;jumpscareEl.classList.add('go');
+    SFX.jumpscare();flash=(settings.reduceFlash?0.6:1.4)*nv;scareShakeT=0.5*nv;}
+  if(!tele)return;
+  /* where it lands: far enough away that turning and running always works */
   const fx=Math.sin(camYaw),fz=Math.cos(camYaw);
   let cx=null,cz=null;
-  for(let dist=4.6;dist>=3.2;dist-=0.3){
-    const[tcx,tcz]=cellOf(P.x+fx*dist,P.z+fz*dist);
-    if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break;}}
-  if(cx===null)for(let dist=2.8;dist>=1.6;dist-=0.3){
+  for(let dist=4.6;dist>=2.6;dist-=0.3){
     const[tcx,tcz]=cellOf(P.x+fx*dist,P.z+fz*dist);
     if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break;}}
   if(cx===null){
     const dirs=[[fz,-fx],[-fz,fx],[-fx,-fz]];
-    outer: for(const dist of [3.4,2.6,2.0]){
+    outer: for(const dist of [3.4,2.6]){
       for(const[dxn,dzn] of dirs){
         const[tcx,tcz]=cellOf(P.x+dxn*dist,P.z+dzn*dist);
         if(nodes.has(nk(P.floor,tcx,tcz))){cx=tcx;cz=tcz;break outer;}}}}
-  if(cx===null)[cx,cz]=cellOf(P.x,P.z);
+  /* no room round you (it used to land in your own cell, a death nobody could dodge): it stays put */
+  if(cx===null)return;
+  if(!face)SFX.sting();
   M.floor=P.floor;M.x=(cx+.5)*CS;M.z=(cz+.5)*CS;M.y=P.floor*FH;
   M.nodeKey=nk(P.floor,cx,cz);M.path=null;M.pathI=0;M.repathT=0;M.stepPhase=0;
   M.yaw=camYaw+Math.PI;M.state='chase';M.losLostT=0;M.lastSeen={x:P.x,z:P.z,f:P.floor};scareSpeedT=3;
-  /* scripted: RUN.spotted is only set if it then actually sees you */
-  graceT=Math.max(graceT,(PS.nerve-1)*0.9);
+  /* scripted: RUN.spotted is only set if it then actually sees you. At least a second to react. */
+  graceT=Math.max(graceT,(PS.nerve-1)*0.9,1);
   seenEl.classList.remove('on');void seenEl.offsetWidth;seenEl.classList.add('on');}
 let settingsOpen=false,suppressPause=false;
 
@@ -4005,7 +4044,11 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyV'&&state!=='play'){e.preventDefault();if(vaultOpen)closeVault();else openVault();}
   if(['ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault();});
 addEventListener('keyup',e=>keys[e.code]=false);
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')openSettings();});
+/* a key let go while the window was not looking never sends its keyup: forget every held key and
+   button, or you come back still running (and still burning essence, and still loud) */
+function releaseAll(){for(const k in keys)keys[k]=false;veilHeld=false;touchBurst=false;}
+addEventListener('blur',releaseAll);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){releaseAll();if(state==='play')openSettings();}});
 addEventListener('mousedown',e=>{if(e.button===2)veilHeld=true;});
 addEventListener('mouseup',e=>{if(e.button===2)veilHeld=false;});
 addEventListener('contextmenu',e=>e.preventDefault());
@@ -4062,7 +4105,13 @@ function toast(t,dur=3.4){toastEl.textContent=t;toastEl.style.opacity=1;
 let subT=null;
 function subtitle(t,dur=4){subEl.textContent=t;subEl.style.opacity=1;clearTimeout(subT);
   subT=setTimeout(()=>subEl.style.opacity=0,dur*1000);}
-function showOv(ov){[titleOv,deathOv,winOv,pauseOv].forEach(o=>o.classList.add('hidden'));
+/* the death and win screens ignore input for a moment after they appear, so a click or key
+   still meant for the night does not skip straight past them (see ovSettling) */
+let ovShownAt=0;
+const ovSettling=()=>(state==='dead'||state==='win')&&performance.now()-ovShownAt<900;
+function showOv(ov){
+  if(ov&&(ov===deathOv||ov===winOv)&&ov.classList.contains('hidden'))ovShownAt=performance.now();
+  [titleOv,deathOv,winOv,pauseOv].forEach(o=>o.classList.add('hidden'));
   if(ov)ov.classList.remove('hidden');}
 function setScreenState(){document.body.classList.toggle('title',state==='title');}
 {const c=document.createElement('canvas');c.width=c.height=140;const g=c.getContext('2d');
@@ -4085,7 +4134,9 @@ function syncSetUI(){
   sensRange.value=settings.sens;
   sensVal.textContent=settings.sens.toFixed(2);
   invertBtn.textContent=settings.invertY?'INVERTED \u2014 UP LOOKS DOWN':'NORMAL \u2014 UP LOOKS UP';
-  flashBtn.textContent=settings.reduceFlash?'REDUCED \u2014 DIMMER FLASHES':'NORMAL \u2014 FULL INTENSITY';
+  flashBtn.textContent=settings.reduceFlash?'REDUCED \u2014 NO STROBING, SOFT FLASHES':'NORMAL \u2014 FULL INTENSITY';
+  $('scareBtn').textContent=settings.scares?'ON \u2014 THE FACE CAN FIND YOU':'OFF \u2014 NO FACE, NO SCREAM';
+  $('camBtn').textContent=settings.calmCam?'REDUCED \u2014 NO BOB, SWAY OR SHAKE':'FULL \u2014 BOB, SWAY AND SHAKE';
   {const mb=document.getElementById('musicBtn');
    if(mb)mb.textContent=(save.music!==false)?'ON \u2014 THE HOUSE HUMS':'OFF \u2014 SILENCE IN THE MENUS';}
   $('setClose').textContent=(state==='play')?'RESUME':'CLOSE';
@@ -4101,7 +4152,9 @@ $('voiceRange').addEventListener('pointerdown',e=>e.stopPropagation());
 sensRange.addEventListener('input',()=>{settings.sens=parseFloat(sensRange.value);sensVal.textContent=settings.sens.toFixed(2);saveSettings();});
 sensRange.addEventListener('pointerdown',e=>e.stopPropagation());
 invertBtn.addEventListener('click',e=>{e.stopPropagation();settings.invertY=!settings.invertY;saveSettings();syncSetUI();});
-flashBtn.addEventListener('click',e=>{e.stopPropagation();settings.reduceFlash=!settings.reduceFlash;saveSettings();syncSetUI();});
+flashBtn.addEventListener('click',e=>{e.stopPropagation();settings.reduceFlash=!settings.reduceFlash;saveSettings();syncSetUI();applyCalm();});
+$('scareBtn').addEventListener('click',e=>{e.stopPropagation();settings.scares=!settings.scares;saveSettings();syncSetUI();});
+$('camBtn').addEventListener('click',e=>{e.stopPropagation();settings.calmCam=!settings.calmCam;saveSettings();syncSetUI();});
 $('gamRange').addEventListener('input',()=>{settings.gamma=parseFloat($('gamRange').value);$('gamVal').textContent=Math.round(settings.gamma*100)+'%';saveSettings();});
 $('gamRange').addEventListener('pointerdown',e=>e.stopPropagation());
 $('viewBtn').addEventListener('click',e=>{e.stopPropagation();settings.view=settings.view==='tp'?'fp':'tp';saveSettings();syncSetUI();
@@ -5420,8 +5473,9 @@ function startGame(){ if(state!=='title')return;
   resetRun();refreshLegendHUD();
   skipFloorToast=true;toast('THE HEART OF HOLLOWMERE \u00b7 '+DF().n,3.5);
   cloudPush();
-  setTimeout(()=>subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor, never where they were before.'),3800);
-  setTimeout(()=>subtitle('Something else walks these floors. Listen to its steps.'),8200);
+  /* (only if the night is still going: not over the title screen after a quick quit) */
+  setTimeout(()=>{if(state==='play')subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor, never where they were before.');},3800);
+  setTimeout(()=>{if(state==='play')subtitle('Something else walks these floors. Listen to its steps.');},8200);
   heatNote();}
 /* ================= BACKSTORY =================
    backstory.js draws the opening cinematic. It plays as you wake for your first night:
@@ -5483,7 +5537,7 @@ function threatInfo(){
   return chase?'chase':near?'near':'';}
 function tryHeart(){
   if(vaultOpen)return;
-  if(state==='dead')riseOrRestart();
+  if(state==='dead'){if(!ovSettling())riseOrRestart();}
   else if(state==='play'){
     if(settingsOpen&&!MP)return;
     const th=threatInfo();
@@ -5594,6 +5648,7 @@ function mpTeamCheck(){
 }
 function advance(){
   if(vaultOpen)return;
+  if(ovSettling())return;
   if(lbOpen){closeBoard();return;}
   if(acctOpen){closeAcct();return;}
   if(settingsOpen){closeSettings();return;}
@@ -5897,8 +5952,9 @@ let flash=0,lightT=6,hbT=0,whT=18,dangerLevel=0,fireEmberT=0,lf=0;
 const _tint=new THREE.Color(),_white=new THREE.Color(0xdfe6f0),_v2=new THREE.Vector2();
 function updateFX(dt,t){
   flash*=Math.pow(0.001,dt);
-  /* lightning lights the rooms through the windows; the screen flash is only a touch now */
-  lf=flash>0.015?flash*(0.55+0.45*Math.abs(Math.sin(t*47)))*(Math.random()<0.1?0.3:1):0;
+  /* lightning lights the rooms through the windows; the screen flash is only a touch now.
+     Its shimmer is a ~15 Hz strobe, so with PHOTOSENSITIVITY reduced the light just rises and fades. */
+  lf=flash>0.015?(settings.reduceFlash?flash*0.45:flash*(0.55+0.45*Math.abs(Math.sin(t*47)))*(Math.random()<0.1?0.3:1)):0;
   flashEl.style.opacity=lf*(settings.reduceFlash?0.03:0.09);
   lightT-=dt;if(lightT<=0){lightT=10+Math.random()*16;flash=settings.reduceFlash?0.4:1;window.__thunderAt=t+0.7+Math.random()*1.8;}
   if(window.__thunderAt&&t>window.__thunderAt){window.__thunderAt=0;SFX.thunder();}
@@ -5985,8 +6041,8 @@ function updateCamera(dt,t){
     if(FP()){const d=Math.max(0.42,1.1-caughtT*0.55);_cp.set(_hd.x+fx*d,_hd.y-0.02,_hd.z+fz*d);}
     else _cp.copy(_hd).add(new THREE.Vector3(Math.sin(fy+2.6),0.25,Math.cos(fy+2.6)).multiplyScalar(1.6));
     camera.position.lerp(_cp,Math.min(1,dt*(FP()?9:6)));
-    const sh=FP()?0.02+caughtT*0.01:0;camera.position.x+=(Math.random()-.5)*sh;camera.position.y+=(Math.random()-.5)*sh;
-    camera.lookAt(_hd.x,_hd.y-0.03,_hd.z);camera.rotation.z+=Math.sin(t*3)*0.05;
+    const calm=settings.calmCam,sh=FP()&&!calm?0.02+caughtT*0.01:0;camera.position.x+=(Math.random()-.5)*sh;camera.position.y+=(Math.random()-.5)*sh;
+    camera.lookAt(_hd.x,_hd.y-0.03,_hd.z);if(!calm)camera.rotation.z+=Math.sin(t*3)*0.05;
     camera.fov+=((FP()?54:90)-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();
     FLASH.level+=((0.6+Math.random()*0.4)-FLASH.level)*Math.min(1,dt*10);updateFlashlight(dt,t);return;}
   /* a step every ~0.75 m, two per bob cycle — heard in either view */
@@ -6001,23 +6057,25 @@ function updateCamera(dt,t){
     if(updateCamera._lastPy===undefined)updateCamera._lastPy=P.y;
     if(updateCamera._lastPy-P.y>0.05&&state==='play'&&!P.hiding){updateCamera._landT=0.35;SFX.step(0.35*(P.dashing?1:0.6),0);}
     updateCamera._lastPy=P.y;
-    if(updateCamera._landT>0){updateCamera._landT-=dt;bobAmt+=updateCamera._landT*0.18;}
-    const ba=P.moving?(P.dashing?0.075:P.veiling?0.026:0.055):0;bobAmt+=(ba-bobAmt)*Math.min(1,dt*6);
+    /* CAMERA MOTION reduced: no head bob, sway, roll, shake or sprint zoom (steps still sound) */
+    const calm=settings.calmCam;
+    if(updateCamera._landT>0){updateCamera._landT-=dt;if(!calm)bobAmt+=updateCamera._landT*0.18;}
+    const ba=P.moving&&!calm?(P.dashing?0.075:P.veiling?0.026:0.055):0;bobAmt+=(ba-bobAmt)*Math.min(1,dt*6);
     const fx=Math.sin(camYaw),fz=Math.cos(camYaw),rx=-Math.cos(camYaw),rz=Math.sin(camYaw);
-    const lat=Math.sin(bobPh)*bobAmt*0.6,up=-Math.abs(Math.sin(bobPh))*bobAmt+Math.sin(t*1.7)*0.006;
+    const lat=Math.sin(bobPh)*bobAmt*0.6,up=-Math.abs(Math.sin(bobPh))*bobAmt+(calm?0:Math.sin(t*1.7)*0.006);
     _cp.set(P.x+rx*lat,P.y+eyeH+up,P.z+rz*lat);
     if(P.hiding)_cp.addScaledVector(new THREE.Vector3(fx,0,fz),-0.15);
     let jx=0,jy=0;
-    if(state==='play'&&dangerLevel>0.02){const sh=dangerLevel*(M.state==='chase'?0.012:0.004);jx=(Math.random()-.5)*sh;jy=(Math.random()-.5)*sh;}
-    if(scareShakeT>0){scareShakeT-=dt;const ss=Math.min(1,scareShakeT/0.5)*0.06;jx+=(Math.random()-.5)*ss;jy+=(Math.random()-.5)*ss;}
+    if(state==='play'&&dangerLevel>0.02&&!calm){const sh=dangerLevel*(M.state==='chase'?0.012:0.004);jx=(Math.random()-.5)*sh;jy=(Math.random()-.5)*sh;}
+    if(scareShakeT>0){scareShakeT-=dt;const ss=calm?0:Math.min(1,scareShakeT/0.5)*0.06;jx+=(Math.random()-.5)*ss;jy+=(Math.random()-.5)*ss;}
     camera.position.copy(_cp);camera.position.x+=jx;camera.position.y+=jy;
     const strafe=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+(stick.id!==null?stick.dx:0);
-    camRoll+=((P.moving?-strafe*0.028:0)+Math.sin(bobPh)*bobAmt*0.25+Math.sin(bobPh)*bobAmt*0.5-camRoll)*Math.min(1,dt*5);
+    camRoll+=((P.moving&&!calm?-strafe*0.028:0)+Math.sin(bobPh)*bobAmt*0.25+Math.sin(bobPh)*bobAmt*0.5-camRoll)*Math.min(1,dt*5);
     fpPitchS+=(fpPitch-fpPitchS)*Math.min(1,dt*25);
     const bobY=Math.cos(bobPh*2)*bobAmt*0.9;
     const yawLead=-Math.sin(bobPh)*bobAmt*0.35;
     camera.rotation.set(fpPitchS+bobY+jy*2,camYaw+Math.PI+jx*2+yawLead,camRoll);
-    const tf=P.dashing&&P.moving?82:70;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();
+    const tf=P.dashing&&P.moving&&!calm?82:70;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();
   }else{
     const tgt=new THREE.Vector3(P.x,P.y+1.3,P.z);
     const fwd=new THREE.Vector3(Math.sin(camYaw),0,Math.cos(camYaw));
@@ -6028,14 +6086,15 @@ function updateCamera(dt,t){
       const px=tgt.x+(cp.x-tgt.x)*f,py=tgt.y+(cp.y-tgt.y)*f,pz=tgt.z+(cp.z-tgt.z)*f;
       if(blocksSight(P.floor,Math.floor(px/CS),Math.floor(pz/CS))||(py>P.floor*FH+LINTEL-0.1&&DOORSET.has(nk(P.floor,Math.floor(px/CS),Math.floor(pz/CS))))){best=(i-1)/steps*0.92;break;}}
     cp=tgt.clone().lerp(cp,best);
-    if(state==='play'&&dangerLevel>0.02){const sh=dangerLevel*(M.state==='chase'?0.06:0.025);
+    const calm=settings.calmCam;
+    if(state==='play'&&dangerLevel>0.02&&!calm){const sh=dangerLevel*(M.state==='chase'?0.06:0.025);
       cp.x+=(Math.random()-.5)*sh;cp.y+=(Math.random()-.5)*sh;}
-    if(scareShakeT>0){scareShakeT-=dt;const ss=Math.min(1,scareShakeT/0.5)*0.14;
+    if(scareShakeT>0){scareShakeT-=dt;const ss=calm?0:Math.min(1,scareShakeT/0.5)*0.14;
       cp.x+=(Math.random()-.5)*ss;cp.y+=(Math.random()-.5)*ss;}
     camera.position.lerp(cp,Math.min(1,dt*14));
     const look=tgt.clone().addScaledVector(fwd,1.6);look.y+=0.1;
     camera.lookAt(look);
-    const tf=P.dashing?70:62;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();}
+    const tf=P.dashing&&!calm?70:62;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();}
   /* your light: off while you hide, cupped while you creep, and it does not like the thing */
   let lv=P.hiding?0:(P.veiling?0.12:1);if(state==='dead'||state==='win')lv=0;
   FLASH.level+=(lv-FLASH.level)*Math.min(1,dt*(lv<FLASH.level?10:5));
@@ -6054,9 +6113,10 @@ function updateFlashlight(dt,t){
   /* flicker when it is close, when it hunts, in the jumpscare, in the dark */
   let fl=1;
   if(state==='play'||state==='caught'){
-    if(flickT>0){flickT-=dt;fl=Math.random()<0.5?0.05:1;}
+    /* (PHOTOSENSITIVITY reduced: the torch browns out instead of strobing on and off every frame) */
+    if(flickT>0){flickT-=dt;fl=settings.reduceFlash?0.5:(Math.random()<0.5?0.05:1);}
     else if(dangerLevel>0.35&&Math.random()<dt*dangerLevel*(M.state==='chase'?7:2.5))flickT=0.05+Math.random()*0.18;}
-  if(scareShakeT>0.3)fl=Math.random()<0.6?0.08:1;
+  if(scareShakeT>0.3)fl=settings.reduceFlash?0.5:(Math.random()<0.6?0.08:1);
   if(DARK.t>0)fl*=0.55;
   const tint=_tint.set(curLegend().t).lerp(_white,0.82);
   L.color.copy(tint);
@@ -7894,7 +7954,8 @@ if(WATCH)watchInit();
 /* ?debug=1 — a handle for automated tests */
 if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return state;},get got(){return got;},get doorOpen(){return doorOpen;},
   get MP(){return MP;},embers,stairs,nodes,adj,findPath,nk,NF,CS,FH,PATROL,maps,entAt,TOTAL_EMBERS,startGame,warpTo,openDoor,camera,scene,get REMOTE(){return typeof REMOTE!=='undefined'?REMOTE:null;},
-  get PUP(){return typeof PUP!=='undefined'?PUP:null;}};
+  get PUP(){return typeof PUP!=='undefined'?PUP:null;},
+  get graceT(){return graceT;},triggerJumpscare,doDeath,settings,keys,setDiff(d){runDiff=d;}};
 window.__HM_BOOTED=true;
 </script>
 </body>
