@@ -14,7 +14,7 @@ service cloud.firestore {
                                'music','lastDay','v','stats','live','lastSeen','createdAt'])
         && d.name is string && d.name.size() <= 60
         && d.ether is int && d.ether >= 0 && d.ether <= 10000000
-        && d.unlocked is list && d.unlocked.size() <= 40
+        && d.unlocked is list && d.unlocked.size() <= 64
         && d.main is string && d.main.size() <= 40
         && d.escapes is int && d.escapes >= 0
         && d.pending is list && d.pending.size() <= 20
