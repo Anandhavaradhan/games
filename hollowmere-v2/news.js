@@ -15,6 +15,17 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-16-ash-upgrades',
+    date: '2026-10-16',
+    tag: 'NEW',
+    title: 'Ash and legend upgrades',
+    body: 'A new currency, ASH, gathers as you play: from embers, memories, surviving a hunt and escaping (more if it never saw you). ' +
+      'It settles into the vault when the night ends; it cannot be bought with ether.\n\n' +
+      'Spend it in the vault to upgrade any legend you own, up to level 10. Every level adds 3 to all four stats (up to 100) ' +
+      'and brings its power back 3% sooner. A combined legend grows with the legends it was fused from. ' +
+      'A legend you gift away leaves its upgrades behind.'
+  },
+  {
     id: '2026-10-16-gifts',
     date: '2026-10-16',
     tag: 'NEW',
