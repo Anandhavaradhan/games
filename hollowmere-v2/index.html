@@ -1441,7 +1441,7 @@ function godBuild(){
   return {id:'god',n:'GOD',e:'Keeper of the House',c:'ADMIN',tier:4,pw:100,r:b.r,t:b.t,look:b.look,st:[100,100,100,100],pub:b.id,
     l:'Only the keeper of Hollowmere walks as this.',
     ab:{n:'EVERY HAND AT ONCE',k:'multi',cd:35,cost:30,parts,
-      p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. The keeper\u2019s essence never runs out, so veil and burst as long as you like. Unerring Arrow, Horseborn and Last Ferry each have their own cooldown: fire one (keys 3\u20135, or tap its icon) or the ticked ones together (G or ALL). Last Ferry carries you straight out once every ember is gathered. Hold an icon (or Alt + 3\u20135) to tick or untick it.',
+      p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. The keeper\u2019s essence never runs out, so veil and burst as long as you like. Horseborn has no cooldown at all; Unerring Arrow and Last Ferry each have their own: fire one (keys 3\u20135, or tap its icon) or the ticked ones together (G or ALL). Last Ferry carries you straight out once every ember is gathered. Hold an icon (or Alt + 3\u20135) to tick or untick it.',
       d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once \u2014 and, once the seal breaks, the ferry out.'}};}
 const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
 /* the legend everyone else sees you as */
@@ -3052,15 +3052,17 @@ function godFire(i,quiet,auto){
   if(!pa||!s||state!=='play')return false;
   const say=t=>{if(!quiet)toast(t,1.5);};
   if(godIsAuto(pa)&&!auto){say(pa.n+' \u2014 AUTOMATIC');return false;}
+  /* the keeper's Horseborn has no cooldown: fire it again any time, even to top it back up while it runs */
+  const noCd=isRealGod()&&pa===BYID.outrider.ab;
   if(s.cd>0){say(pa.n+' \u2014 '+Math.ceil(s.cd)+'S');return false;}
   if(!auto&&s.ess<pa.cost){say(pa.n+' \u2014 NOT ENOUGH ESSENCE');return false;}
   if(pa.k==='ward'&&AB.ward>0){say(pa.n+' \u2014 STILL HOLDING');return false;}
-  if(pa.k==='haste'&&AB.hasteT>0){say(pa.n+' \u2014 STILL ACTIVE');return false;}
+  if(pa.k==='haste'&&AB.hasteT>0&&!noCd){say(pa.n+' \u2014 STILL ACTIVE');return false;}
   if(pa.k==='reveal'&&AB.revealT>1000){say(pa.n+' \u2014 THE HOUSE IS ALREADY MARKED');return false;}
   if(pa.k==='exit'&&!exitReady()){if(!quiet)exitSealedToast();return false;}
   if(pa.k==='pull'){if(!pullEmber(pa.scope))return false;SFX.chime();toast(pa.n,2.2);}
   else{fireAbility(c,pa);if(MP)mpPower(pa);}
-  if(!auto&&!isRealGod())s.ess-=pa.cost;s.cd=Math.max(8,Math.round(pa.cd*PS.cdMul));AB.used++;
+  if(!auto&&!isRealGod())s.ess-=pa.cost;s.cd=noCd?0:Math.max(8,Math.round(pa.cd*PS.cdMul));AB.used++;
   return true;
 }
 function godFireAll(){
