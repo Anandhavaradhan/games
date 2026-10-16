@@ -155,6 +155,7 @@
   #mpBanner{margin-top:18px;max-width:560px;padding:12px 18px;border:1px solid #3a3630;background:rgba(10,12,18,.6);font-size:15px;line-height:1.6;color:#a89f8a}
   #mpBanner b{font-weight:normal;color:#ffbe6f;letter-spacing:3px}
   body.mp #titleCoop,body.mp #titleBoard{display:none}
+  body.mp #titleVersion{display:none}
   /* ===== ACCOUNT PANEL ===== */
   #frPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:27;width:min(460px,94vw);
     max-height:88vh;overflow-y:auto;display:none;background:rgba(10,10,14,.96);border:1px solid rgba(160,150,130,.25);padding:22px 20px 16px}
@@ -180,6 +181,15 @@
   .fradd{display:flex;gap:8px;align-items:center}.fradd input{flex:1;min-width:0}
   .frnote{font-size:13px;color:#7d7663;font-style:italic;margin-top:8px}
   .frmsg{font-size:13px;margin-top:8px;color:#d98b7a}.frmsg.ok{color:#9fd18a}
+  /* gifting ether and legends */
+  #gfPanel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:27;width:min(460px,94vw);
+    max-height:88vh;overflow-y:auto;display:none;background:rgba(10,10,14,.96);border:1px solid rgba(160,150,130,.25);padding:22px 20px 16px}
+  #gfPanel h3{font-family:'Cormorant SC',serif;letter-spacing:4px;font-size:17px;color:#d8cfb6;margin-bottom:14px;text-align:center}
+  #gfClose{margin-top:14px;text-align:center;cursor:pointer;font-family:'Cormorant SC',serif;letter-spacing:3px;color:#8f8874;font-size:13px}
+  .gftabs{display:flex;gap:8px}.gftabs .frbtn{flex:1;text-align:center}.gftabs .frbtn.on{color:#ffbe6f;border-color:rgba(255,190,111,.55);background:rgba(255,190,111,.08)}
+  .gflist{max-height:240px;overflow-y:auto}
+  .gflist .frrow{cursor:pointer}.gflist .frrow.on{background:rgba(255,190,111,.1)}
+  .gfwarn{font-size:13px;color:#ffbe6f;margin-top:10px;text-align:center}
   #specBar,#watchBar{display:none;position:absolute;left:50%;transform:translateX(-50%);z-index:20;align-items:center;gap:10px;
     background:rgba(8,8,12,.78);border:1px solid rgba(160,150,130,.25);padding:8px 12px;max-width:94vw}
   #specBar{bottom:22px}#watchBar{top:14px}
@@ -727,6 +737,11 @@
     <div id="frBody"></div>
     <div id="frClose">CLOSE</div>
   </div>
+  <div id="gfPanel" role="dialog" aria-label="Send a gift">
+    <h3>SEND A GIFT</h3>
+    <div id="gfBody"></div>
+    <div id="gfClose">CLOSE</div>
+  </div>
   <!-- spectating: a teammate after you are taken (co-op), or a friend (index.html?watch=UID) -->
   <div id="specBar"><span class="sbtn" id="specPrev">&#9664;</span><div class="stext"><b id="specName"></b><span id="specSub"></span></div><span class="sbtn" id="specNext">&#9654;</span></div>
   <div id="watchBar"><div class="stext"><b id="watchName"></b><span id="watchSub"></span></div><span class="sbtn wide" id="watchLeave">LEAVE</span></div>
@@ -820,6 +835,7 @@
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
     <button id="titleStory" class="ovbtn">THE BACKSTORY</button>
     <button id="titleCoop" class="ovbtn">CO-OP — PLAY WITH FRIENDS</button>
+    <button id="titleVersion" class="ovbtn" onclick="event.stopPropagation();location.href='../HOLLOWMERE/index.html'">SWITCH VERSION — PLAY THE ORIGINAL (V1)</button>
     <button id="titleLeave" class="ovbtn" style="display:none">LEAVE CO-OP — BACK TO THE TITLE</button>
     <div class="diffRow" data-where="title"></div>
     <div id="mpBanner" style="display:none"></div>
@@ -4104,7 +4120,7 @@ if(isTouch){
 }
 addEventListener('touchstart',()=>actInput(),{passive:true});
 addEventListener('touchmove',()=>actInput(),{passive:true});
-document.addEventListener('touchmove',e=>{if(!e.target.closest('.overlay,#vaultOv,#setPanel,#acctPanel,#lbPanel,#acctScrim'))e.preventDefault();},{passive:false});
+document.addEventListener('touchmove',e=>{if(!e.target.closest('.overlay,#vaultOv,#setPanel,#acctPanel,#lbPanel,#acctScrim,#gfPanel'))e.preventDefault();},{passive:false});
 
 
 /* =========================================================
@@ -6046,6 +6062,8 @@ function liveNow(){
 function cloudPush(create){
   if(!cloud||!cloudUser)return Promise.resolve();
   clearTimeout(cloudTimer);cloudTimer=null;
+  /* a gift is being sent or collected: its own write changes ether / legends, so wait for it */
+  if(typeof GIFT!=='undefined'&&GIFT.busy){cloudSaveSoon();return Promise.resolve();}
   const st=save.stats;
   const data={name:cloudUser.name,email:cloudUser.email||'',provider:cloudUser.provider||'',
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
@@ -6106,7 +6124,7 @@ async function applyUser(u){
     loadFailed=false;
     if(cloudUser){
       clearTimeout(cloudTimer);cloudTimer=null;
-      socialStop();godDisable();cloudUser=null;saveKey=LS_KEY;ptReset();
+      socialStop();giftStop();godDisable();cloudUser=null;saveKey=LS_KEY;ptReset();
       replaceSave(cleanSave(readLocal(LS_KEY),true));
       toast('SIGNED OUT \u2014 PLAYING AS A GUEST',2.6);
     }
@@ -6138,6 +6156,7 @@ async function applyUser(u){
   await ensureUsername();   /* every account has one unique username before it can post anywhere */
   ptLoad();      /* this player's entry on the most-time-played board */
   socialStart(); /* friends, and what they can see of you */
+  giftStart();   /* gifts other players sent while you were away */
   godCheck();
   toast((isNew?'ACCOUNT CREATED \u2014 ':'WELCOME BACK \u2014 ')+u.name.toUpperCase(),2.8);
   renderAcct();
@@ -7240,8 +7259,10 @@ function renderFriends(){
       return '<div class="frrow"><div class="who"><b>'+escHTML(f.name)+'</b><span class="'+cls+'">'+escHTML(txt)+'</span></div>'
         +(v&&!MP?'<span class="frbtn go" data-fr="invite" data-u="'+escHTML(f.uid)+'">INVITE</span>':'')
         +(v&&v.st==='night'?'<span class="frbtn go" data-fr="watch" data-u="'+escHTML(f.uid)+'">WATCH</span>':'')
+        +'<span class="frbtn go" data-fr="gift" data-u="'+escHTML(f.uid)+'">GIFT</span>'
         +'<span class="frbtn no" data-fr="remove" data-u="'+escHTML(f.uid)+'">REMOVE</span></div>';}).join('')
       :'<p class="frnote">No friends yet. Add someone by their username above.</p>';
+    h+='<div class="frsec">GIFTS</div><div class="fradd"><span class="frnote" style="flex:1;margin:0">Give ether or a legend to any player. What you give leaves your vault.</span><span class="frbtn go" data-fr="gift">SEND A GIFT</span></div>';
     h+='<p class="frnote">Friends can see when you are online, watch your nights live and invite you into their co-op room. Only your friends can. INVITE makes a room and asks them in.</p>';
   }
   const keep=$('frName')?$('frName').value:'';
@@ -7279,6 +7300,9 @@ async function frAction(act,u){
       if(MP){frMsg('You are already in a co-op night.');return;}
       if(state==='play'||state==='caught'){frMsg('Finish or leave your own night first.');return;}
       (window.hmKeepTab&&window.hmKeepTab()),location.href='lobby.html?invite='+encodeURIComponent(u)+(DEBUG?'&debug=1':'');
+    }else if(act==='gift'){
+      const f=u?SOC.friends.find(x=>x.uid===u):null;
+      openGift(f?f.name:'');
     }else if(act==='watch'){
       const v=SOC.pres[u];if(!v)return;
       if(state==='play'||state==='caught'){frMsg('Finish or leave your own night first.');return;}
@@ -7293,6 +7317,147 @@ $('frPanel').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Ente
 $('frClose').addEventListener('click',e=>{e.stopPropagation();closeFriends();});
 $('titleFriends').addEventListener('click',e=>{e.stopPropagation();openFriends();});
 $('acctScrim').addEventListener('click',()=>closeFriends());
+
+/* =========================================================
+   GIFTS — give ether or a legend to another player. If you gift it, you lose it.
+   Signed-in players with a username only (guests are temporary). The recipient is found by username.
+   Sending: your record pays (ether down by exactly the amount, or the legend out of your vault) in the
+   same write that creates gifts/{id}; firestore.rules refuse any gift that was not paid for.
+   Collecting: the recipient's game watches gifts sent to it and adds each one to its own record in the
+   same write that deletes the gift, so a gift is collected once and only once.
+   What can be gifted: ether, and any legend you bought. Not the free five (everyone has them), not the
+   keeper's GOD legend, not a combined legend, and not a legend fused into one of your combined legends
+   (giving it away would break the combined legend you paid for).
+   A legend the recipient already has turns into its price in ether instead.
+   ========================================================= */
+/* var, not const: cloudPush (earlier in the file) checks it before this line has run */
+var GIFT={unsub:null,uid:'',busy:false,open:false,kind:'ether',to:'',amt:'',legend:'',msg:'',msgOk:false,done:{}};
+const GIFT_MAX=1000000;
+function giftStart(){
+  if(!cloud||!cloudUser||cloudUser.anon||WATCH||typeof cloud.watchGifts!=='function')return;
+  if(GIFT.uid===cloudUser.uid)return;
+  giftStop();
+  GIFT.uid=cloudUser.uid;
+  GIFT.unsub=cloud.watchGifts(GIFT.uid,list=>{GIFT.waiting=list;giftCollect();});
+}
+function giftStop(){
+  if(GIFT.unsub){try{GIFT.unsub();}catch(e){}GIFT.unsub=null;}
+  GIFT.uid='';GIFT.waiting=[];GIFT.done={};closeGift();
+}
+/* legends you may give away right now */
+function giftable(){
+  const fused={};(save.combos||[]).forEach(x=>x.p.forEach(id=>{fused[id]=1;}));
+  return ORDER.filter(c=>!c.combo&&c.id!=='god'&&FREE.indexOf(c.id)<0&&!fused[c.id]&&save.unlocked.indexOf(c.id)>=0);
+}
+async function giftCollect(){
+  if(GIFT.busy||!cloudUser||GIFT.uid!==cloudUser.uid)return;
+  const g=(GIFT.waiting||[]).find(x=>!GIFT.done[x.id]);
+  if(!g)return;
+  const me=cloudUser.uid;
+  GIFT.busy=true;GIFT.done[g.id]=1;
+  let ether=0,legend='',what='';
+  if(g.kind==='legend'&&BYID[g.legend]&&!BYID[g.legend].combo&&g.legend!=='god'){
+    if(save.unlocked.indexOf(g.legend)<0){legend=g.legend;what=BYID[g.legend].n;}
+    else{ether=TIER_COST[BYID[g.legend].tier]||0;what=BYID[g.legend].n+' (already yours — '+ether+' ether instead)';}
+  }else if(g.kind==='ether'&&g.n>0){ether=Math.floor(g.n);what=ether+' ether';}
+  try{
+    await cloud.claimGift(me,g.id,ether,legend);
+    if(cloudUser&&cloudUser.uid===me){
+      if(ether)save.ether+=ether;
+      if(legend&&save.unlocked.indexOf(legend)<0)save.unlocked.push(legend);
+      saveNow();if(vaultOpen)renderVault();
+      if(what){SFX.chime();toast('✦ '+String(g.fromName||'A PLAYER').toUpperCase()+' GIFTED YOU '+what.toUpperCase(),4.5);}
+    }
+  }catch(e){console.warn('Gift not collected:',e);   /* already collected (another tab) or offline: try again later */
+    setTimeout(()=>{delete GIFT.done[g.id];giftCollect();},30000);}
+  finally{GIFT.busy=false;}
+  if(GIFT.open)renderGift();
+  setTimeout(giftCollect,300);
+}
+function openGift(to){
+  if(acctOpen)closeAcct();if(lbOpen)closeBoard();if(settingsOpen)closeSettings();if(SOC.open)closeFriends();
+  GIFT.open=true;GIFT.msg='';GIFT.to=to||GIFT.to||'';
+  $('gfPanel').style.display='block';$('acctScrim').style.display='block';renderGift();
+}
+function closeGift(){
+  if(!GIFT.open)return;GIFT.open=false;$('gfPanel').style.display='none';
+  if(!acctOpen&&!lbOpen&&!SOC.open)$('acctScrim').style.display='none';
+}
+function renderGift(){
+  if(!GIFT.open)return;
+  const el=$('gfBody');let h='';
+  if(!cloud)h='<p class="acnote">Gifts need accounts switched on for this copy of the game.</p>';
+  else if(!cloudUser)h='<p class="acnote">Sign in (the ACCOUNT button) to send gifts. Guests are temporary and cannot gift or receive.</p>';
+  else if(!canPost())h='<p class="acnote">Choose a username in your account first.</p>';
+  else{
+    const list=giftable();
+    if(GIFT.legend&&!list.some(c=>c.id===GIFT.legend))GIFT.legend='';
+    h+='<div class="frsec">TO</div><input class="acin" id="gfTo" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Their username" value="'+escHTML(GIFT.to)+'">';
+    h+='<div class="frsec">WHAT</div><div class="gftabs"><span class="frbtn'+(GIFT.kind==='ether'?' on':'')+'" data-gf="kind" data-k="ether">ETHER</span>'
+      +'<span class="frbtn'+(GIFT.kind==='legend'?' on':'')+'" data-gf="kind" data-k="legend">A LEGEND</span></div>';
+    if(GIFT.kind==='ether'){
+      h+='<input class="acin" id="gfAmt" type="number" inputmode="numeric" min="1" max="'+Math.min(GIFT_MAX,save.ether)+'" placeholder="How much ether" value="'+escHTML(GIFT.amt)+'">'
+        +'<p class="frnote">You have <b>'+save.ether+'</b> ether.</p>';
+    }else{
+      h+=list.length?'<div class="gflist">'+list.map(c=>'<div class="frrow'+(GIFT.legend===c.id?' on':'')+'" data-gf="pick" data-l="'+c.id+'"><div class="who"><b>'+escHTML(c.n)+'</b><span>'
+          +escHTML(c.r)+(save.main===c.id&&!(GOD.on&&GOD.ok)?' · bound now':'')+'</span></div>'+(GIFT.legend===c.id?'<span class="frbtn go">✓</span>':'')+'</div>').join('')+'</div>'
+        :'<p class="frnote">You have no legend you can give. The free five, combined legends and legends fused into one cannot be gifted.</p>';
+    }
+    h+='<p class="gfwarn">If you gift it, you lose it. It leaves your vault for good.</p>'
+      +'<div class="fradd" style="justify-content:center;margin-top:10px"><span class="frbtn go" data-gf="send">'+(GIFT.busy?'SENDING…':'SEND GIFT')+'</span></div>'
+      +'<div class="frmsg'+(GIFT.msgOk?' ok':'')+'" id="gfMsg">'+escHTML(GIFT.msg)+'</div>';
+  }
+  el.innerHTML=h;
+}
+function gfMsg(t,ok){GIFT.msg=t||'';GIFT.msgOk=!!ok;const m=$('gfMsg');if(m){m.textContent=GIFT.msg;m.classList.toggle('ok',GIFT.msgOk);}}
+async function giftSend(){
+  if(GIFT.busy||!canPost())return;
+  if(state==='play'||state==='caught'){gfMsg('Finish or leave your night first.');return;}
+  const nm=(GIFT.to||'').replace(/\s+/g,' ').trim();
+  if(!nm){gfMsg('Type their username.');return;}
+  let n=0,c=null;
+  if(GIFT.kind==='ether'){
+    n=Math.floor(Number(GIFT.amt));
+    if(!(n>=1)){gfMsg('Type how much ether to send.');return;}
+    if(n>GIFT_MAX){gfMsg('At most '+GIFT_MAX+' ether in one gift.');return;}
+    if(n>save.ether){gfMsg('You only have '+save.ether+' ether.');return;}
+  }else{
+    c=BYID[GIFT.legend];
+    if(!c||!giftable().some(x=>x.id===c.id)){gfMsg('Pick a legend to send.');return;}
+  }
+  const me=cloudUser.uid,my=cloudUser.name;
+  GIFT.busy=true;renderGift();
+  try{
+    const own=await cloud.usernameOwner(nm);
+    if(!own){gfMsg('No player has the username "'+nm+'".');return;}
+    if(own.uid===me){gfMsg('You cannot gift yourself.');return;}
+    const what=c?c.n:n+' ether';
+    if(!confirm('Give '+what+' to '+own.name+'?\n\nIf you gift it, you lose it. This cannot be undone.'))return;
+    /* make sure the account holds what this device holds before paying from it */
+    GIFT.busy=false;await cloudPush();GIFT.busy=true;
+    if(syncBad){gfMsg('Your account is not synced yet. Try again in a moment.');return;}
+    await cloud.sendGift(me,my,own.uid,own.name,c?'legend':'ether',n,c?c.id:'');
+    if(c){
+      const i=save.unlocked.indexOf(c.id);if(i>=0)save.unlocked.splice(i,1);
+      if(save.main===c.id)setLegend(FIRST_GHOST);
+      GIFT.legend='';
+    }else{save.ether-=n;GIFT.amt='';}
+    saveNow();if(vaultOpen)renderVault();
+    SFX.chime();
+    gfMsg(what+' is on its way to '+own.name+'.',true);
+  }catch(e){console.warn('Gift:',e);gfMsg(cloud.friendlyError(e));}
+  finally{GIFT.busy=false;renderGift();}
+}
+$('gfPanel').addEventListener('click',e=>{e.stopPropagation();
+  const b=e.target.closest('[data-gf]');if(!b)return;
+  const a=b.getAttribute('data-gf');
+  if(a==='kind'){GIFT.kind=b.getAttribute('data-k');GIFT.msg='';renderGift();}
+  else if(a==='pick'){GIFT.legend=b.getAttribute('data-l');renderGift();}
+  else if(a==='send')giftSend();});
+$('gfPanel').addEventListener('input',e=>{if(e.target.id==='gfTo')GIFT.to=e.target.value;else if(e.target.id==='gfAmt')GIFT.amt=e.target.value;});
+$('gfPanel').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&(e.target.id==='gfTo'||e.target.id==='gfAmt')){e.preventDefault();giftSend();}});
+$('gfClose').addEventListener('click',e=>{e.stopPropagation();closeGift();});
+$('acctScrim').addEventListener('click',()=>closeGift());
 
 /* =========================================================
    WATCH — index.html?watch=UID&floors=N : spectating a friend's night, live.
