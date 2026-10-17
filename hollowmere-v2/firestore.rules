@@ -241,9 +241,9 @@ service cloud.firestore {
     }
 
     // GIFTS — gifts/{id} { from, fromName, to, toName, kind, n, legend, at }
-    // A signed-in player (not a guest) may gift ether or a legend to another player's account. The gift
-    // must be PAID FOR in the same write that creates it: for ether, the giver's record goes down by
-    // exactly n; for a legend, it was in the giver's vault before and is gone after. So a gift can never
+    // A signed-in player (not a guest) may gift ether, ash or a legend to another player's account. The gift
+    // must be PAID FOR in the same write that creates it: for ether or ash (kept in stats.ash), the giver's
+    // record goes down by exactly n and does not go below 0; for a legend, it was in the giver's vault before and is gone after. So a gift can never
     // create ether or a legend out of nothing, and only the giver's own record can pay. The recipient
     // collects it by deleting it (in the same write that adds it to their own record); a gift can be
     // deleted only once, so it can be collected only once. Nobody else can read or touch it.
@@ -261,6 +261,9 @@ service cloud.firestore {
         && g.at == request.time
         && ((g.kind == 'ether' && g.legend == '' && g.n >= 1 && g.n <= 1000000
              && getAfter(me).data.ether == get(me).data.ether - g.n)
+            || (g.kind == 'ash' && g.legend == '' && g.n >= 1 && g.n <= 1000000
+                && getAfter(me).data.stats.ash == get(me).data.stats.ash - g.n
+                && getAfter(me).data.stats.ash >= 0)
             || (g.kind == 'legend' && g.n == 0 && g.legend.size() >= 1 && g.legend.size() <= 40
                 && g.legend in get(me).data.unlocked
                 && !(g.legend in getAfter(me).data.unlocked)));

@@ -351,8 +351,8 @@ export function addGuestStats(seconds, active, escapes) {
 }
 
 /* ---------- GIFTS: gifts/{id} { from, fromName, to, toName, kind, n, legend, at } ----------
-   A player can gift ether or a legend to another account. The giver pays in the SAME write that
-   creates the gift (ether goes down by exactly n, or the legend leaves their vault), and firestore.rules
+   A player can gift ether, ash or a legend to another account. The giver pays in the SAME write that
+   creates the gift (ether or ash goes down by exactly n, or the legend leaves their vault), and firestore.rules
    refuse a gift that was not paid for. The gift then waits until the recipient's game picks it up:
    it adds the ether or legend to their record and deletes the gift in one write, so a gift can only
    ever be collected once. */
@@ -360,18 +360,21 @@ export function sendGift(me, myName, to, toName, kind, n, legend) {
   const b = F.writeBatch(db);
   const p = F.doc(db, 'players', me);
   if (kind === 'ether') b.update(p, { ether: F.increment(-n), lastSeen: F.serverTimestamp() });
+  /* ash lives in stats (like combined legends), so only that one field is changed */
+  else if (kind === 'ash') b.update(p, { 'stats.ash': F.increment(-n), lastSeen: F.serverTimestamp() });
   else b.update(p, { unlocked: F.arrayRemove(legend), lastSeen: F.serverTimestamp() });
   b.set(F.doc(F.collection(db, 'gifts')), {
     from: me, fromName: String(myName || '').slice(0, 40), to, toName: String(toName || '').slice(0, 40),
-    kind, n: kind === 'ether' ? n : 0, legend: kind === 'legend' ? legend : '', at: F.serverTimestamp()
+    kind, n: kind === 'legend' ? 0 : n, legend: kind === 'legend' ? legend : '', at: F.serverTimestamp()
   });
   return b.commit();
 }
-/* collect a gift sent to me: `ether` added and/or `legend` unlocked, and the gift removed, together */
-export function claimGift(me, id, ether, legend) {
+/* collect a gift sent to me: `ether` / `ash` added and/or `legend` unlocked, and the gift removed, together */
+export function claimGift(me, id, ether, legend, ash) {
   const b = F.writeBatch(db);
   const up = { lastSeen: F.serverTimestamp() };
   if (ether > 0) up.ether = F.increment(ether);
+  if (ash > 0) up['stats.ash'] = F.increment(ash);
   if (legend) up.unlocked = F.arrayUnion(legend);
   b.update(F.doc(db, 'players', me), up);
   b.delete(F.doc(db, 'gifts', id));

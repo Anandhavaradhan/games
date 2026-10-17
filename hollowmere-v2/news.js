@@ -16,6 +16,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-gift-ash',
+    date: '2026-10-17',
+    tag: 'NEW',
+    title: 'Gift ash to other players',
+    body: 'Ash can now be gifted, just like ether and legends. Open FRIENDS, press GIFT on a friend or SEND A GIFT, and choose ASH. ' +
+      'If you gift it, you lose it: the ash leaves your vault and lands in theirs the next time they play.'
+  },
+  {
     id: '2026-10-17-friends-offline',
     date: '2026-10-17',
     tag: 'FIX',
