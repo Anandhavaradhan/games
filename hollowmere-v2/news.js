@@ -16,6 +16,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-upgrade-combined',
+    date: '2026-10-17',
+    tag: 'NEW',
+    title: 'Upgrade a combined legend at once',
+    body: 'A combined legend now has an UPGRADE THE WHOLE COMBINATION button in the vault. One press takes every legend it was fused from up a level, ' +
+      'for the same ash those upgrades cost one by one. Legends already at the top level are skipped.'
+  },
+  {
     id: '2026-10-17-upgrade-levels-kept',
     date: '2026-10-17',
     tag: 'FIX',
