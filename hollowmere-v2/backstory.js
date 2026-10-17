@@ -410,8 +410,8 @@ function scenes(A){
   return [
   { /* 1. THE HOUSE */
     dur:12,
-    lines:[[0.8,'They built Hollowmere Manor on a hill no one would farm.',3.42],
-           [5.6,'It was finished in a single winter. The family who built it was never seen again.',4.99]],
+    lines:[[0.8,'They built Hollowmere Manor on a hill no one would farm.',3.73],
+           [5.6,'It was finished in a single winter. The family who built it was never seen again.',5.61]],
     draw(g,t,o){
       const Z=o.motion?1+0.12*ease(t/12):1.04,PY=o.motion?-20*ease(t/12):0;
       const layer=k=>{const z=1+(Z-1)*k;g.setTransform(o.base[0]*z,0,0,o.base[0]*z,o.base[1]+(1-z)*VX*o.base[0],o.base[2]+((1-z)*520+PY*k)*o.base[0]);};
@@ -466,8 +466,8 @@ function scenes(A){
     }},
   { /* 2. YOU */
     dur:11,
-    lines:[[0.8,'Years later, you came to the house with a candle, looking for something.',3.99],
-           [6.0,'You never found it. The house found you.',2.41]],
+    lines:[[0.8,'Years later, you came to the house with a candle, looking for something.',4.39],
+           [6.0,'You never found it. The house found you.',2.76]],
     draw(g,t,o){
       const camZ=o.motion?t*0.3:0.6,stop=9.3,tw=Math.min(t,stop);
       const fz=1.75+tw*0.14+(t>stop?0:0);                 /* your distance ahead of the camera */
@@ -512,9 +512,9 @@ function scenes(A){
     }},
   { /* 3. THE HEART */
     dur:13,
-    lines:[[0.8,'You died here, on the cellar floor.',2.26],
-           [4.6,'Beneath the stones, something beats like a heart.',2.89],
-           [8.0,'It caught your soul as it left you. It has not let go since.',3.84]],
+    lines:[[0.8,'You died here, on the cellar floor.',2.54],
+           [4.6,'Beneath the stones, something beats like a heart.',3.39],
+           [8.0,'It caught your soul as it left you. It has not let go since.',4.0]],
     draw(g,t,o){
       const p=pulseAt(BEATS3,t),shake=o.motion?p*(t>6.5&&t<10.8?4:1.5):0;
       g.save();g.translate((hash(Math.floor(t*30))-0.5)*shake,(hash(Math.floor(t*30)+7)-0.5)*shake);
@@ -578,8 +578,8 @@ function scenes(A){
     }},
   { /* 4. THE THING */
     dur:12,
-    lines:[[0.8,'You are not alone in there. Something tall and patient walks its four floors.',4.57],
-           [6.0,'It feeds on the souls the Heart keeps. Tonight, it is hungry.',4.06]],
+    lines:[[0.8,'You are not alone in there. Something tall and patient walks its four floors.',4.97],
+           [6.0,'It feeds on the souls the Heart keeps. Tonight, it is hungry.',4.25]],
     draw(g,t,o){
       const close=t>=10.4;
       if(!close){
@@ -625,8 +625,8 @@ function scenes(A){
     }},
   { /* 5. THE EMBERS */
     dur:11,
-    lines:[[0.8,'Your passing left eight embers, scattered through the house. Two on every floor.',4.9],
-           [6.2,'Fragments of your old memory lie with them, somewhere in the dark.',3.91]],
+    lines:[[0.8,'Your passing left eight embers, scattered through the house. Two on every floor.',5.0],
+           [6.2,'Fragments of your old memory lie with them, somewhere in the dark.',4.06]],
     draw(g,t,o){
       const pz=o.motion?lerp(1.7,1,easeOut((t-0.2)/4.5)):1,py=o.motion?lerp(-330,0,easeOut((t-0.2)/4.5)):0;
       g.save();g.translate(VX,450);g.scale(pz,pz);g.translate(-VX,-450+py);
@@ -681,8 +681,8 @@ function scenes(A){
     }},
   { /* 6. THE DOOR */
     dur:12,
-    lines:[[0.8,'Gather the embers. Break the seal on the front door. Leave.',3.53],
-           [4.9,'If it takes you, the embers scatter, the seal re-forms, and the Heart drags you back down to begin again.',6.23]],
+    lines:[[0.8,'Gather the embers. Break the seal on the front door. Leave.',3.83],
+           [4.9,'If it takes you, the embers scatter, the seal re-forms, and the Heart drags you back down to begin again.',6.5]],
     draw(g,t,o){
       const fall=o.motion?easeIn((t-9.6)/1.6):0,slam=t>7.6&&t<8.2?Math.exp(-(t-7.6)*8):0;
       g.save();g.translate(o.motion?(hash(Math.floor(t*40))-0.5)*slam*30:0,-fall*1100);
@@ -929,7 +929,7 @@ function makeSound(ac,out,S,SC){
   const T=(sc,at)=>t0+S[sc]+at;
   /* the narrator's voice: a little air around it, a soft room behind */
   const vo=ac.createGain();vo.gain.value=0.95;vo.connect(main);
-  const vroom=ac.createConvolver(),vwet=ac.createGain();vwet.gain.value=0.16;
+  const vroom=ac.createConvolver(),vwet=ac.createGain();vwet.gain.value=0.22;
   {const n=Math.floor(ac.sampleRate*1.8),ir=ac.createBuffer(2,n,ac.sampleRate);
    for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,3.2);}
    vroom.buffer=ir;}
