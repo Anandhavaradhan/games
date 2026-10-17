@@ -1,4 +1,5 @@
-/* =========================================================
+/* ==================================================  },
+  {
    HOLLOWMERE — NEWS INBOX
    What players read under NEWS on the title screen. Only things meant for players go here:
    new legends, new features, changes they will notice, fixes they asked for. Internal work
@@ -22,6 +23,14 @@ export const NEWS = [
     body: 'Playing the original Hollowmere could take The Psychopomp out of your vault, and with it any combined legend it was fused into. ' +
       'That no longer happens: the original now leaves legends it does not know alone, and a combined legend keeps every legend it was made from.\n\n' +
       'Having the game open in two tabs or on two devices can no longer wipe a combined legend you just made, either.'
+  },
+  {
+    id: '2026-10-17-trinkets-fix',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'Trinkets you can find, and throws that work',
+    body: 'The bottles are bigger now, glow green so you can spot them across a room, and chime the first time you come near one.\n\n' +
+      'A thrown bottle now draws the thing from anywhere in the house, even another floor, and a line at the foot of the screen tells you what it did.'
   },
   {
     id: '2026-10-17-backstory-freeze',
