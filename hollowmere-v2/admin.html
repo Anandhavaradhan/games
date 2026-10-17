@@ -150,7 +150,6 @@
   .cpart.pick{cursor:pointer;color:var(--dim);background:#0b0d14}
   .cpart.pick.on{color:var(--bone);border-color:var(--c)}
   .cpart.pick b{color:var(--ember)}
-  .lost{color:var(--blood);font-size:13px;margin-top:8px}
 
   /* ---- keeper's edits: only visible while the drawer is in edit mode ---- */
   .lg.can{cursor:pointer}
@@ -227,9 +226,6 @@ const combosOf=p=>{const c=p&&p.stats&&p.stats.combos;
   const ok=Array.isArray(c)?c.filter(x=>x&&typeof x.id==='string'&&Array.isArray(x.p)&&x.p.length>=2&&x.p.every(id=>BY[id])):[];
   return ok.filter(x=>!ok.some(y=>y.id===x.id&&(y.p.length>x.p.length||(y.p.length===x.p.length&&ok.indexOf(y)<ok.indexOf(x)))));};
 const comboName=x=>x.p.map(legendName).join(' + ');
-/* combined legends this player has played nights with that are no longer in their record */
-const lostCombos=p=>{const have=new Set(combosOf(p).map(x=>x.id)),u=(p.stats||{}).legendRuns||{};
-  return Object.keys(u).filter(id=>/^cx/.test(id)&&!have.has(id)).map(id=>({id,runs:u[id]}));};
 function nameCombos(){players.forEach(p=>combosOf(p).forEach(x=>{COMBO_FIRST[x.id]=x.p[0];COMBO_NAME[x.id]=x.p.map(id=>legendName(id)).join(' + ');}));}
 const comboChip=(id,own)=>'<span class="cpart'+(own&&!own.has(id)?' gone':'')+'" style="--c:'+legendColour(id)+'"'
   +(own&&!own.has(id)?' title="Not in their vault any more"':'')+'>'+esc(legendName(id))+'</span>';
@@ -615,10 +611,8 @@ function render(){
     :'<p class="empty">No time recorded yet.</p>';
   /* ---- character combinations: every combined legend, every player ---- */
   const allC=[];players.forEach(p=>combosOf(p).forEach(x=>allC.push({p,x})));
-  const lostN=players.reduce((a,p)=>a+lostCombos(p).length,0);
   allC.sort((a,b)=>(((b.p.stats||{}).legendRuns||{})[b.x.id]||0)-(((a.p.stats||{}).legendRuns||{})[a.x.id]||0)||(a.p.name||'').localeCompare(b.p.name||''));
-  h+='<h3>Character combinations <small>'+plural(allC.length,'combined legend')+' \u00b7 '+plural(players.filter(p=>combosOf(p).length).length,'player')
-    +(lostN?' \u00b7 <span style="color:var(--blood)">'+lostN+' missing from a record</span>':'')+'</small></h3>';
+  h+='<h3>Character combinations <small>'+plural(allC.length,'combined legend')+' \u00b7 '+plural(players.filter(p=>combosOf(p).length).length,'player')+'</small></h3>';
   h+=allC.length?'<ul class="combos">'+allC.map(({p,x})=>{const own=new Set(p.unlocked||[]),runs=((p.stats||{}).legendRuns||{})[x.id]||0;
       return '<li><button class="cwho" data-uid="'+esc(p.uid)+'">'+esc(p.name||'Unnamed')+'</button>'
         +'<span class="cparts">'+x.p.map(id=>comboChip(id,own)).join('')+'</span>'
@@ -950,14 +944,12 @@ function renderDrawer(){
 }
 /* the player's combined legends; while editing, remove one or put one together for them */
 function comboSection(p){
-  const cs=combosOf(p),own=new Set(p.unlocked||[]),uses=(p.stats||{}).legendRuns||{},lost=lostCombos(p);
+  const cs=combosOf(p),own=new Set(p.unlocked||[]),uses=(p.stats||{}).legendRuns||{};
   let h='<h3>Character combinations <small>'+plural(cs.length,'combined legend')+'</small></h3>';
   h+=cs.length?'<ul class="combos">'+cs.map(x=>'<li><span class="cparts">'+x.p.map(id=>comboChip(id,own)).join('')+'</span>'
       +'<span class="cmeta">'+plural(uses[x.id]||0,'night')+(p.main===x.id?' \u00b7 bound now':'')+'</span>'
       +(editing?'<button class="mini warn" data-crm="'+esc(x.id)+'">Remove</button>':'')+'</li>').join('')+'</ul>'
     :'<p class="empty">No combined legends.</p>';
-  if(lost.length)h+='<p class="lost">'+plural(lost.length,'combined legend')+' they played with '+(lost.length===1?'is':'are')+' no longer in this record ('
-    +lost.map(l=>plural(l.runs,'night')).join(', ')+'). The record does not say which legends '+(lost.length===1?'it was':'they were')+' made of; ask the player and put it back below.</p>';
   if(editing){
     cmbPick=cmbPick.filter(id=>BY[id]);
     const dup=cmbPick.length>=2&&cs.some(x=>x.p.slice().sort().join('|')===cmbPick.slice().sort().join('|'));
