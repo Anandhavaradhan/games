@@ -15,6 +15,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-trinkets-fix',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'Trinkets you can find, and throws that work',
+    body: 'The bottles are bigger now, glow green so you can spot them across a room, and chime the first time you come near one.\n\n' +
+      'A thrown bottle now draws the thing from anywhere in the house, even another floor, and a line at the foot of the screen tells you what it did.'
+  },
+  {
     id: '2026-10-16-dread',
     date: '2026-10-16',
     tag: 'NEW',
