@@ -226,6 +226,19 @@ const combosOf=p=>{const c=p&&p.stats&&p.stats.combos;
   const ok=Array.isArray(c)?c.filter(x=>x&&typeof x.id==='string'&&Array.isArray(x.p)&&x.p.length>=2&&x.p.every(id=>BY[id])):[];
   return ok.filter(x=>!ok.some(y=>y.id===x.id&&(y.p.length>x.p.length||(y.p.length===x.p.length&&ok.indexOf(y)<ok.indexOf(x)))));};
 const comboName=x=>x.p.map(legendName).join(' + ');
+/* ASH AND LEGEND UPGRADES — stats.ash is the ash a player holds; stats.ups lists 'legendId:level' and only ever
+   grows (the game adds to it), so the highest level listed for a legend they own is its level. */
+const UP_MAX=10;
+const ashOf=p=>Math.max(0,Math.floor(((p&&p.stats)||{}).ash||0));
+function upsOf(p){
+  const o={},own=new Set((p&&p.unlocked)||[]),l=((p&&p.stats)||{}).ups;
+  (Array.isArray(l)?l:[]).forEach(x=>{const m=/^([a-z0-9_]{1,40}):(\d{1,2})$/.exec(String(x));
+    if(m&&own.has(m[1])&&BY[m[1]])o[m[1]]=Math.min(UP_MAX,Math.max(o[m[1]]||0,+m[2]));});
+  return o;
+}
+const upTotal=p=>Object.values(upsOf(p)).reduce((a,b)=>a+b,0);
+/* taking legends away from a player takes their upgrade levels with them */
+const upsDrop=ids=>F.arrayRemove(...[].concat(...ids.map(id=>Array.from({length:UP_MAX},(_,i)=>id+':'+(i+1)))));
 function nameCombos(){players.forEach(p=>combosOf(p).forEach(x=>{COMBO_FIRST[x.id]=x.p[0];COMBO_NAME[x.id]=x.p.map(id=>legendName(id)).join(' + ');}));}
 const comboChip=(id,own)=>'<span class="cpart'+(own&&!own.has(id)?' gone':'')+'" style="--c:'+legendColour(id)+'"'
   +(own&&!own.has(id)?' title="Not in their vault any more"':'')+'>'+esc(legendName(id))+'</span>';
@@ -544,7 +557,9 @@ const COLS=[
   ['name','Player',p=>(p.name||'').toLowerCase()],
   ['status','Status',p=>isLive(p)?2:1],
   ['ether','Ether',p=>p.ether||0,'r'],
+  ['ash','Ash',ashOf,'r'],
   ['legends','Legends',p=>(p.unlocked||[]).length,'r'],
+  ['ups','Upgrades',upTotal,'r'],
   ['combos','Combined',p=>combosOf(p).length,'r'],
   ['main','Haunts as',p=>legendName(p.main)],
   ['escapes','Escapes',p=>p.escapes||0,'r'],
@@ -670,7 +685,9 @@ function fillRows(){
       +'<td><div class="pname">'+esc(p.name||'Unnamed')+'</div><div class="pmail">'+esc(p.email||'')+'</div></td>'
       +'<td>'+status+'</td>'
       +'<td class="r ether">'+(p.ether||0)+(pend?' <span class="pmail">+'+pend+' unclaimed</span>':'')+'</td>'
+      +'<td class="r">'+ashOf(p)+'</td>'
       +'<td class="r">'+(p.unlocked||[]).length+' / '+TOTAL+'</td>'
+      +'<td class="r">'+(()=>{const u=upsOf(p),n=Object.keys(u).length;return n?upTotal(p)+' <span class="pmail">on '+n+'</span>':'—';})()+'</td>'
       +'<td class="r">'+(combosOf(p).length||'—')+'</td>'
       +'<td><span class="dot" style="background:'+legendColour(p.main)+'"></span>'+esc(legendName(p.main))+'</td>'
       +'<td class="r">'+(p.escapes||0)+'</td>'
@@ -727,11 +744,12 @@ function toggleLegend(uid,id){
   had?own.delete(id):own.add(id);
   const list=ALL_IDS.filter(x=>own.has(x)),upd={unlocked:list};
   if(had&&p.main===id)upd.main=list[0]||FREE_IDS[0];
+  if(had)upd.stats={ups:upsDrop([id])};
   /* the game puts a combined legend's legends back in the vault, so sealing one takes its combinations too */
   const cs=combosOf(p),hit=had?cs.filter(x=>x.p.indexOf(id)>=0):[];
   if(hit.length){
     if(!confirm(legendName(id)+' is part of '+hit.map(comboName).join(', ')+'. Sealing it removes '+(hit.length===1?'that combination':'those combinations')+' too. Go on?'))return;
-    upd.stats={combos:cs.filter(x=>hit.indexOf(x)<0).map(x=>({id:x.id,p:x.p.slice()}))};
+    upd.stats=Object.assign(upd.stats||{},{combos:cs.filter(x=>hit.indexOf(x)<0).map(x=>({id:x.id,p:x.p.slice()}))});
     if(hit.some(x=>x.id===p.main))upd.main=list[0]||FREE_IDS[0];
   }
   patch(uid,upd,(had?'Sealed ':'Granted ')+legendName(id));
@@ -743,6 +761,8 @@ function revokeAll(uid){
   if(!confirm('Seal every legend except the five the game gives everyone?'+(cs.length>left.length?' Their combined legends made with any other legend go too.':'')))return;
   const keep=ALL_IDS.filter(x=>FREE_IDS.indexOf(x)>=0),upd={unlocked:keep,main:keep.indexOf(p.main)>=0||left.some(x=>x.id===p.main)?p.main:keep[0]};
   if(cs.length>left.length)upd.stats={combos:left.map(x=>({id:x.id,p:x.p.slice()}))};
+  const gone=(p.unlocked||[]).filter(id=>keep.indexOf(id)<0);
+  if(gone.length)upd.stats=Object.assign(upd.stats||{},{ups:upsDrop(gone)});
   patch(uid,upd,'Back to the five starting legends');
 }
 function clearPending(uid){patch(uid,{pending:[]},'Unclaimed ether cleared');}
@@ -759,6 +779,8 @@ function saveForm(uid){
   st.embers=int('e_embers',st.embers||0);
   st.memories=int('e_mem',st.memories||0);
   st.etherEarned=int('e_earned',st.etherEarned||0);
+  st.ash=int('e_ash',ashOf(p));
+  delete st.ups;   /* levels are only added by the game; writing this copy back could undo one bought a moment ago */
   const best=flt('e_best',0);
   if(best>0)st.bestTime=best;else delete st.bestTime;
   const newName=String(val('e_name')||p.name||'Unnamed').replace(/\s+/g,' ').trim().slice(0,24);
@@ -865,7 +887,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&openUid)closeDrawer();});
 
 function renderDrawer(){
   const p=players.find(x=>x.uid===openUid);if(!p){closeDrawer();return;}
-  const st=p.stats||{},l=p.live||{},own=new Set(p.unlocked||[]),uses=st.legendRuns||{};
+  const st=p.stats||{},l=p.live||{},own=new Set(p.unlocked||[]),uses=st.legendRuns||{},ups=upsOf(p);
   const scroll=drawer.scrollTop;
   let h='<div class="dhead"><div><h2>'+esc(p.name||'Unnamed')+'</h2><div class="dsub">'+esc(p.email||'')+' · joined '+ago(ms(p.createdAt))+' · signs in with '+esc(providerName(p.provider))+'</div></div>'
     +'<button class="btn'+(editing?' primary':'')+'" id="dedit">'+(editing?'Done':'Edit')+'</button>'
@@ -877,6 +899,8 @@ function renderDrawer(){
   h+='<div class="grid2">'
     +'<div><span>Ether</span><b class="num ether">'+(p.ether||0)+'</b></div>'
     +'<div><span>Unclaimed</span><b class="num">'+pend+'</b></div>'
+    +'<div><span>Ash</span><b class="num">'+ashOf(p)+'</b></div>'
+    +'<div><span>Upgrade levels</span><b class="num">'+upTotal(p)+'</b></div>'
     +'<div><span>Ether earned</span><b class="num">'+(st.etherEarned||0)+'</b></div>'
     +'<div><span>Legends</span><b class="num">'+own.size+' / '+TOTAL+'</b></div>'
     +'<div><span>Escapes</span><b class="num">'+(p.escapes||0)+'</b></div>'
@@ -900,7 +924,7 @@ function renderDrawer(){
     h+='<div class="tier">Tier '+['','I','II','III','IV'][t]+' · '+list.filter(r=>own.has(r[0])).length+' of '+list.length+'</div><div class="legends">'
       +list.map(r=>'<div class="lg'+(own.has(r[0])?' own':'')+(p.main===r[0]?' bound':'')+(editing?' can':'')+'" style="--c:'+r[3]+'"'
         +(editing?' data-grant="'+esc(r[0])+'" role="button" tabindex="0" title="'+(own.has(r[0])?'Seal':'Grant')+' '+esc(legendName(r[0]))+'"':'')
-        +'>'+esc(legendName(r[0]))+'<small>'+(own.has(r[0])?(p.main===r[0]?'bound · ':'')+(uses[r[0]]||0)+' runs':'sealed')+'</small></div>').join('')+'</div>';
+        +'>'+esc(legendName(r[0]))+'<small>'+(own.has(r[0])?(p.main===r[0]?'bound · ':'')+'level '+(ups[r[0]]||0)+' · '+(uses[r[0]]||0)+' runs':'sealed')+'</small></div>').join('')+'</div>';
   });
   h+=comboSection(p);
   const runs=runsCache[p.uid];
@@ -1000,6 +1024,7 @@ function editPanel(p){
     +field('e_embers','Embers carried',st.embers||0)
     +field('e_mem','Memories found',st.memories||0)
     +field('e_earned','Ether earned',st.etherEarned||0)
+    +field('e_ash','Ash',ashOf(p))
     +'<div style="grid-column:1/-1"><label for="e_main">Haunts as</label><select id="e_main">'+opts+'</select></div>'
     +'</div>'
     +'<div class="editbar"><button class="btn primary" id="e_save">Save changes</button>'

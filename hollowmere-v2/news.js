@@ -16,6 +16,15 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-upgrade-levels-kept',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'Legend upgrade levels now stay saved',
+    body: 'Upgrade levels bought in the vault could be lost: when the game was closed right after an upgrade, ' +
+      'or when the game was open on another tab or device. Every upgrade now goes to your account the moment you buy it, ' +
+      'and an older tab or device can no longer take a level back down.'
+  },
+  {
     id: '2026-10-17-sound-on-phones',
     date: '2026-10-17',
     tag: 'FIX',
