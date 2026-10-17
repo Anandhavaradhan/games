@@ -5056,6 +5056,10 @@ function renderVault(){
   if(upb)upb.addEventListener('click',function(e){e.stopPropagation();
     if(!upgradeLegend(c))return;
     renderVault();SFX.chime();toast(c.n+' \u2014 LEVEL '+upLevel(c.id),2.4);});
+  const upa=$('vUpAll');
+  if(upa)upa.addEventListener('click',function(e){e.stopPropagation();
+    if(!upgradeCombo(c))return;
+    renderVault();SFX.chime();toast(c.n+' \u2014 UPGRADED',2.4);});
   $('vDossBody').querySelectorAll('[data-ap]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();
     const id=el.getAttribute('data-ap');vAdd.pick=vAdd.pick===id?'':id;
     if(typeof SFX.uiPick==='function')SFX.uiPick();
@@ -5076,8 +5080,15 @@ function renderVault(){
 function upgradeHTML(c){
   const AS='<span class="ash"></span>';
   if(c.id==='god'||!isUnlocked(c.id))return '';
-  if(c.combo)return '<div class="vd-label">UPGRADES</div><div class="vup-txt">A combined legend grows with the legends it was fused from: '
-    +'upgrade '+c.p.map(id=>escHTML(shortName(BYID[id]))+' (level '+upLevel(id)+')').join(', ')+' and it takes their highest stats and each power\u2019s shorter cooldown.</div>';
+  if(c.combo){
+    let h='<div class="vd-label">UPGRADES</div><div class="vup"><div class="vup-txt">A combined legend grows with the legends it was fused from: '
+      +'upgrade '+c.p.map(id=>escHTML(shortName(BYID[id]))+' (level '+upLevel(id)+')').join(', ')+' and it takes their highest stats and each power\u2019s shorter cooldown.</div>';
+    const cost=comboUpCost(c);
+    if(!cost)return h+'<button class="vbtn dim" disabled>EVERY LEGEND IN IT IS FULLY UPGRADED</button></div>';
+    const ok=(save.ash||0)>=cost;
+    return h+'<button class="vbtn'+(ok?'':' dim')+'" id="vUpAll"'+(ok?'':' disabled')+'>UPGRADE THE WHOLE COMBINATION \u2014 '+cost+' '+AS+'</button>'
+      +'<div class="vneed">'+(ok?'EVERY LEGEND IN IT GOES UP ONE LEVEL':AS+' '+(cost-(save.ash||0))+' MORE ASH \u2014 GATHER EMBERS AND MEMORIES, SURVIVE HUNTS, ESCAPE')+'</div></div>';
+  }
   const l=upLevel(c.id),pips=Array.from({length:UP_MAX},(_,i)=>'<i'+(i<l?' class="on"':'')+'></i>').join('');
   let h='<div class="vd-label">UPGRADES \u2014 LEVEL '+l+' / '+UP_MAX+'</div><div class="vup"><div class="vup-lv">'+pips+'</div>';
   h+='<div class="vup-txt">'+(l?'Now: <b>+'+l*UP_STAT+'</b> to every stat (up to 100), power back <b>'+Math.round(l*UP_CD*100)+'%</b> sooner.':'Every level adds <b>+'+UP_STAT+'</b> to every stat (up to 100) and brings the power back <b>'+Math.round(UP_CD*100)+'%</b> sooner.')+'</div>';
@@ -5096,6 +5107,19 @@ function upgradeLegend(c){
   /* the bound legend (or a combined one it is part of) feels it at once */
   const cur=curLegend();
   if(cur.id===c.id||(cur.combo&&cur.p.indexOf(c.id)>=0)){computePS(cur);AB.cdMax=cdFor(cur.ab);refreshLegendHUD();}
+  return true;
+}
+/* upgrading a whole combined legend: every legend in it that is not at UP_MAX goes up one level, for the sum of their prices */
+const comboUpList=c=>c.p.filter(id=>canUpgrade(BYID[id])&&upLevel(id)<UP_MAX);
+const comboUpCost=c=>comboUpList(c).reduce((t,id)=>t+upCost(upLevel(id)),0);
+function upgradeCombo(c){
+  if(!c||!c.combo)return false;
+  const ids=comboUpList(c),cost=comboUpCost(c);
+  if(!ids.length||(save.ash||0)<cost)return false;
+  save.ash-=cost;ids.forEach(id=>{save.ups[id]=upLevel(id)+1;});saveNow();
+  cloudPush();   /* straight to the account, like a single upgrade */
+  const cur=curLegend();
+  if(cur.combo&&ids.some(id=>cur.p.indexOf(id)>=0)||ids.indexOf(cur.id)>=0){computePS(cur);AB.cdMax=cdFor(cur.ab);refreshLegendHUD();}
   return true;
 }
 /* adding one more legend to a combined legend, in its dossier */
