@@ -1538,9 +1538,9 @@ function cleanSave(raw,isLocal){
   const ash=typeof src.ash==='number'?src.ash:(src.stats&&typeof src.stats.ash==='number')?src.stats.ash:0;
   if(isFinite(ash))out.ash=Math.max(0,Math.min(1e7,Math.floor(ash)));
   let ups=(src.ups&&typeof src.ups==='object')?src.ups:(src.stats&&src.stats.ups&&typeof src.stats.ups==='object')?src.stats.ups:{};
-  /* the cloud keeps them as a list of 'id:level' (a list is replaced whole on save, so a level
-     dropped here — a legend gifted away — never comes back from an old copy of the map) */
-  if(Array.isArray(ups)){const o={};ups.forEach(x=>{const m=/^([a-z0-9_]{1,40}):(\d{1,2})$/.exec(String(x));if(m)o[m[1]]=+m[2];});ups=o;}
+  /* the cloud keeps them as a list of 'id:level' that is only ever added to (see cloud.savePlayer), so a stale
+     tab or device can never take a level away; the highest level listed for a legend is its level */
+  if(Array.isArray(ups))ups=upsFromList(ups);
   Object.keys(ups).forEach(id=>{const l=ups[id];
     if(BYID[id]&&!BYID[id].combo&&id!=='god'&&out.unlocked.indexOf(id)>=0&&typeof l==='number'&&isFinite(l)&&l>=1)
       out.ups[id]=Math.min(UP_MAX,Math.floor(l));});
@@ -1615,9 +1615,13 @@ let save=cleanSave(readLocal(LS_KEY),true);
 /* the news inbox (NEWS INBOX, near FRIENDS): what is open, and the notices themselves once news.js has loaded */
 let NEWS_UI={open:false,list:[],filter:'all',sort:'new',device:[]};
 comboSync(save.combos);
+/* 'id:level' list (the cloud's form) -> {id: highest level} */
+function upsFromList(list){const o={};(list||[]).forEach(x=>{const m=/^([a-z0-9_]{1,40}):(\d{1,2})$/.exec(String(x));if(m)o[m[1]]=Math.max(o[m[1]]||0,+m[2]);});return o;}
+/* legends whose upgrades left this save; their entries are taken out of the cloud list on the next push */
+const UPS_GONE=new Set();
 function saveNow(){
   /* a legend that has left this save (gifted away) takes its upgrades with it: whoever owns it next starts at level 0 */
-  if(save.ups)Object.keys(save.ups).forEach(id=>{if(save.unlocked.indexOf(id)<0)delete save.ups[id];});
+  if(save.ups)Object.keys(save.ups).forEach(id=>{if(save.unlocked.indexOf(id)<0){delete save.ups[id];UPS_GONE.add(id);}});
   try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}cloudSaveSoon();}
 saveNow();
 const isUnlocked=id=>id==='god'?GOD.ok:(BYID[id]&&BYID[id].combo)?true:save.unlocked.indexOf(id)>=0;
@@ -5088,6 +5092,7 @@ function upgradeLegend(c){
   const l=upLevel(c.id),cost=upCost(l);
   if(l>=UP_MAX||(save.ash||0)<cost)return false;
   save.ash-=cost;save.ups[c.id]=l+1;saveNow();
+  cloudPush();   /* straight to the account, not after the usual short wait, so closing the game cannot lose it */
   /* the bound legend (or a combined one it is part of) feels it at once */
   const cur=curLegend();
   if(cur.id===c.id||(cur.combo&&cur.p.indexOf(c.id)>=0)){computePS(cur);AB.cdMax=cdFor(cur.ab);refreshLegendHUD();}
@@ -6711,7 +6716,9 @@ function cloudPush(create){
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
       combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),bty:{d:(save.bty&&save.bty.d)||'',p:Object.assign({},save.bty&&save.bty.p),done:((save.bty&&save.bty.done)||[]).slice()},ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id])}),
     live:liveNow()};
+  const gone=Array.from(UPS_GONE).filter(id=>!(save.ups||{})[id]);
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
+    .then(()=>gone.length&&typeof cloud.dropUps==='function'?cloud.dropUps(cloudUser.uid,gone,UP_MAX).then(()=>gone.forEach(id=>UPS_GONE.delete(id))):0)
     .then(()=>{lastSync=Date.now();syncBad=false;updateAcctLive();})
     .catch(e=>{syncBad=true;console.warn('Progress sync failed:',e);updateAcctLive();});
 }
@@ -6792,6 +6799,13 @@ async function applyUser(u){
     if(next.bty.d!==save.bty.d)next.bty={d:save.bty.d,p:{},done:[]};
     Object.keys(save.bty.p).forEach(id=>{next.bty.p[id]=Math.max(next.bty.p[id]||0,save.bty.p[id]);});
     save.bty.done.forEach(id=>{if(next.bty.done.indexOf(id)<0)next.bty.done.push(id);});}
+  /* upgrades bought on this device whose save had not reached the account when the game was closed:
+     this device's copy of the account has a higher level, so it wins (and so does the ash it had left) */
+  if(data){const mine=readLocal(LS_KEY+':'+u.uid);
+    if(mine&&mine.ups&&typeof mine.ups==='object'){let ahead=false;
+      Object.keys(mine.ups).forEach(id=>{const l=mine.ups[id]|0;
+        if(l>(next.ups[id]||0)&&l<=UP_MAX&&next.unlocked.indexOf(id)>=0&&BYID[id]&&!BYID[id].combo){next.ups[id]=l;ahead=true;}});
+      if(ahead&&typeof mine.ash==='number'&&isFinite(mine.ash))next.ash=Math.max(0,Math.min(next.ash,Math.floor(mine.ash)));}}
   if(wantName&&wantName.uid===u.uid)u.name=wantName.name;
   else if(data&&data.name)u.name=String(data.name).slice(0,40);
   /* progress moves, it is not copied: the guest slot in this browser starts fresh */

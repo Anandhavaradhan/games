@@ -108,7 +108,21 @@ export function savePlayer(uid, data, opts) {
     if (d.stats.combos.length) d.stats.combos = F.arrayUnion(...d.stats.combos);
     else delete d.stats.combos;
   }
+  /* legend upgrade levels ('id:level') are added the same way: the highest level listed is the one that counts,
+     so a stale tab or device can never take a level back down */
+  if (d.stats && Array.isArray(d.stats.ups)) {
+    d.stats = Object.assign({}, d.stats);
+    if (d.stats.ups.length) d.stats.ups = F.arrayUnion(...d.stats.ups);
+    else delete d.stats.ups;
+  }
   return F.setDoc(F.doc(db, 'players', uid), d, { merge: true });
+}
+/* a legend that left the account (gifted away) leaves its upgrade levels behind */
+export function dropUps(uid, ids, max) {
+  const all = [];
+  ids.forEach(id => { for (let l = 1; l <= max; l++) all.push(id + ':' + l); });
+  if (!all.length) return Promise.resolve();
+  return F.setDoc(F.doc(db, 'players', uid), { stats: { ups: F.arrayRemove(...all) }, lastSeen: F.serverTimestamp() }, { merge: true });
 }
 
 /* one document per run (every death and every escape) */
