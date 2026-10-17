@@ -601,6 +601,8 @@
   .claimdone b{color:#ffbe6f;font-weight:normal;font-size:19px;letter-spacing:2px}
   .claimnew{font-size:11px;letter-spacing:2px;color:#bfead0;margin-top:7px}
 
+  #sndTest{width:100%;margin-top:8px;padding:10px 12px;border:1px solid #3a3630;background:rgba(15,17,26,.7);color:#cfc8b8;cursor:pointer;text-align:center;font-size:12px;letter-spacing:2px}
+  #sndInfo{font-size:11px;letter-spacing:1px;color:#8f8874;margin-top:6px;min-height:14px}
   #musicBtn{width:100%;padding:10px 12px;border:1px solid #3a3630;background:rgba(15,17,26,.7);color:#cfc8b8;
     font-family:'IM Fell English',serif;font-size:14px;letter-spacing:1px;cursor:pointer;text-align:center}
   #musicBtn:hover{border-color:#8a7f60;color:#e5dcc2}
@@ -840,6 +842,8 @@
     <div class="srow">
       <div class="slab"><span>VOLUME</span><span class="sv" id="volVal"></span></div>
       <input type="range" id="volRange" min="0" max="1" step="0.05">
+      <div id="sndTest">TEST SOUND</div>
+      <div id="sndInfo"></div>
     </div>
     <div class="srow" id="voiceRow">
       <div class="slab"><span>VOICE CHAT VOLUME</span><span class="sv" id="voiceVal"></span></div>
@@ -3868,7 +3872,7 @@ function moveEnt(ent,vx,vz,dt){
    sounds placed in 3D (HRTF) and muffled through walls and floors, your own
    steps changing with what is under them, rain on the roof.
    ========================================== */
-let AC=null,master,echoIn,noiseBuf,dashGain,breathGain,breathPan,
+let AC=null,audioErr='',master,echoIn,noiseBuf,dashGain,breathGain,breathPan,
     monPan=null,monLP=null,monBus=null,rainGain=null,rainLP=null,pBreathGain=null,ambT=8;
 function makeNoise(){const b=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate);const d=b.getChannelData(0);
   for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b;}
@@ -3936,7 +3940,7 @@ function initAudio(){if(AC)return;try{
   pBreathGain=AC.createGain();pBreathGain.gain.value=0;
   pS.connect(pf);pf.connect(pA);pA.connect(pBreathGain);pBreathGain.connect(master);pS.start();pL.start();
   pBreathGain.lfo=pL;
- }catch(e){console.warn('Audio init failed',e);AC=null;}}
+ }catch(e){console.warn('Audio init failed',e);audioErr=String(e&&e.message||e);AC=null;}}
 function panNode(pan){if(AC.createStereoPanner){const p=AC.createStereoPanner();p.pan.value=Math.max(-1,Math.min(1,pan));return p;}
   return AC.createGain();}
 function panOf(x,z){const dx=x-P.x,dz=z-P.z;const rx=-Math.cos(camYaw),rz=Math.sin(camYaw);
@@ -4228,7 +4232,7 @@ $('viewBtn').addEventListener('click',e=>{e.stopPropagation();settings.view=sett
   if(ghost)ghost.g.visible=settings.view==='tp';});
 $('qualBtn').addEventListener('click',e=>{e.stopPropagation();const o=['high','medium','low'];
   settings.quality=o[(o.indexOf(settings.quality)+1)%3];saveSettings();syncSetUI();applyQuality();});
-function openSettings(){if(settingsOpen)return;settingsOpen=true;syncSetUI();setPanel.style.display='block';
+function openSettings(){if(settingsOpen)return;settingsOpen=true;syncSetUI();sndInfo();setPanel.style.display='block';
   if(typeof navSync==='function')navSync();
   if(!isTouch&&document.pointerLockElement){suppressPause=true;try{document.exitPointerLock();}catch(e){}}}
 function closeSettings(){if(!settingsOpen)return;settingsOpen=false;setPanel.style.display='none';
@@ -5442,6 +5446,16 @@ function armAudio(){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wakeAudio();});
 addEventListener('pageshow',wakeAudio);
 addEventListener('focus',wakeAudio);
+/* SETTINGS > TEST SOUND: plays a chime and says what state the sound is in, so a silent phone can tell us why */
+function sndInfo(){const el=$('sndInfo');if(!el)return;
+  const ok=window.AudioContext||window.webkitAudioContext;
+  el.textContent=!ok?'THIS BROWSER HAS NO WEB AUDIO':
+    !AC?('SOUND COULD NOT START'+(audioErr?' \u2014 '+audioErr:'')):
+    ('SOUND IS '+String(AC.state).toUpperCase()+' \u00b7 '+AC.sampleRate+' HZ \u00b7 VOLUME '+Math.round(settings.vol*100)+'%'+
+      (settings.vol<=0?' \u2014 TURN THE VOLUME UP':AC.state==='running'?' \u2014 IF YOU HEAR NOTHING, CHECK THE PHONE\u2019S MEDIA VOLUME':''));}
+$('sndTest').addEventListener('click',e=>{e.stopPropagation();armAudio();wakeAudio();
+  try{if(AC)SFX.chime();}catch(err){audioErr=String(err&&err.message||err);}
+  sndInfo();setTimeout(sndInfo,400);setTimeout(sndInfo,1500);});
 
 {const mb=$('musicBtn');
  if(mb){
