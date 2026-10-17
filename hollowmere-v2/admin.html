@@ -221,8 +221,11 @@ const legendColour=id=>BY[id]?BY[id][3]:COMBO_FIRST[id]?BY[COMBO_FIRST[id]][3]:'
 /* CHARACTER COMBINATIONS — a player's combined legends live in stats.combos as [{id:'cx…', p:[2 to 5 legend ids]}].
    It looks like (and everyone else sees) the first legend in p. */
 const COMBO_MAX=5, COMBO_FIRST={};
+/* A player can add legends to a combined legend later; the cloud keeps the older, shorter copy under the same id,
+   so the one with the most legends is the real one (and writing the list back from here drops the old copies). */
 const combosOf=p=>{const c=p&&p.stats&&p.stats.combos;
-  return Array.isArray(c)?c.filter(x=>x&&typeof x.id==='string'&&Array.isArray(x.p)&&x.p.length>=2&&x.p.every(id=>BY[id])):[];};
+  const ok=Array.isArray(c)?c.filter(x=>x&&typeof x.id==='string'&&Array.isArray(x.p)&&x.p.length>=2&&x.p.every(id=>BY[id])):[];
+  return ok.filter(x=>!ok.some(y=>y.id===x.id&&(y.p.length>x.p.length||(y.p.length===x.p.length&&ok.indexOf(y)<ok.indexOf(x)))));};
 const comboName=x=>x.p.map(legendName).join(' + ');
 /* combined legends this player has played nights with that are no longer in their record */
 const lostCombos=p=>{const have=new Set(combosOf(p).map(x=>x.id)),u=(p.stats||{}).legendRuns||{};

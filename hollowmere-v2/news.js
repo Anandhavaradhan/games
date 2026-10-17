@@ -16,6 +16,16 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-grow-combined',
+    date: '2026-10-17',
+    tag: 'NEW',
+    title: 'Grow a combined legend',
+    body: 'A combined legend can now take one more legend you own, up to five in all, and you only pay the difference in price: ' +
+      '10,000 ether to go from two legends to three, 20,000 from three to four, and 40,000 from four to five.\n\n' +
+      'Open the combined legend in the vault and look under ADD A LEGEND. It gains the new power, keeps the higher of each stat, ' +
+      'and keeps the nights it has already played. Your originals stay yours.'
+  },
+  {
     id: '2026-10-17-todays-bounties',
     date: '2026-10-17',
     tag: 'NEW',
