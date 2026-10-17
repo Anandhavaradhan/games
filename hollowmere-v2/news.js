@@ -15,6 +15,15 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-combined-legends-kept',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'Combined legends stay put',
+    body: 'Playing the original Hollowmere could take The Psychopomp out of your vault, and with it any combined legend it was fused into. ' +
+      'That no longer happens: the original now leaves legends it does not know alone, and a combined legend keeps every legend it was made from.\n\n' +
+      'Having the game open in two tabs or on two devices can no longer wipe a combined legend you just made, either.'
+  },
+  {
     id: '2026-10-17-backstory-freeze',
     date: '2026-10-17',
     tag: 'FIX',

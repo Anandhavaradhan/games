@@ -1488,11 +1488,15 @@ function cleanSave(raw,isLocal){
   if(isLocal&&raw&&raw.v!==SAVE_V)out.unlocked=FREE.slice();
   /* combined legends (kept in the cloud inside stats, so the account rules need no change) */
   const cs=Array.isArray(src.combos)?src.combos:(src.stats&&Array.isArray(src.stats.combos))?src.stats.combos:[];
-  const seenK={};
+  const seenK={},seenId={};
   out.combos=cs.filter(x=>x&&typeof x.id==='string'&&/^cx[a-z0-9]{1,20}$/.test(x.id)&&Array.isArray(x.p)
-      &&x.p.length>=2&&x.p.length<=COMBO_MAX&&x.p.every((id,i,a)=>BYID[id]&&!BYID[id].combo&&id!=='god'&&a.indexOf(id)===i&&out.unlocked.indexOf(id)>=0))
-    .filter(x=>{const k=comboKey(x.p);if(seenK[k])return false;seenK[k]=1;return true;})
+      &&x.p.length>=2&&x.p.length<=COMBO_MAX&&x.p.every((id,i,a)=>BYID[id]&&!BYID[id].combo&&id!=='god'&&a.indexOf(id)===i))
+    .filter(x=>{const k=comboKey(x.p);if(seenK[k]||seenId[x.id])return false;seenK[k]=seenId[x.id]=1;return true;})
     .slice(0,COMBO_LIMIT).map(x=>({id:x.id,p:x.p.slice()}));
+  /* a combined legend you paid for is never thrown away because one of its legends went missing from the
+     list (the original game used to drop legends it did not know, like the Psychopomp): a fused legend
+     cannot be gifted or sold, so it is still yours, and goes back in the vault */
+  out.combos.forEach(x=>x.p.forEach(id=>{if(out.unlocked.indexOf(id)<0)out.unlocked.push(id);}));
   if(st.legendRuns&&typeof st.legendRuns==='object')
     out.combos.forEach(x=>{if(typeof st.legendRuns[x.id]==='number')out.stats.legendRuns[x.id]=st.legendRuns[x.id];});
   /* news notices this player has read (kept in the cloud inside stats, like the combined legends) */

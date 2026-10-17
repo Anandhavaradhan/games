@@ -1125,6 +1125,12 @@ function cleanSave(raw,isLocal){
      so saves made before that go back to the free five and keep their ether. */
   if(isLocal&&raw&&raw.v!==SAVE_V)out.unlocked=FREE.slice();
   if(BYID[src.main]&&out.unlocked.indexOf(src.main)>=0)out.main=src.main;
+  /* The new version (hollowmere-v2) shares this account. Legends only it knows (the Psychopomp, combined
+     legends) are kept aside and written back unchanged, so playing the original never takes them away. */
+  const okId=id=>typeof id==='string'&&/^[a-z0-9_]{1,40}$/.test(id)&&!BYID[id];
+  out.keep=(isLocal&&raw&&raw.v!==SAVE_V)||!Array.isArray(src.unlocked)?[]
+    :src.unlocked.filter((id,i,a)=>okId(id)&&a.indexOf(id)===i).slice(0,20);
+  if(okId(src.main)){out.mainAway=src.main;out.mainAt=out.main;}
   return out;
 }
 let save=cleanSave(readLocal(LS_KEY),true);
@@ -3996,7 +4002,9 @@ function cloudPush(create){
   clearTimeout(cloudTimer);cloudTimer=null;
   const st=save.stats;
   const data={name:cloudUser.name,email:cloudUser.email||'',provider:cloudUser.provider||'',
-    ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
+    ether:save.ether,unlocked:save.unlocked.concat(save.keep||[]),
+    /* bound to a new-version legend: it stays bound there unless a legend is chosen here */
+    main:save.mainAway&&save.main===save.mainAt?save.mainAway:save.main,escapes:save.escapes,
     pending:save.pending.map(e=>({l:e.l,n:e.n})),music:save.music,lastDay:save.lastDay,v:SAVE_V,
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),legendRuns:Object.assign({},st.legendRuns)}),
     live:liveNow()};
