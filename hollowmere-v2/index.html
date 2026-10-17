@@ -1518,6 +1518,7 @@ function cleanSave(raw,isLocal){
   const seenK={},seenId={};
   out.combos=cs.filter(x=>x&&typeof x.id==='string'&&/^cx[a-z0-9]{1,20}$/.test(x.id)&&Array.isArray(x.p)
       &&x.p.length>=2&&x.p.length<=COMBO_MAX&&x.p.every((id,i,a)=>BYID[id]&&!BYID[id].combo&&id!=='god'&&a.indexOf(id)===i))
+    .filter((x,i,a)=>comboLatest(a,x.id)===x)
     .filter(x=>{const k=comboKey(x.p);if(seenK[k]||seenId[x.id])return false;seenK[k]=seenId[x.id]=1;return true;})
     .slice(0,COMBO_LIMIT).map(x=>({id:x.id,p:x.p.slice()}));
   /* a combined legend you paid for is never thrown away because one of its legends went missing from the
@@ -1556,8 +1557,14 @@ function cleanSave(raw,isLocal){
    together, like the keeper's legend), the highest of each stat, and the look of the first one picked.
    Everyone else — co-op, the watch page, the leaderboards — sees that first legend.
    Price: 10,000 ether for two, doubling for each one more.
+   A combined legend can take one more legend later (up to COMBO_MAX) for the difference in price:
+   2 to 3 costs 10,000, 3 to 4 costs 20,000, 4 to 5 costs 40,000. It keeps its id, so its nights stay with it.
+   The cloud only ever adds combined legends (arrayUnion), so it can hold an older, shorter copy under the
+   same id: the one with the most legends is the real one.
    ========================================================= */
 const COMBO_MAX=5,COMBO_LIMIT=20;
+const comboAddCost=n=>comboCost(n+1)-comboCost(n);
+function comboLatest(list,id){let b=null;list.forEach(x=>{if(x.id===id&&(!b||x.p.length>b.p.length))b=x;});return b;}
 /* =========================================================
    LEGEND UPGRADES — paid in ASH, which is only earned in the house (never bought with ether).
    Each legend you own climbs UP_MAX levels. Every level adds UP_STAT to all four stats (up to 100)
@@ -4885,7 +4892,7 @@ function previewGhost(t){
 }
 
 /* --- THE VAULT ------------------------------------------------- */
-let vaultOpen=false,vSel=0,vaultRed=null,vFilter='ALL',vCombining=false,vCmbPick=[];
+let vaultOpen=false,vSel=0,vaultRed=null,vFilter='ALL',vCombining=false,vCmbPick=[],vAdd={id:'',pick:''};
 function openVault(){
   if(vaultOpen)return;
   vaultOpen=true;
@@ -5025,6 +5032,7 @@ function renderVault(){
     +'<div class="vd-label">IN THE MANOR</div>'
     +'<div class="vd-stats">'+bars+'</div>'
     +upgradeHTML(c)
+    +comboAddHTML(c)
     +(un?'<div class="vd-lore">'+c.l+'</div>'
         :'<div class="vd-lore">Record sealed. Declassify this ghost to read its file.</div>')
     +'<div class="vd-act">'+act+'</div>';
@@ -5040,6 +5048,15 @@ function renderVault(){
   if(upb)upb.addEventListener('click',function(e){e.stopPropagation();
     if(!upgradeLegend(c))return;
     renderVault();SFX.chime();toast(c.n+' \u2014 LEVEL '+upLevel(c.id),2.4);});
+  $('vDossBody').querySelectorAll('[data-ap]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();
+    const id=el.getAttribute('data-ap');vAdd.pick=vAdd.pick===id?'':id;
+    if(typeof SFX.uiPick==='function')SFX.uiPick();
+    renderVault();}));
+  const addb=$('vAddGo');
+  if(addb)addb.addEventListener('click',e=>{e.stopPropagation();
+    const id=comboAddLegend(c,vAdd.pick);if(!id)return;
+    vAdd={id:'',pick:''};vSel=ROSTER.indexOf(BYID[id]);
+    renderVault();SFX.chime();toast(BYID[id].n+' \u2014 '+BYID[id].p.length+' LEGENDS',3);});
   const unl=$('vUnl');
   if(unl)unl.addEventListener('click',function(e){e.stopPropagation();
     if(!canBuy(c))return;
@@ -5071,6 +5088,41 @@ function upgradeLegend(c){
   const cur=curLegend();
   if(cur.id===c.id||(cur.combo&&cur.p.indexOf(c.id)>=0)){computePS(cur);AB.cdMax=cdFor(cur.ab);refreshLegendHUD();}
   return true;
+}
+/* adding one more legend to a combined legend, in its dossier */
+function comboAddable(c){
+  return ORDER.filter(o=>!o.combo&&o.id!=='god'&&save.unlocked.indexOf(o.id)>=0&&c.p.indexOf(o.id)<0);
+}
+function comboAddHTML(c){
+  if(!c.combo)return '';
+  if(vAdd.id!==c.id)vAdd={id:c.id,pick:''};
+  const n=c.p.length;
+  if(n>=COMBO_MAX)return '<div class="vd-label">ADD A LEGEND</div><div class="vup-txt">It already holds '+COMBO_MAX+' legends, the most a combined legend can.</div>';
+  const can=comboAddable(c),cost=comboAddCost(n);
+  if(vAdd.pick&&!can.some(o=>o.id===vAdd.pick))vAdd.pick='';
+  const pick=vAdd.pick,next=pick?c.p.concat(pick):null;
+  const dup=!!next&&save.combos.some(x=>x.id!==c.id&&comboKey(x.p)===comboKey(next));
+  const ok=!!pick&&!dup&&save.ether>=cost;
+  let h='<div class="vd-label">ADD A LEGEND \u2014 '+n+' TO '+(n+1)+'</div>'
+    +'<div class="vup-txt">Fuse one more legend you own into it for the difference in price: <b>'+cost.toLocaleString('en-IN')+' '+EG+'</b>. '
+    +'It gains that legend\u2019s power and keeps the higher of each stat. It still looks like '+escHTML(titleCase(BYID[c.p[0]].n))+', and your originals stay yours.</div>';
+  if(!can.length)return h+'<div class="vneed">YOU OWN NO OTHER LEGEND TO ADD \u2014 DECLASSIFY ONE FIRST</div>';
+  h+='<div class="vcmb-list">'+can.map(o=>'<span class="vcmb-pick'+(o.id===pick?' on':'')+'" data-ap="'+o.id+'" style="--pt:'+o.t+'">'+(o.id===pick?'<b>+</b>':'')+escHTML(shortName(o))+'</span>').join('')+'</div>';
+  if(!pick)h+='<button class="vbtn dim" disabled>PICK A LEGEND TO ADD</button>';
+  else if(dup)h+='<button class="vbtn dim" disabled>YOU ALREADY HAVE THIS COMBINATION</button>';
+  else h+='<button class="vbtn'+(ok?'':' dim')+'" id="vAddGo"'+(ok?'':' disabled')+'>ADD '+escHTML(shortName(BYID[pick]))+' \u2014 '+cost.toLocaleString('en-IN')+' '+EG+'</button>'
+    +(save.ether<cost?'<div class="vneed">'+EG+' '+(cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
+  return '<div class="vup">'+h+'</div>';
+}
+function comboAddLegend(c,pick){
+  const x=c&&c.combo&&save.combos.find(y=>y.id===c.id);
+  if(!x||x.p.length>=COMBO_MAX||!comboAddable(c).some(o=>o.id===pick))return '';
+  const next=x.p.concat(pick),cost=comboAddCost(x.p.length);
+  if(save.ether<cost||save.combos.some(y=>y!==x&&comboKey(y.p)===comboKey(next)))return '';
+  save.ether-=cost;x.p=next;comboSync(save.combos);saveNow();
+  /* bound to it: rebuild it now so the new power is on the HUD */
+  if(isBound(x.id))setLegend(x.id);
+  return x.id;
 }
 /* the combine panel (in the dossier's place) */
 function renderCombine(){
