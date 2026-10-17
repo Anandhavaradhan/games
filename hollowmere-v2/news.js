@@ -1,4 +1,5 @@
-/* =========================================================
+/* ==================================================  },
+  {
    HOLLOWMERE — NEWS INBOX
    What players read under NEWS on the title screen. Only things meant for players go here:
    new legends, new features, changes they will notice, fixes they asked for. Internal work
@@ -14,6 +15,15 @@
      body   plain text, a short paragraph or two (blank line between paragraphs). No HTML.
    ========================================================= */
 export const NEWS = [
+  {
+    id: '2026-10-17-combined-legends-kept',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'Combined legends stay put',
+    body: 'Playing the original Hollowmere could take The Psychopomp out of your vault, and with it any combined legend it was fused into. ' +
+      'That no longer happens: the original now leaves legends it does not know alone, and a combined legend keeps every legend it was made from.\n\n' +
+      'Having the game open in two tabs or on two devices can no longer wipe a combined legend you just made, either.'
+  },
   {
     id: '2026-10-17-trinkets-fix',
     date: '2026-10-17',

@@ -101,6 +101,13 @@ export function savePlayer(uid, data, opts) {
   const d = Object.assign({}, data, { lastSeen: F.serverTimestamp() });
   if (d.live) d.live = Object.assign({}, d.live, { updatedAt: F.serverTimestamp() });
   if (opts && opts.create) d.createdAt = F.serverTimestamp();
+  /* combined legends are only ever added in the game, so they are added to what the account already
+     holds instead of written over it: a second tab or device that has not seen a new one cannot wipe it */
+  if (d.stats && Array.isArray(d.stats.combos)) {
+    d.stats = Object.assign({}, d.stats);
+    if (d.stats.combos.length) d.stats.combos = F.arrayUnion(...d.stats.combos);
+    else delete d.stats.combos;
+  }
   return F.setDoc(F.doc(db, 'players', uid), d, { merge: true });
 }
 

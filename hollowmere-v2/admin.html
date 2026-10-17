@@ -5,7 +5,7 @@
   Only accounts listed in the Firestore collection "admins" can see any data;
   everyone else gets instructions instead (firestore.rules enforces this, not the page).
   Shows: headline figures, who is in the house right now (live clocks),
-  the leaderboard (with remove / block), every player, and each player's run history.
+  the leaderboard (with remove / block), character combinations, every player, and each player's run history.
 -->
 <html lang="en">
 <head>
@@ -137,6 +137,21 @@
   .bar i{display:block;height:100%;background:var(--c,var(--veil))}
   .uses{display:grid;grid-template-columns:130px 1fr 36px;gap:4px 10px;align-items:center;font-size:12px}
 
+  /* ---- character combinations (combined legends) ---- */
+  .combos{list-style:none;border:1px solid var(--line);border-radius:4px}
+  .combos li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:9px 14px;border-top:1px solid var(--line)}
+  .combos li:first-child{border-top:0}
+  .combos .cwho{background:none;border:0;cursor:pointer;color:var(--bone);font-weight:500;min-width:120px;text-align:left}
+  .combos .cwho:hover{color:var(--ember)}
+  .combos .cparts{display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:200px}
+  .combos .cmeta{color:var(--ash);font-size:12px;white-space:nowrap}
+  .cpart{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border:1px solid #2c3042;border-radius:10px;font-size:12px;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 18%,transparent),transparent 80%)}
+  .cpart.gone{border-color:var(--blood);color:var(--blood)}
+  .cpart.pick{cursor:pointer;color:var(--dim);background:#0b0d14}
+  .cpart.pick.on{color:var(--bone);border-color:var(--c)}
+  .cpart.pick b{color:var(--ember)}
+  .lost{color:var(--blood);font-size:13px;margin-top:8px}
+
   /* ---- keeper's edits: only visible while the drawer is in edit mode ---- */
   .lg.can{cursor:pointer}
   .lg.can:hover{border-color:var(--c);color:var(--bone)}
@@ -199,8 +214,22 @@ function dur(sec){sec=Math.round(sec||0);const h=Math.floor(sec/3600),m=Math.flo
 function ago(t){if(!t)return '—';const d=(Date.now()-t)/1000;
   if(d<45)return 'just now';if(d<3600)return Math.round(d/60)+' min ago';if(d<86400)return Math.round(d/3600)+' h ago';
   if(d<86400*14)return Math.round(d/86400)+' d ago';return new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});}
-const legendName=id=>BY[id]?BY[id][1].replace(/(^|\s)(\S)(\S*)/g,(m,a,b,c)=>a+b+c.toLowerCase()):/^cx/.test(id||'')?'A combined legend':(id||'—');
-const legendColour=id=>BY[id]?BY[id][3]:'#8c8573';
+/* COMBO_NAME: every combined legend's name (its legends joined with +), filled from the players' records */
+const COMBO_NAME={};
+const legendName=id=>BY[id]?BY[id][1].replace(/(^|\s)(\S)(\S*)/g,(m,a,b,c)=>a+b+c.toLowerCase()):COMBO_NAME[id]?COMBO_NAME[id]:/^cx/.test(id||'')?'A combined legend':(id||'—');
+const legendColour=id=>BY[id]?BY[id][3]:COMBO_FIRST[id]?BY[COMBO_FIRST[id]][3]:'#8c8573';
+/* CHARACTER COMBINATIONS — a player's combined legends live in stats.combos as [{id:'cx…', p:[2 to 5 legend ids]}].
+   It looks like (and everyone else sees) the first legend in p. */
+const COMBO_MAX=5, COMBO_FIRST={};
+const combosOf=p=>{const c=p&&p.stats&&p.stats.combos;
+  return Array.isArray(c)?c.filter(x=>x&&typeof x.id==='string'&&Array.isArray(x.p)&&x.p.length>=2&&x.p.every(id=>BY[id])):[];};
+const comboName=x=>x.p.map(legendName).join(' + ');
+/* combined legends this player has played nights with that are no longer in their record */
+const lostCombos=p=>{const have=new Set(combosOf(p).map(x=>x.id)),u=(p.stats||{}).legendRuns||{};
+  return Object.keys(u).filter(id=>/^cx/.test(id)&&!have.has(id)).map(id=>({id,runs:u[id]}));};
+function nameCombos(){players.forEach(p=>combosOf(p).forEach(x=>{COMBO_FIRST[x.id]=x.p[0];COMBO_NAME[x.id]=x.p.map(id=>legendName(id)).join(' + ');}));}
+const comboChip=(id,own)=>'<span class="cpart'+(own&&!own.has(id)?' gone':'')+'" style="--c:'+legendColour(id)+'"'
+  +(own&&!own.has(id)?' title="Not in their vault any more"':'')+'>'+esc(legendName(id))+'</span>';
 const titleCase=s=>String(s||'').toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase());
 const plural=(n,w)=>n+' '+w+(n===1?'':'s');
 const providerName=p=>p==='google.com'?'Google':p==='password'?'email and password':(p||'email');
@@ -452,6 +481,7 @@ A.onAuthStateChanged(auth,async u=>{
   unsub=F.onSnapshot(F.query(F.collection(db,'players'),F.orderBy('lastSeen','desc'),F.limit(1000)),snap=>{
     const all=snap.docs.map(d=>Object.assign({uid:d.id},d.data()));
     players=all.filter(p=>!isGuestDoc(p));oldGuests=all.filter(isGuestDoc);
+    nameCombos();
     playersLoaded=true;
     render();
     if(openUid)renderDrawer();
@@ -516,6 +546,7 @@ const COLS=[
   ['status','Status',p=>isLive(p)?2:1],
   ['ether','Ether',p=>p.ether||0,'r'],
   ['legends','Legends',p=>(p.unlocked||[]).length,'r'],
+  ['combos','Combined',p=>combosOf(p).length,'r'],
   ['main','Haunts as',p=>legendName(p.main)],
   ['escapes','Escapes',p=>p.escapes||0,'r'],
   ['deaths','Deaths',p=>(p.stats||{}).deaths||0,'r'],
@@ -579,6 +610,17 @@ function render(){
       +'<span class="bx"><button class="mini" data-ptrm="'+esc(r.uid)+'">Remove</button><button class="mini warn" data-ptban="'+esc(r.uid)+'">Remove &amp; block</button></span>'
       +'</li>').join('')+'</ol>'
     :'<p class="empty">No time recorded yet.</p>';
+  /* ---- character combinations: every combined legend, every player ---- */
+  const allC=[];players.forEach(p=>combosOf(p).forEach(x=>allC.push({p,x})));
+  const lostN=players.reduce((a,p)=>a+lostCombos(p).length,0);
+  allC.sort((a,b)=>(((b.p.stats||{}).legendRuns||{})[b.x.id]||0)-(((a.p.stats||{}).legendRuns||{})[a.x.id]||0)||(a.p.name||'').localeCompare(b.p.name||''));
+  h+='<h3>Character combinations <small>'+plural(allC.length,'combined legend')+' \u00b7 '+plural(players.filter(p=>combosOf(p).length).length,'player')
+    +(lostN?' \u00b7 <span style="color:var(--blood)">'+lostN+' missing from a record</span>':'')+'</small></h3>';
+  h+=allC.length?'<ul class="combos">'+allC.map(({p,x})=>{const own=new Set(p.unlocked||[]),runs=((p.stats||{}).legendRuns||{})[x.id]||0;
+      return '<li><button class="cwho" data-uid="'+esc(p.uid)+'">'+esc(p.name||'Unnamed')+'</button>'
+        +'<span class="cparts">'+x.p.map(id=>comboChip(id,own)).join('')+'</span>'
+        +'<span class="cmeta">'+x.p.length+' legends \u00b7 '+plural(runs,'night')+(p.main===x.id?' \u00b7 bound now':'')+'</span></li>';}).join('')+'</ul>'
+    :'<p class="empty">No one has combined legends yet.</p>';
   h+='<h3>Every player <small>'+players.length+'</small></h3>'
     +'<div class="tools"><input id="q" type="search" placeholder="Search name or email" value="'+esc(filter)+'"></div>'
     +'<div class="wrap"><table><thead><tr>'+COLS.map(c=>'<th data-k="'+c[0]+'" class="'+(c[3]||'')+'"'+(sortKey===c[0]?' aria-sort="'+(sortDir>0?'ascending':'descending')+'"':'')+'>'+c[1]
@@ -593,6 +635,7 @@ function render(){
   app.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;
     if(sortKey===k)sortDir=-sortDir;else{sortKey=k;sortDir=(k==='name'||k==='main'||k==='best')?1:-1;}render();});
   app.querySelectorAll('.lcard').forEach(c=>c.onclick=()=>openDrawer(c.dataset.uid));
+  app.querySelectorAll('.combos .cwho').forEach(b=>b.onclick=()=>openDrawer(b.dataset.uid));
   app.querySelectorAll('.board .bname').forEach(b=>b.onclick=()=>{if(players.some(p=>p.uid===b.dataset.uid))openDrawer(b.dataset.uid);});
   app.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>removeFromBoard(b.dataset.rm,false));
   app.querySelectorAll('[data-ban]').forEach(b=>b.onclick=()=>removeFromBoard(b.dataset.ban,true));
@@ -616,7 +659,7 @@ function liveCard(p){
     +'</button>';
 }
 function fillRows(){
-  const col=COLS.find(c=>c[0]===sortKey)||COLS[9];
+  const col=COLS.find(c=>c[0]===sortKey)||COLS.find(c=>c[0]==='active');
   const f=filter.trim().toLowerCase();
   const rows=players.filter(p=>!f||(p.name||'').toLowerCase().includes(f)||(p.email||'').toLowerCase().includes(f))
     .sort((a,b)=>{const x=col[2](a),y=col[2](b);return (x>y?1:x<y?-1:0)*sortDir;});
@@ -631,6 +674,7 @@ function fillRows(){
       +'<td>'+status+'</td>'
       +'<td class="r ether">'+(p.ether||0)+(pend?' <span class="pmail">+'+pend+' unclaimed</span>':'')+'</td>'
       +'<td class="r">'+(p.unlocked||[]).length+' / '+TOTAL+'</td>'
+      +'<td class="r">'+(combosOf(p).length||'—')+'</td>'
       +'<td><span class="dot" style="background:'+legendColour(p.main)+'"></span>'+esc(legendName(p.main))+'</td>'
       +'<td class="r">'+(p.escapes||0)+'</td>'
       +'<td class="r">'+(st.deaths||0)+'</td>'
@@ -639,7 +683,7 @@ function fillRows(){
       +'<td class="r">'+dur(st.activeTime)+'</td>'
       +'<td class="r">'+(live?'now':ago(ms(p.lastSeen)))+'</td>'
       +'<td class="r">'+ago(ms(p.createdAt))+'</td></tr>';
-  }).join(''):'<tr><td colspan="11" class="empty">'+(players.length?'No player matches that search.':'No players yet. They appear here the first time someone signs in to the game.')+'</td></tr>';
+  }).join(''):'<tr><td colspan="'+COLS.length+'" class="empty">'+(players.length?'No player matches that search.':'No players yet. They appear here the first time someone signs in to the game.')+'</td></tr>';
   tb.querySelectorAll('tr[data-uid]').forEach(tr=>{tr.onclick=()=>openDrawer(tr.dataset.uid);
     tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDrawer(tr.dataset.uid);}};});
 }
@@ -686,14 +730,23 @@ function toggleLegend(uid,id){
   had?own.delete(id):own.add(id);
   const list=ALL_IDS.filter(x=>own.has(x)),upd={unlocked:list};
   if(had&&p.main===id)upd.main=list[0]||FREE_IDS[0];
+  /* the game puts a combined legend's legends back in the vault, so sealing one takes its combinations too */
+  const cs=combosOf(p),hit=had?cs.filter(x=>x.p.indexOf(id)>=0):[];
+  if(hit.length){
+    if(!confirm(legendName(id)+' is part of '+hit.map(comboName).join(', ')+'. Sealing it removes '+(hit.length===1?'that combination':'those combinations')+' too. Go on?'))return;
+    upd.stats={combos:cs.filter(x=>hit.indexOf(x)<0).map(x=>({id:x.id,p:x.p.slice()}))};
+    if(hit.some(x=>x.id===p.main))upd.main=list[0]||FREE_IDS[0];
+  }
   patch(uid,upd,(had?'Sealed ':'Granted ')+legendName(id));
 }
 function grantAll(uid){patch(uid,{unlocked:ALL_IDS.slice()},'All '+TOTAL+' legends granted');}
 function revokeAll(uid){
   const p=players.find(x=>x.uid===uid);if(!p)return;
-  if(!confirm('Seal every legend except the five the game gives everyone?'))return;
-  const keep=ALL_IDS.filter(x=>FREE_IDS.indexOf(x)>=0);
-  patch(uid,{unlocked:keep,main:keep.indexOf(p.main)>=0?p.main:keep[0]},'Back to the five starting legends');
+  const cs=combosOf(p),left=cs.filter(x=>x.p.every(id=>FREE_IDS.indexOf(id)>=0));
+  if(!confirm('Seal every legend except the five the game gives everyone?'+(cs.length>left.length?' Their combined legends made with any other legend go too.':'')))return;
+  const keep=ALL_IDS.filter(x=>FREE_IDS.indexOf(x)>=0),upd={unlocked:keep,main:keep.indexOf(p.main)>=0||left.some(x=>x.id===p.main)?p.main:keep[0]};
+  if(cs.length>left.length)upd.stats={combos:left.map(x=>({id:x.id,p:x.p.slice()}))};
+  patch(uid,upd,'Back to the five starting legends');
 }
 function clearPending(uid){patch(uid,{pending:[]},'Unclaimed ether cleared');}
 /* Save the whole form in one write. Blank or nonsense values keep what was there. */
@@ -852,6 +905,7 @@ function renderDrawer(){
         +(editing?' data-grant="'+esc(r[0])+'" role="button" tabindex="0" title="'+(own.has(r[0])?'Seal':'Grant')+' '+esc(legendName(r[0]))+'"':'')
         +'>'+esc(legendName(r[0]))+'<small>'+(own.has(r[0])?(p.main===r[0]?'bound · ':'')+(uses[r[0]]||0)+' runs':'sealed')+'</small></div>').join('')+'</div>';
   });
+  h+=comboSection(p);
   const runs=runsCache[p.uid];
   h+='<h3>Recent runs</h3>';
   if(!runs)h+='<p class="empty">Loading…</p>';
@@ -886,13 +940,57 @@ function renderDrawer(){
     el.onclick=()=>toggleLegend(p.uid,el.dataset.grant);
     el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleLegend(p.uid,el.dataset.grant);}};});
   drawer.querySelectorAll('[data-run]').forEach(b=>b.onclick=()=>deleteRun(p.uid,b.dataset.run));
+  drawer.querySelectorAll('[data-cpick]').forEach(el=>el.onclick=()=>{const id=el.dataset.cpick,k=cmbPick.indexOf(id);
+    if(k>=0)cmbPick.splice(k,1);else if(cmbPick.length<COMBO_MAX)cmbPick.push(id);renderDrawer();});
+  drawer.querySelectorAll('[data-crm]').forEach(b=>b.onclick=()=>removeCombo(p.uid,b.dataset.crm));
+  on('e_cadd',()=>addCombo(p.uid));
+}
+/* the player's combined legends; while editing, remove one or put one together for them */
+function comboSection(p){
+  const cs=combosOf(p),own=new Set(p.unlocked||[]),uses=(p.stats||{}).legendRuns||{},lost=lostCombos(p);
+  let h='<h3>Character combinations <small>'+plural(cs.length,'combined legend')+'</small></h3>';
+  h+=cs.length?'<ul class="combos">'+cs.map(x=>'<li><span class="cparts">'+x.p.map(id=>comboChip(id,own)).join('')+'</span>'
+      +'<span class="cmeta">'+plural(uses[x.id]||0,'night')+(p.main===x.id?' \u00b7 bound now':'')+'</span>'
+      +(editing?'<button class="mini warn" data-crm="'+esc(x.id)+'">Remove</button>':'')+'</li>').join('')+'</ul>'
+    :'<p class="empty">No combined legends.</p>';
+  if(lost.length)h+='<p class="lost">'+plural(lost.length,'combined legend')+' they played with '+(lost.length===1?'is':'are')+' no longer in this record ('
+    +lost.map(l=>plural(l.runs,'night')).join(', ')+'). The record does not say which legends '+(lost.length===1?'it was':'they were')+' made of; ask the player and put it back below.</p>';
+  if(editing){
+    cmbPick=cmbPick.filter(id=>BY[id]);
+    const dup=cmbPick.length>=2&&cs.some(x=>x.p.slice().sort().join('|')===cmbPick.slice().sort().join('|'));
+    h+='<div class="edits" style="margin-top:12px"><h4>Put a combination together</h4>'
+      +'<div class="hint">Pick 2 to '+COMBO_MAX+' legends in order (the first is the one it looks like). It costs them nothing, and any picked legend they do not own is granted with it.</div>'
+      +'<div class="cparts" style="margin-top:8px">'+ALL_IDS.filter(id=>id!=='god').map(id=>{const k=cmbPick.indexOf(id);
+        return '<span class="cpart pick'+(k>=0?' on':'')+'" data-cpick="'+esc(id)+'" style="--c:'+legendColour(id)+'">'+(k>=0?'<b>'+(k+1)+'</b>':'')+esc(legendName(id))+(own.has(id)?'':' \u00b7 sealed')+'</span>';}).join('')+'</div>'
+      +'<div class="editbar"><button class="btn primary" id="e_cadd"'+(cmbPick.length>=2&&!dup?'':' disabled')+'>'
+      +(dup?'They already have this combination':'Add '+(cmbPick.length>=2?cmbPick.map(legendName).join(' + '):'combination'))+'</button></div></div>';
+  }
+  return h;
+}
+let cmbPick=[];
+function addCombo(uid){
+  const p=players.find(x=>x.uid===uid);if(!p||cmbPick.length<2)return;
+  const cs=combosOf(p).map(x=>({id:x.id,p:x.p.slice()})),pick=cmbPick.slice();
+  if(cs.some(x=>x.p.slice().sort().join('|')===pick.slice().sort().join('|')))return;
+  cs.push({id:'cx'+Date.now().toString(36),p:pick});
+  const own=new Set(p.unlocked||[]);pick.forEach(id=>own.add(id));
+  cmbPick=[];
+  patch(uid,{unlocked:ALL_IDS.filter(x=>own.has(x)).concat((p.unlocked||[]).filter(x=>!BY[x])),stats:{combos:cs}},'Added '+pick.map(legendName).join(' + '));
+}
+function removeCombo(uid,id){
+  const p=players.find(x=>x.uid===uid);if(!p)return;
+  const x=combosOf(p).find(c=>c.id===id);if(!x)return;
+  if(!confirm('Remove '+comboName(x)+' from '+(p.name||'this player')+'?\n\nThey keep the legends it was made of. If their game is open right now it will put the combination back, so do this while they are away.'))return;
+  const upd={stats:{combos:combosOf(p).filter(c=>c.id!==id).map(c=>({id:c.id,p:c.p.slice()}))}};
+  if(p.main===id)upd.main=x.p[0];
+  patch(uid,upd,'Removed '+comboName(x));
 }
 
 /* the edit form: name, ether, the counters, and the buttons that act at once */
 function editPanel(p){
   const st=p.stats||{}, own=new Set(p.unlocked||[]);
   const ownIds=ALL_IDS.filter(id=>own.has(id));
-  const opts=(ownIds.length?ownIds:FREE_IDS).map(id=>'<option value="'+esc(id)+'"'+(p.main===id?' selected':'')+'>'+esc(legendName(id))+'</option>').join('');
+  const opts=(ownIds.length?ownIds:FREE_IDS).concat(combosOf(p).map(x=>x.id)).map(id=>'<option value="'+esc(id)+'"'+(p.main===id?' selected':'')+'>'+esc(legendName(id))+'</option>').join('');
   const field=(id,label,v,extra)=>'<div><label for="'+id+'">'+label+'</label><input id="'+id+'" type="number" min="0" '+(extra||'')+' value="'+v+'"></div>';
   return '<div class="edits"><h4>Keeper\'s edits</h4>'
     +'<div class="hint">These write straight to the player\'s record. The legend tiles below are clickable while this is open.</div>'
