@@ -16,6 +16,15 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-todays-bounties',
+    date: '2026-10-17',
+    tag: 'NEW',
+    title: "Today's bounties",
+    body: "There are now three bounties for the whole day, alongside the three you get each night. Everyone who plays that day gets the same three, and new ones arrive at midnight.\n\n" +
+      "Every night you play counts towards them, even the ones you do not survive, and each pays a large share of ether once it is done. " +
+      "See them under TODAY'S BOUNTIES on the title screen, and under tonight's bounties while you play."
+  },
+  {
     id: '2026-10-17-combined-legends-kept',
     date: '2026-10-17',
     tag: 'FIX',
