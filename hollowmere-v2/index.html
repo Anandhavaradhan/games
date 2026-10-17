@@ -5420,16 +5420,28 @@ function uiMusicTick(){
     (vaultOpen||settingsOpen||state==='title'||state==='dead'||state==='win');
   if(want!==UIM.want){UIM.want=want;uiMusicSet(want);}
 }
-/* the audio context can only wake on a gesture — any gesture will do */
+/* the audio context can only wake on a gesture. Phones are strict about which one:
+   Chrome on Android counts only the END of a tap (touchend / pointerup / click), not the touch going
+   down, so a context made on touchstart is born asleep. The phone can also put it back to sleep at any
+   time (another app takes the sound, the screen locks, the tab is hidden). So every gesture, caught
+   before any button can swallow it, wakes it again if it is not running, and so does coming back to the tab. */
+function wakeAudio(){
+  try{if(AC&&AC.state!=='running'&&AC.state!=='closed'&&AC.resume)AC.resume().catch(()=>{});}catch(e){}}
 function armAudio(){
-  if(AC)return;
-  try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){}
+  if(AC){wakeAudio();return;}
+  try{initAudio();}catch(e){}
+  if(!AC)return;
+  wakeAudio();
+  /* the phone suspended it on its own: wake it as soon as that is allowed */
+  AC.addEventListener('statechange',()=>{if(AC.state!=='running'&&document.visibilityState==='visible')wakeAudio();});
   UIM.want=null;
   uiMusicTick();
 }
-addEventListener('pointerdown',armAudio,{passive:true});
-addEventListener('keydown',armAudio);
-addEventListener('touchstart',armAudio,{passive:true});
+['pointerdown','pointerup','touchstart','touchend','mousedown','click','keydown'].forEach(ev=>
+  addEventListener(ev,armAudio,{capture:true,passive:true}));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wakeAudio();});
+addEventListener('pageshow',wakeAudio);
+addEventListener('focus',wakeAudio);
 
 {const mb=$('musicBtn');
  if(mb){

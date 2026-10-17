@@ -16,6 +16,15 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-sound-on-phones',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'Sound on phones and tablets',
+    body: 'On Android phones and tablets the house could stay silent: the first touch did not count as the tap the browser waits for, ' +
+      'and once the phone muted the game (another app, a locked screen, switching tabs) the sound never came back.\n\n' +
+      'Now any tap wakes the sound again, and so does coming back to the game.'
+  },
+  {
     id: '2026-10-17-grow-combined',
     date: '2026-10-17',
     tag: 'NEW',
