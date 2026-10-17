@@ -7949,7 +7949,7 @@ function renderFriends(){
         +'<span class="frbtn go" data-fr="gift" data-u="'+escHTML(f.uid)+'">GIFT</span>'
         +'<span class="frbtn no" data-fr="remove" data-u="'+escHTML(f.uid)+'">REMOVE</span></div>';}).join('')
       :'<p class="frnote">No friends yet. Add someone by their username above.</p>';
-    h+='<div class="frsec">GIFTS</div><div class="fradd"><span class="frnote" style="flex:1;margin:0">Give ether or a legend to any player. What you give leaves your vault.</span><span class="frbtn go" data-fr="gift">SEND A GIFT</span></div>';
+    h+='<div class="frsec">GIFTS</div><div class="fradd"><span class="frnote" style="flex:1;margin:0">Give ether, ash or a legend to any player. What you give leaves your vault.</span><span class="frbtn go" data-fr="gift">SEND A GIFT</span></div>';
     h+='<p class="frnote">Friends can see when you are online, watch your nights live and invite you into their co-op room. Only your friends can. INVITE makes a room and asks them in.</p>';
   }
   const keep=$('frName')?$('frName').value:'';
@@ -8135,13 +8135,13 @@ import('./news.js').then(m=>{
 }).catch(e=>console.warn('News unavailable:',e));
 
 /* =========================================================
-   GIFTS — give ether or a legend to another player. If you gift it, you lose it.
+   GIFTS — give ether, ash or a legend to another player. If you gift it, you lose it.
    Signed-in players with a username only (guests are temporary). The recipient is found by username.
-   Sending: your record pays (ether down by exactly the amount, or the legend out of your vault) in the
+   Sending: your record pays (ether or ash down by exactly the amount, or the legend out of your vault) in the
    same write that creates gifts/{id}; firestore.rules refuse any gift that was not paid for.
    Collecting: the recipient's game watches gifts sent to it and adds each one to its own record in the
    same write that deletes the gift, so a gift is collected once and only once.
-   What can be gifted: ether, and any legend you bought. Not the free five (everyone has them), not the
+   What can be gifted: ether, ash, and any legend you bought. Not the free five (everyone has them), not the
    keeper's GOD legend, not a combined legend, and not a legend fused into one of your combined legends
    (giving it away would break the combined legend you paid for).
    A legend the recipient already has turns into its price in ether instead.
@@ -8171,15 +8171,17 @@ async function giftCollect(){
   if(!g)return;
   const me=cloudUser.uid;
   GIFT.busy=true;GIFT.done[g.id]=1;
-  let ether=0,legend='',what='';
+  let ether=0,ash=0,legend='',what='';
   if(g.kind==='legend'&&BYID[g.legend]&&!BYID[g.legend].combo&&g.legend!=='god'){
     if(save.unlocked.indexOf(g.legend)<0){legend=g.legend;what=BYID[g.legend].n;}
     else{ether=TIER_COST[BYID[g.legend].tier]||0;what=BYID[g.legend].n+' (already yours — '+ether+' ether instead)';}
   }else if(g.kind==='ether'&&g.n>0){ether=Math.floor(g.n);what=ether+' ether';}
+  else if(g.kind==='ash'&&g.n>0){ash=Math.floor(g.n);what=ash+' ash';}
   try{
-    await cloud.claimGift(me,g.id,ether,legend);
+    await cloud.claimGift(me,g.id,ether,legend,ash);
     if(cloudUser&&cloudUser.uid===me){
       if(ether)save.ether+=ether;
+      if(ash)save.ash=Math.min(1e7,(save.ash||0)+ash);
       if(legend&&save.unlocked.indexOf(legend)<0)save.unlocked.push(legend);
       saveNow();if(vaultOpen)renderVault();
       if(what){SFX.chime();toast('✦ '+String(g.fromName||'A PLAYER').toUpperCase()+' GIFTED YOU '+what.toUpperCase(),4.5);}
@@ -8210,10 +8212,14 @@ function renderGift(){
     if(GIFT.legend&&!list.some(c=>c.id===GIFT.legend))GIFT.legend='';
     h+='<div class="frsec">TO</div><input class="acin" id="gfTo" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Their username" value="'+escHTML(GIFT.to)+'">';
     h+='<div class="frsec">WHAT</div><div class="gftabs"><span class="frbtn'+(GIFT.kind==='ether'?' on':'')+'" data-gf="kind" data-k="ether">ETHER</span>'
+      +'<span class="frbtn'+(GIFT.kind==='ash'?' on':'')+'" data-gf="kind" data-k="ash">ASH</span>'
       +'<span class="frbtn'+(GIFT.kind==='legend'?' on':'')+'" data-gf="kind" data-k="legend">A LEGEND</span></div>';
     if(GIFT.kind==='ether'){
       h+='<input class="acin" id="gfAmt" type="number" inputmode="numeric" min="1" max="'+Math.min(GIFT_MAX,save.ether)+'" placeholder="How much ether" value="'+escHTML(GIFT.amt)+'">'
         +'<p class="frnote">You have <b>'+save.ether+'</b> ether.</p>';
+    }else if(GIFT.kind==='ash'){
+      h+='<input class="acin" id="gfAmt" type="number" inputmode="numeric" min="1" max="'+Math.min(GIFT_MAX,save.ash||0)+'" placeholder="How much ash" value="'+escHTML(GIFT.amt)+'">'
+        +'<p class="frnote">You have <b>'+(save.ash||0)+'</b> ash.</p>';
     }else{
       h+=list.length?'<div class="gflist">'+list.map(c=>'<div class="frrow'+(GIFT.legend===c.id?' on':'')+'" data-gf="pick" data-l="'+c.id+'"><div class="who"><b>'+escHTML(c.n)+'</b><span>'
           +escHTML(c.r)+(save.main===c.id&&!(GOD.on&&GOD.ok)?' · bound now':'')+'</span></div>'+(GIFT.legend===c.id?'<span class="frbtn go">✓</span>':'')+'</div>').join('')+'</div>'
@@ -8232,11 +8238,12 @@ async function giftSend(){
   const nm=(GIFT.to||'').replace(/\s+/g,' ').trim();
   if(!nm){gfMsg('Type their username.');return;}
   let n=0,c=null;
-  if(GIFT.kind==='ether'){
+  const cur=GIFT.kind==='ash'?'ash':'ether',have=GIFT.kind==='ash'?(save.ash||0):save.ether;
+  if(GIFT.kind==='ether'||GIFT.kind==='ash'){
     n=Math.floor(Number(GIFT.amt));
-    if(!(n>=1)){gfMsg('Type how much ether to send.');return;}
-    if(n>GIFT_MAX){gfMsg('At most '+GIFT_MAX+' ether in one gift.');return;}
-    if(n>save.ether){gfMsg('You only have '+save.ether+' ether.');return;}
+    if(!(n>=1)){gfMsg('Type how much '+cur+' to send.');return;}
+    if(n>GIFT_MAX){gfMsg('At most '+GIFT_MAX+' '+cur+' in one gift.');return;}
+    if(n>have){gfMsg('You only have '+have+' '+cur+'.');return;}
   }else{
     c=BYID[GIFT.legend];
     if(!c||!giftable().some(x=>x.id===c.id)){gfMsg('Pick a legend to send.');return;}
@@ -8247,17 +8254,17 @@ async function giftSend(){
     const own=await cloud.usernameOwner(nm);
     if(!own){gfMsg('No player has the username "'+nm+'".');return;}
     if(own.uid===me){gfMsg('You cannot gift yourself.');return;}
-    const what=c?c.n:n+' ether';
+    const what=c?c.n:n+' '+cur;
     if(!confirm('Give '+what+' to '+own.name+'?\n\nIf you gift it, you lose it. This cannot be undone.'))return;
     /* make sure the account holds what this device holds before paying from it */
     GIFT.busy=false;await cloudPush();GIFT.busy=true;
     if(syncBad){gfMsg('Your account is not synced yet. Try again in a moment.');return;}
-    await cloud.sendGift(me,my,own.uid,own.name,c?'legend':'ether',n,c?c.id:'');
+    await cloud.sendGift(me,my,own.uid,own.name,c?'legend':cur,n,c?c.id:'');
     if(c){
       const i=save.unlocked.indexOf(c.id);if(i>=0)save.unlocked.splice(i,1);
       if(save.main===c.id)setLegend(FIRST_GHOST);
       GIFT.legend='';
-    }else{save.ether-=n;GIFT.amt='';}
+    }else{if(cur==='ash')save.ash=Math.max(0,(save.ash||0)-n);else save.ether-=n;GIFT.amt='';}
     saveNow();if(vaultOpen)renderVault();
     SFX.chime();
     gfMsg(what+' is on its way to '+own.name+'.',true);
