@@ -1486,7 +1486,7 @@ const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','me
 /* the ids today's bounties can have (see DAILY_POOL) */
 const DAILY_IDS_SAVE=['d_emb','d_mem','d_lure','d_close','d_hunt','d_esc','d_hide','d_bnt'];
 function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
-function freshSave(){return {bty:{d:'',p:{},done:[]},combos:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
+function freshSave(){return {bty:{d:'',p:{},done:[]},combos:[],cmbPend:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
    new account. A signed-in account's local copy (LS_KEY:uid) stays in localStorage as before. */
@@ -1531,6 +1531,8 @@ function cleanSave(raw,isLocal){
   out.combos.forEach(x=>x.p.forEach(id=>{if(out.unlocked.indexOf(id)<0)out.unlocked.push(id);}));
   if(st.legendRuns&&typeof st.legendRuns==='object')
     out.combos.forEach(x=>{if(typeof st.legendRuns[x.id]==='number')out.stats.legendRuns[x.id]=st.legendRuns[x.id];});
+  /* combined legends made (or grown) on this device that the account has not confirmed yet (only kept on the device) */
+  if(Array.isArray(src.cmbPend))out.cmbPend=src.cmbPend.filter((id,i,a)=>out.combos.some(x=>x.id===id)&&a.indexOf(id)===i);
   /* news notices this player has read (kept in the cloud inside stats, like the combined legends) */
   const nr=Array.isArray(src.newsRead)?src.newsRead:(src.stats&&Array.isArray(src.stats.newsRead))?src.stats.newsRead:[];
   out.newsRead=nr.filter((id,i,a)=>typeof id==='string'&&NEWS_ID_RE.test(id)&&a.indexOf(id)===i).slice(-NEWS_KEEP);
@@ -1602,6 +1604,14 @@ function comboBuild(x){
     ab:{n:abs.map(a=>a.n).join(' + '),k:'multi',cd:Math.min.apply(null,abs.map(a=>a.cd)),cost:Math.min.apply(null,abs.map(a=>a.cost)),parts:abs,
       p:abs.map(a=>a.n).join(', ')+' \u2014 '+abs.length+' powers, each with its own essence and cooldown. Fire one (keys 1\u2013'+abs.length+', or tap its icon) or the ticked ones together (G or ALL). Hold an icon (or Alt + its number) to tick or untick it.',
       d:abs.map(a=>a.d).join(' ')}};
+}
+/* a combined legend was just made or grown here: it is saved to the account at once (not after the usual
+   short wait), and this device remembers it until the account has it, so closing or leaving the game
+   before that write lands cannot lose it (see applyUser) */
+function comboMade(id){
+  if(!Array.isArray(save.cmbPend))save.cmbPend=[];
+  if(save.cmbPend.indexOf(id)<0)save.cmbPend.push(id);
+  saveNow();cloudPush();
 }
 /* put this save's combined legends into the vault (and take out any from another save) */
 function comboSync(list){
@@ -5152,7 +5162,7 @@ function comboAddLegend(c,pick){
   if(!x||x.p.length>=COMBO_MAX||!comboAddable(c).some(o=>o.id===pick))return '';
   const next=x.p.concat(pick),cost=comboAddCost(x.p.length);
   if(save.ether<cost||save.combos.some(y=>y!==x&&comboKey(y.p)===comboKey(next)))return '';
-  save.ether-=cost;x.p=next;comboSync(save.combos);saveNow();
+  save.ether-=cost;x.p=next;comboSync(save.combos);comboMade(x.id);
   /* bound to it: rebuild it now so the new power is on the HUD */
   if(isBound(x.id))setLegend(x.id);
   return x.id;
@@ -5204,7 +5214,7 @@ function renderCombine(){
     if(p.length<2||p.length>COMBO_MAX||save.ether<price||save.combos.length>=COMBO_LIMIT)return;
     if(save.combos.some(x=>comboKey(x.p)===comboKey(p)))return;
     const id='cx'+Date.now().toString(36);
-    save.ether-=price;save.combos.push({id,p});comboSync(save.combos);
+    save.ether-=price;save.combos.push({id,p});comboSync(save.combos);comboMade(id);
     if(GOD.on)setGod(false,true);
     setLegend(id);
     vCombining=false;vCmbPick=[];vSel=ROSTER.indexOf(BYID[id]);vFilter='ALL';
@@ -6741,7 +6751,12 @@ function cloudPush(create){
       combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),bty:{d:(save.bty&&save.bty.d)||'',p:Object.assign({},save.bty&&save.bty.p),done:((save.bty&&save.bty.done)||[]).slice()},ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id])}),
     live:liveNow()};
   const gone=Array.from(UPS_GONE).filter(id=>!(save.ups||{})[id]);
+  const sent=(save.cmbPend||[]).slice(),uid=cloudUser.uid;
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
+    .then(()=>{   /* the account has these combined legends now */
+      if(!sent.length||!cloudUser||cloudUser.uid!==uid)return;
+      save.cmbPend=(save.cmbPend||[]).filter(id=>sent.indexOf(id)<0);
+      try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}})
     .then(()=>gone.length&&typeof cloud.dropUps==='function'?cloud.dropUps(cloudUser.uid,gone,UP_MAX).then(()=>gone.forEach(id=>UPS_GONE.delete(id))):0)
     .then(()=>{lastSync=Date.now();syncBad=false;updateAcctLive();})
     .catch(e=>{syncBad=true;console.warn('Progress sync failed:',e);updateAcctLive();});
@@ -6829,7 +6844,21 @@ async function applyUser(u){
     if(mine&&mine.ups&&typeof mine.ups==='object'){let ahead=false;
       Object.keys(mine.ups).forEach(id=>{const l=mine.ups[id]|0;
         if(l>(next.ups[id]||0)&&l<=UP_MAX&&next.unlocked.indexOf(id)>=0&&BYID[id]&&!BYID[id].combo){next.ups[id]=l;ahead=true;}});
-      if(ahead&&typeof mine.ash==='number'&&isFinite(mine.ash))next.ash=Math.max(0,Math.min(next.ash,Math.floor(mine.ash)));}}
+      if(ahead&&typeof mine.ash==='number'&&isFinite(mine.ash))next.ash=Math.max(0,Math.min(next.ash,Math.floor(mine.ash)));}
+    /* combined legends made or grown on this device whose save had not reached the account when the game was
+       closed or left: they are put back (with the ether this device had left after paying for them), and are
+       sent to the account straight away below */
+    if(mine&&Array.isArray(mine.cmbPend)&&mine.cmbPend.length){const mc=cleanSave(mine,false);let back=false;
+      mc.cmbPend.forEach(id=>{const x=mc.combos.find(y=>y.id===id);if(!x)return;
+        const have=next.combos.find(y=>y.id===id);
+        if(have&&have.p.length>=x.p.length)return;
+        if(next.combos.some(y=>y.id!==id&&comboKey(y.p)===comboKey(x.p)))return;
+        if(!have&&next.combos.length>=COMBO_LIMIT)return;
+        if(have)have.p=x.p.slice();else next.combos.push({id:x.id,p:x.p.slice()});
+        x.p.forEach(l=>{if(next.unlocked.indexOf(l)<0)next.unlocked.push(l);});
+        if(next.cmbPend.indexOf(id)<0)next.cmbPend.push(id);back=true;});
+      if(back){next.ether=Math.max(0,Math.min(next.ether,mc.ether));
+        if(next.combos.some(y=>y.id===mine.main))next.main=mine.main;}}}
   if(wantName&&wantName.uid===u.uid)u.name=wantName.name;
   else if(data&&data.name)u.name=String(data.name).slice(0,40);
   /* progress moves, it is not copied: the guest slot in this browser starts fresh */

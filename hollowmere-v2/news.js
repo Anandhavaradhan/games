@@ -16,6 +16,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-combined-legends-saved',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'New combined legends are kept',
+    body: 'A combined legend you had just made, or just added a legend to, could vanish if you closed the game, reloaded it or headed into a night straight away. ' +
+      'It is now saved to your account the moment you make it, and if the game is closed before that save lands, it comes back the next time you sign in.'
+  },
+  {
     id: '2026-10-17-gift-ash',
     date: '2026-10-17',
     tag: 'NEW',
