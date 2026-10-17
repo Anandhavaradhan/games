@@ -5488,10 +5488,13 @@ const ENG={carry:0,lures:0,close:0,hidT:0,ccArmed:false,ccCool:0,fly:null,bounti
 /* a bottle: a lathe of green glass with a faint glint so a beam can find it */
 const trinketGeo=(()=>{const p=[[0,0],[0.045,0],[0.05,0.02],[0.05,0.13],[0.03,0.17],[0.016,0.19],[0.016,0.25],[0.02,0.26],[0,0.26]]
   .map(([r,y])=>new THREE.Vector2(r,y));const g=new THREE.LatheGeometry(p,10);g.computeVertexNormals();return g;})();
-const trinketMat=std({color:0x2c4a36,roughness:0.15,metalness:0.2,emissive:0x0d2418,emissiveIntensity:0.6});
+const trinketMat=std({color:0x3a7a55,roughness:0.15,metalness:0.2,emissive:0x2f9a66,emissiveIntensity:1.1});
+/* big enough to spot across a room, with a green glow that does not need your torch to find it */
 function makeTrinket(){const grp=new THREE.Group();
-  const b=new THREE.Mesh(trinketGeo,trinketMat);b.rotation.z=Math.PI/2.3;b.castShadow=true;grp.add(b);
-  const halo=glowSprite(0x8fd1b0,0.28);halo.position.y=0.06;grp.add(halo);
+  const b=new THREE.Mesh(trinketGeo,trinketMat);b.rotation.z=Math.PI/2.3;b.position.y=0.05;b.castShadow=true;grp.add(b);
+  const halo=glowSprite(0x8fe8b8,0.85);halo.position.y=0.12;halo.material.fog=false;grp.add(halo);
+  const core=glowSprite(0xd8ffe8,0.22);core.position.y=0.1;core.material.fog=false;grp.add(core);
+  grp.userData.halo=halo;grp.scale.setScalar(1.7);
   grp.position.set(0,-10,0);scene.add(grp);return grp;}
 const trinkets=[];
 for(let i=0;i<NF*TRINKET_MAX;i++)trinkets.push({x:0,z:0,f:0,grp:makeTrinket(),taken:true});
@@ -5505,7 +5508,7 @@ function scatterTrinkets(){
     for(let k=0;k<TRINKET_MAX;k++){const t=trinkets[i++];
       const[x,z]=src[Math.floor(Math.random()*src.length)];
       /* off-centre in the cell, as if it rolled there */
-      t.f=f;t.x=(x+.5)*CS+(Math.random()-.5)*0.9;t.z=(z+.5)*CS+(Math.random()-.5)*0.9;t.taken=false;
+      t.f=f;t.x=(x+.5)*CS+(Math.random()-.5)*0.9;t.z=(z+.5)*CS+(Math.random()-.5)*0.9;t.taken=false;t.heard=false;
       t.grp.position.set(t.x,f*FH+0.05,t.z);t.grp.rotation.y=Math.random()*6.28;t.grp.visible=true;}}}
 
 /* ---- the bounties ---- */
@@ -5572,20 +5575,22 @@ function shatter(fl){
   thrown.visible=false;ENG.fly=null;
   const pan=Math.max(-1,Math.min(1,panOf(fl.x1,fl.z1)));
   const v=0.4+0.6*volAt(Math.hypot(fl.x1-P.x,fl.z1-P.z),18);
-  noiseHit({dur:.35,vol:.32*v,type:'highpass',f:3200,f2:1800,q:0.8,pan,echo:.6,att:0.002});
+  noiseHit({dur:.45,vol:.5*v,type:'highpass',f:3200,f2:1800,q:0.8,pan,echo:.6,att:0.002});
   [2200,3100,4150].forEach((f,i)=>tone({f,f2:f*0.92,type:'triangle',dur:.25,vol:.035*v,a:.002,pan,echo:.5,delay:i*0.03+Math.random()*0.04}));
   for(let i=0;i<12;i++)spawnPart(fl.x1,fl.y1+0.1,fl.z1,0x8fd1b0,{x:(Math.random()-.5)*2.2,y:Math.random()*1.6,z:(Math.random()-.5)*2.2},.6,.18);
   /* the thing goes to look: on this floor from across the house, through the ceiling or floor if it is close */
-  if(M.goneT>0||M.stunT>0)return;
-  const dm=Math.hypot(M.x-fl.x1,M.z-fl.z1),same=M.floor===fl.f;
-  if(!(same?dm<24:(Math.abs(M.floor-fl.f)===1&&dm<10)))return;
-  if(M.state==='chase'&&(M.losLostT<0.25||(MP&&M.tgt&&M.tgt!==P)))return;   /* it still has you in sight */
+  /* the thing hears breaking glass from anywhere in the house and comes to look, down or up the stairs
+     if it has to. You are always told what came of it, so a throw never seems to do nothing. */
+  const nobody=()=>subtitle('The glass rings out. Nothing comes to look\u2026 this time.',2.8);
+  if(M.goneT>0||M.stunT>0){nobody();return;}
+  if(M.state==='chase'&&(M.losLostT<0.25||(MP&&M.tgt&&M.tgt!==P))){subtitle('It does not even turn. It still sees you.',2.6);return;}
   const[cx,cz]=cellOf(fl.x1,fl.z1);
   const was=M.state;
   M.state=was==='chase'?'search':'investigate';M.invT=0;M.searchT=3;M.losLostT=0;M.path=null;M.pathI=0;
   setTargetCell(cx,cz,fl.f);
   ENG.lures++;
-  subtitle(was==='chase'?'It wheels toward the breaking glass.':'Somewhere, it turns toward the sound.',2.8);}
+  subtitle(was==='chase'?'It wheels toward the breaking glass.':M.floor===fl.f?'Somewhere, it turns toward the sound.':
+    (M.floor>fl.f?'Above you, it stops \u2014 and starts down the stairs toward the sound.':'Below you, it stops \u2014 and starts up the stairs toward the sound.'),3.2);}
 
 /* ---- each frame of play ---- */
 function engPlayer(dt){
@@ -5596,6 +5601,12 @@ function engPlayer(dt){
     if(Math.hypot(t.x-P.x,t.z-P.z)<PS.pick+(AB.quickT>0?0.7:0)){t.taken=true;t.grp.visible=false;ENG.carry++;
       tone({f:1320,f2:1250,type:'triangle',dur:.18,vol:.05,a:.003,echo:.4});
       if(!ENG.toldThrow){ENG.toldThrow=1;toast(isTouch?'A TRINKET · TAP THROW TO LURE IT AWAY':'A TRINKET · PRESS T TO THROW IT AND LURE IT AWAY',3.2);}}});
+  /* the glow breathes, and the first time you come near one it chimes, so you know it is there */
+  {const pulse=0.55+0.3*Math.sin(performance.now()/1000*2.6);
+   trinkets.forEach(t=>{if(t.taken||t.f!==P.floor)return;t.grp.userData.halo.material.opacity=pulse;
+     if(!t.heard&&ENG.carry<TRINKET_MAX&&Math.hypot(t.x-P.x,t.z-P.z)<7){t.heard=true;
+       const pan=Math.max(-1,Math.min(1,panOf(t.x,t.z)));
+       tone({f:1760,f2:1700,type:'triangle',dur:.5,vol:.04,a:.003,pan,echo:.7});tone({f:2637,type:'sine',dur:.4,vol:.02,a:.003,pan,echo:.7,delay:.05});}});}
   /* in flight: a lob that tumbles */
   const fl=ENG.fly;
   if(fl){fl.t+=dt;const k=Math.min(1,fl.t/fl.dur);
