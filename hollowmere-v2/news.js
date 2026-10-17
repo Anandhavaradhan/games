@@ -23,6 +23,14 @@ export const NEWS = [
       'A thrown bottle now draws the thing from anywhere in the house, even another floor, and a line at the foot of the screen tells you what it did.'
   },
   {
+    id: '2026-10-17-backstory-freeze',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'Backstory no longer freezes',
+    body: 'The backstory could stop on its first picture while the sound carried on. It now plays through. ' +
+      'It also follows your Camera motion setting: with it set to reduced, the camera holds still.'
+  },
+  {
     id: '2026-10-16-dread',
     date: '2026-10-16',
     tag: 'NEW',

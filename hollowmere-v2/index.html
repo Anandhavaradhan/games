@@ -5823,7 +5823,7 @@ function playStory(then){
   try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){}
   closeSettings();
   try{document.exitPointerLock();}catch(e){}
-  HMStory.play({ac:AC,out:master,reduceFlash:settings.reduceFlash,onEnd(){
+  HMStory.play({ac:AC,out:master,reduceFlash:settings.reduceFlash,reduceMotion:settings.calmCam,onEnd(){
     /* seen: a guest's mark goes with their progress if they make an account this visit */
     if(!(save.stats.story>0)){save.stats.story=1;saveNow();}
     UIM.want=null;uiMusicTick();
