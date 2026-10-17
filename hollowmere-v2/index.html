@@ -8500,6 +8500,9 @@ if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return s
   get graceT(){return graceT;},triggerJumpscare,doDeath,settings,keys,setDiff(d){runDiff=d;}};
 if(DEBUG)Object.assign(window.__hm,{ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare,DAILY,dailyDefs,btyToday,dailyAdd,openBty,doWin,doDeath,getSave:()=>save,setGot:v=>{got=v;}});
 window.__HM_BOOTED=true;
+/* fetch the backstory's narrator early, so its first words aren't lost to the download */
+try{if(storyDue())HMStory.preload();}catch(e){}
+['pointerenter','focus','touchstart'].forEach(ev=>$('titleStory').addEventListener(ev,()=>{try{HMStory.preload();}catch(e){}},{once:true,passive:true}));
 </script>
 </body>
 </html>
