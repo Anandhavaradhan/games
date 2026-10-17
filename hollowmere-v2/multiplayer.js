@@ -323,19 +323,48 @@ export function setFriendsMirror(uid, uids) {
   uids.forEach(u => { map[u] = true; });
   return D.set(R('friendsOf/' + uid), uids.length ? map : null);
 }
-let presenceArmed = '';
-export function setPresence(uid, o) {
-  const r = R('presence/' + uid);
-  if (presenceArmed !== uid) { presenceArmed = uid; D.onDisconnect(r).remove(); D.onDisconnect(R('watch/' + uid)).remove(); }
+/* Presence has to survive the connection dropping. The server runs onDisconnect only once, so
+   after a reconnect (phone asleep, wifi to mobile data) it must be armed again, or the record
+   it was meant to delete stays forever. A heartbeat also refreshes t, and readers treat a record
+   whose t is older than PRES_STALE as offline, so a player whose tab died without saying goodbye
+   (or whose game is older than this fix) never looks online for ever. */
+const PRES_STALE = 5 * 60e3, PRES_BEAT = 60e3;
+let presMine = null, presWired = false;
+function writePresence() {
+  if (!presMine) return Promise.resolve();
+  const { uid, o } = presMine, r = R('presence/' + uid);
+  D.onDisconnect(r).remove(); D.onDisconnect(R('watch/' + uid)).remove();
   return D.set(r, Object.assign({}, o, { t: D.serverTimestamp() }));
 }
-export const clearPresence = uid => Promise.all([D.remove(R('presence/' + uid)), D.remove(R('watch/' + uid))]).catch(() => {});
+export function setPresence(uid, o) {
+  presMine = { uid, o };
+  if (!presWired) {
+    presWired = true;
+    D.onValue(R('.info/connected'), s => { if (s.val() === true) writePresence().catch(() => {}); });
+    setInterval(() => { writePresence().catch(() => {}); }, PRES_BEAT);
+  }
+  return writePresence();
+}
+export const clearPresence = uid => {
+  if (presMine && presMine.uid === uid) presMine = null;
+  return Promise.all([D.remove(R('presence/' + uid)), D.remove(R('watch/' + uid))]).catch(() => {});
+};
 export const publishWatch = (uid, o) => D.set(R('watch/' + uid + '/s'), o);
 export const publishWatchEmbers = (uid, ep) => D.set(R('watch/' + uid + '/ep'), ep);
 export const clearWatch = uid => D.remove(R('watch/' + uid)).catch(() => {});
 
 /* cb(value|null). Returns an unsubscribe function. A refused read (not friends) reports null. */
-export function onPresence(uid, cb) { return D.onValue(R('presence/' + uid), s => cb(s.val()), () => cb(null)); }
+export function onPresence(uid, cb) {
+  let tm = 0;
+  const un = D.onValue(R('presence/' + uid), s => {
+    clearTimeout(tm);
+    const v = s.val(), age = v && typeof v.t === 'number' ? srvNow() - v.t : Infinity;
+    if (!(age < PRES_STALE)) { cb(null); return; }
+    cb(v);
+    tm = setTimeout(() => cb(null), PRES_STALE - age + 1000);   /* no heartbeat by then: gone */
+  }, () => { clearTimeout(tm); cb(null); });
+  return () => { clearTimeout(tm); un(); };
+}
 export function onWatch(uid, cbS, cbE) {
   const u1 = D.onValue(R('watch/' + uid + '/s'), s => cbS(s.val()), () => cbS(null));
   const u2 = D.onValue(R('watch/' + uid + '/ep'), s => cbE(s.val()), () => cbE(null));

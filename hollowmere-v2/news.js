@@ -16,6 +16,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-friends-offline',
+    date: '2026-10-17',
+    tag: 'FIX',
+    title: 'Friends no longer stuck "playing"',
+    body: 'A friend who lost their connection or closed the game could stay shown as playing a night for ever. ' +
+      'Friends now show as Offline within a few minutes of leaving, and come back online properly after their connection drops.'
+  },
+  {
     id: '2026-10-17-backstory-voice',
     date: '2026-10-17',
     tag: 'NEW',
