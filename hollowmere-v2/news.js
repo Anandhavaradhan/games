@@ -16,6 +16,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-17-backstory-voice',
+    date: '2026-10-17',
+    tag: 'NEW',
+    title: 'The backstory has a narrator',
+    body: 'A voice now tells the story of Hollowmere as the backstory plays, and the music settles back while it speaks. ' +
+      'Watch it again any time with THE BACKSTORY on the title screen.'
+  },
+  {
     id: '2026-10-17-upgrade-combined',
     date: '2026-10-17',
     tag: 'NEW',

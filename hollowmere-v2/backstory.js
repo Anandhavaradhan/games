@@ -410,8 +410,8 @@ function scenes(A){
   return [
   { /* 1. THE HOUSE */
     dur:12,
-    lines:[[0.8,'They built Hollowmere Manor on a hill no one would farm.'],
-           [6.4,'It was finished in a single winter. The family who built it was never seen again.']],
+    lines:[[0.8,'They built Hollowmere Manor on a hill no one would farm.',3.42],
+           [5.6,'It was finished in a single winter. The family who built it was never seen again.',4.99]],
     draw(g,t,o){
       const Z=o.motion?1+0.12*ease(t/12):1.04,PY=o.motion?-20*ease(t/12):0;
       const layer=k=>{const z=1+(Z-1)*k;g.setTransform(o.base[0]*z,0,0,o.base[0]*z,o.base[1]+(1-z)*VX*o.base[0],o.base[2]+((1-z)*520+PY*k)*o.base[0]);};
@@ -466,8 +466,8 @@ function scenes(A){
     }},
   { /* 2. YOU */
     dur:11,
-    lines:[[0.8,'Years later, you came to the house with a candle, looking for something.'],
-           [6.0,'You never found it. The house found you.']],
+    lines:[[0.8,'Years later, you came to the house with a candle, looking for something.',3.99],
+           [6.0,'You never found it. The house found you.',2.41]],
     draw(g,t,o){
       const camZ=o.motion?t*0.3:0.6,stop=9.3,tw=Math.min(t,stop);
       const fz=1.75+tw*0.14+(t>stop?0:0);                 /* your distance ahead of the camera */
@@ -512,9 +512,9 @@ function scenes(A){
     }},
   { /* 3. THE HEART */
     dur:13,
-    lines:[[0.8,'You died here, on the cellar floor.'],
-           [4.6,'Beneath the stones, something beats like a heart.'],
-           [8.6,'It caught your soul as it left you. It has not let go since.']],
+    lines:[[0.8,'You died here, on the cellar floor.',2.26],
+           [4.6,'Beneath the stones, something beats like a heart.',2.89],
+           [8.0,'It caught your soul as it left you. It has not let go since.',3.84]],
     draw(g,t,o){
       const p=pulseAt(BEATS3,t),shake=o.motion?p*(t>6.5&&t<10.8?4:1.5):0;
       g.save();g.translate((hash(Math.floor(t*30))-0.5)*shake,(hash(Math.floor(t*30)+7)-0.5)*shake);
@@ -578,8 +578,8 @@ function scenes(A){
     }},
   { /* 4. THE THING */
     dur:12,
-    lines:[[0.8,'You are not alone in there. Something tall and patient walks its four floors.'],
-           [6.0,'It feeds on the souls the Heart keeps. Tonight, it is hungry.']],
+    lines:[[0.8,'You are not alone in there. Something tall and patient walks its four floors.',4.57],
+           [6.0,'It feeds on the souls the Heart keeps. Tonight, it is hungry.',4.06]],
     draw(g,t,o){
       const close=t>=10.4;
       if(!close){
@@ -625,8 +625,8 @@ function scenes(A){
     }},
   { /* 5. THE EMBERS */
     dur:11,
-    lines:[[0.8,'Your passing left eight embers, scattered through the house. Two on every floor.'],
-           [6.2,'Fragments of your old memory lie with them, somewhere in the dark.']],
+    lines:[[0.8,'Your passing left eight embers, scattered through the house. Two on every floor.',4.9],
+           [6.2,'Fragments of your old memory lie with them, somewhere in the dark.',3.91]],
     draw(g,t,o){
       const pz=o.motion?lerp(1.7,1,easeOut((t-0.2)/4.5)):1,py=o.motion?lerp(-330,0,easeOut((t-0.2)/4.5)):0;
       g.save();g.translate(VX,450);g.scale(pz,pz);g.translate(-VX,-450+py);
@@ -681,8 +681,8 @@ function scenes(A){
     }},
   { /* 6. THE DOOR */
     dur:12,
-    lines:[[0.8,'Gather the embers. Break the seal on the front door. Leave.'],
-           [7.6,'If it takes you, the embers scatter, the seal re-forms, and the Heart drags you back down to begin again.']],
+    lines:[[0.8,'Gather the embers. Break the seal on the front door. Leave.',3.53],
+           [4.9,'If it takes you, the embers scatter, the seal re-forms, and the Heart drags you back down to begin again.',6.23]],
     draw(g,t,o){
       const fall=o.motion?easeIn((t-9.6)/1.6):0,slam=t>7.6&&t<8.2?Math.exp(-(t-7.6)*8):0;
       g.save();g.translate(o.motion?(hash(Math.floor(t*40))-0.5)*slam*30:0,-fall*1100);
@@ -905,15 +905,45 @@ function furnish(g,X0,X1,FL,t){
 }
 
 /* ================= SOUND ================= */
-function makeSound(ac,out,S){
+/* the narrator: one track with every line already in place on the story's clock */
+const VOICE_URL=new URL('backstory-voice.mp3',(document.currentScript&&document.currentScript.src)||location.href).href;
+let voiceBytes=null,voiceFetch=null;const voiceDecoded=new WeakMap();
+function fetchVoice(){
+  if(voiceBytes)return Promise.resolve(voiceBytes);
+  if(!voiceFetch)voiceFetch=fetch(VOICE_URL).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();})
+    .then(b=>voiceBytes=b).catch(e=>{voiceFetch=null;console.warn('Story voice failed to load:',e);return null;});
+  return voiceFetch;
+}
+function decodeVoice(ac){
+  if(voiceDecoded.has(ac))return Promise.resolve(voiceDecoded.get(ac));
+  return fetchVoice().then(b=>b&&new Promise((res,rej)=>ac.decodeAudioData(b.slice(0),res,rej)))
+    .then(buf=>{if(buf)voiceDecoded.set(ac,buf);return buf;}).catch(e=>{console.warn('Story voice failed to decode:',e);return null;});
+}
+function makeSound(ac,out,S,SC){
   if(!ac||!out)return null;
-  const bus=ac.createGain();bus.gain.value=0;bus.connect(out);
+  /* main carries everything; bus (the score and effects) dips under the narrator */
+  const main=ac.createGain();main.gain.value=0;main.connect(out);
+  const bus=ac.createGain();bus.connect(main);
   const t0=ac.currentTime+0.05;
-  bus.gain.setTargetAtTime(1,t0,0.6);
+  main.gain.setTargetAtTime(1,t0,0.6);
+  const T=(sc,at)=>t0+S[sc]+at;
+  /* the narrator's voice: a little air around it, a soft room behind */
+  const vo=ac.createGain();vo.gain.value=0.95;vo.connect(main);
+  const vroom=ac.createConvolver(),vwet=ac.createGain();vwet.gain.value=0.16;
+  {const n=Math.floor(ac.sampleRate*1.8),ir=ac.createBuffer(2,n,ac.sampleRate);
+   for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,3.2);}
+   vroom.buffer=ir;}
+  vo.connect(vroom);vroom.connect(vwet);vwet.connect(main);
+  if(SC)SC.forEach((sc,i)=>sc.lines.forEach(([st,,len])=>{if(!len)return;const a=T(i,st);
+    bus.gain.setTargetAtTime(0.6,a-0.25,0.12);bus.gain.setTargetAtTime(1,a+len,0.35);}));
+  let vsrc=null,stopped=false;
+  const startVoice=buf=>{if(!buf||stopped)return;
+    const off=Math.max(0,ac.currentTime+0.02-t0);if(off>=buf.duration)return;
+    vsrc=ac.createBufferSource();vsrc.buffer=buf;vsrc.connect(vo);vsrc.start(t0+off,off);};
+  if(voiceDecoded.has(ac))startVoice(voiceDecoded.get(ac));else decodeVoice(ac).then(startVoice);
   const noise=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate);
   {const d=noise.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}
   const live=[];
-  const T=(sc,at)=>t0+S[sc]+at;
   function noiseHit(at,dur,f,q,vol,type,f2){
     const s=ac.createBufferSource();s.buffer=noise;s.loop=true;s.loopStart=Math.random();
     const fl=ac.createBiquadFilter();fl.type=type||'lowpass';fl.frequency.setValueAtTime(f,at);fl.Q.value=q||0.7;
@@ -1003,8 +1033,9 @@ function makeSound(ac,out,S){
   pad(T(6,0.3),7.3,[220,261.6,329.6,392,523.3],0.03,'triangle',1600);
   beat(T(6,2.9),0.45);beat(T(6,3.85),0.35);noiseHit(T(6,2.9),3.5,80,0.5,0.15);
   return {t0,stop(){
-    const n=ac.currentTime;bus.gain.cancelScheduledValues(n);bus.gain.setValueAtTime(bus.gain.value,n);bus.gain.linearRampToValueAtTime(0,n+0.5);
-    setTimeout(()=>{live.forEach(o=>{try{o.stop();}catch(e){}});try{bus.disconnect();}catch(e){}},700);}};
+    stopped=true;
+    const n=ac.currentTime;main.gain.cancelScheduledValues(n);main.gain.setValueAtTime(main.gain.value,n);main.gain.linearRampToValueAtTime(0,n+0.5);
+    setTimeout(()=>{live.forEach(o=>{try{o.stop();}catch(e){}});try{if(vsrc)vsrc.stop();}catch(e){}try{main.disconnect();}catch(e){}},700);}};
 }
 
 /* ================= PLAYER ================= */
@@ -1039,7 +1070,7 @@ function start(opt){
   size();addEventListener('resize',size);
   requestAnimationFrame(()=>ov.classList.add('on'));
 
-  const snd=(()=>{try{return opt.ac&&opt.ac.state!=='closed'?makeSound(opt.ac,opt.out,starts):null;}catch(e){console.warn('Story sound failed:',e);return null;}})();
+  const snd=(()=>{try{return opt.ac&&opt.ac.state!=='closed'?makeSound(opt.ac,opt.out,starts,SC):null;}catch(e){console.warn('Story sound failed:',e);return null;}})();
   const useAudioClock=snd&&opt.ac.state==='running';
   const p0=performance.now();
   const now=opt.time||(()=>useAudioClock?opt.ac.currentTime-snd.t0:(performance.now()-p0)/1000);   /* opt.time: for recording */
@@ -1104,5 +1135,7 @@ function start(opt){
   return finish;
 }
 
-window.HMStory={play,get playing(){return !!playing;}};
+/* preload(ac?): fetch the narrator early; with an audio context, decode it too (recording needs it ready) */
+function preload(ac){return ac?decodeVoice(ac):fetchVoice();}
+window.HMStory={play,preload,get playing(){return !!playing;}};
 })();
