@@ -6,8 +6,8 @@
    Database layout (see database.rules.json):
      rooms/{code}/meta            { host, status: lobby|started|running, createdAt, config, go }
      rooms/{code}/players/{uid}   { name, joinedAt, ready }
-     live/{code}/state/{uid}      this player's position / pose, ~10 times a second
-     live/{code}/mon/{uid}        the monster this player owns, ~10 times a second
+     live/{code}/state/{uid}      this player's position / pose (see mpPublish in index.html for how often)
+     live/{code}/mon/{uid}        the monster this player owns, likewise
      live/{code}/embers/{index}   uid of whoever took that ember
      live/{code}/ev/{pushId}      short-lived events (powers that touch other players' monsters)
 
@@ -270,17 +270,21 @@ export const watchEmbers = (code, cb) => {
   return u;
 };
 
+/* Returns the event as sent, with its id, so the game can also send it over the direct link
+   (quicker, but it can drop it); whichever copy arrives second is ignored by id. */
 export function sendEvent(code, ev) {
   const r = D.push(R('live/' + code + '/ev'));
-  D.set(r, Object.assign({}, ev, { from: me.uid, ts: srvNow() })).catch(() => {});
+  const full = Object.assign({}, ev, { from: me.uid, ts: srvNow() });
+  D.set(r, full).catch(() => {});
   setTimeout(() => { D.remove(r).catch(() => {}); }, 20000);
+  return Object.assign({ id: r.key }, full);
 }
 export function watchEvents(code, cb) {
   const since = srvNow() - 1500;
   return D.onChildAdded(R('live/' + code + '/ev'), s => {
     const v = s.val();
     if (!v || v.from === me.uid || (v.ts || 0) < since) return;
-    cb(v);
+    cb(Object.assign({}, v, { id: s.key }));
   });
 }
 

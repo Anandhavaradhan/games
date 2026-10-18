@@ -16,6 +16,16 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-18-smoother-coop',
+    date: '2026-10-18',
+    tag: 'CHANGE',
+    title: 'Snappier co-op, smoother spectating',
+    body: 'Embers taken, powers used and stuns from a ward now reach your friends almost instantly over the direct line between your games, instead of waiting on the slower route. ' +
+      'When that direct line cannot connect, your position is now sent half again as often, so friends still see you move smoothly. ' +
+      'The team list shows each friend\'s ping: green is quick, yellow is fair, and RELAY means your games are talking the slower way round.\n\n' +
+      'Spectating is smoother too. Watching a friend\'s night, or a teammate after you are taken, now plays back a fraction of a second behind so every move glides instead of stuttering, and a friend\'s live view updates 15 times a second instead of 10.'
+  },
+  {
     id: '2026-10-17-combined-legends-saved',
     date: '2026-10-17',
     tag: 'FIX',
