@@ -389,10 +389,11 @@ const IMPORT_FLAG='hm_board_import_v3';
 /* difficulty levels: each has its own board. Entries from before they existed count as Normal. */
 const DIFF_KEYS=['easy','normal','hard','nightmare'],DIFF_NAME={easy:'Easy',normal:'Normal',hard:'Hard',nightmare:'Nightmare'};
 const diffOf=r=>DIFF_KEYS.indexOf(r&&r.diff)>=0?r.diff:'normal';
-let boardDiff='all',boardMode='best';   /* best: each player once, at their fastest */
+let boardDiff='all',boardMode='best';   /* best: each player (solo) and each team once, at their fastest */
+/* best view: each player's fastest solo run once, each co-op team (its set of names, any order) once */
 function bestPerPlayer(list){const k=n=>String(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');const seen=new Set(),out=[];
-  for(const r of list){const who=r.team?String(r.name||'').split('+').map(k).filter(Boolean):[k(r.name)||'u:'+r.uid];
-    if(!who.length||who.every(x=>seen.has(x)))continue;who.forEach(x=>seen.add(x));out.push(r);}return out;}
+  for(const r of list){const who=r.team?'t:'+String(r.name||'').split('+').map(k).filter(Boolean).sort().join('+'):'s:'+(k(r.name)||'u:'+r.uid);
+    if(seen.has(who))continue;seen.add(who);out.push(r);}return out;}
 async function migrateBoard(adminUid,force){
   try{
     for(const e of SEED_ESCAPES){
