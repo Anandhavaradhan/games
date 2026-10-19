@@ -123,6 +123,7 @@
   #micBtn.on{color:#9fd18a;border-color:rgba(159,209,138,.6)}
   #micBtn.on.talk{box-shadow:0 0 12px rgba(159,209,138,.7)}
   body.watching #micBtn{display:none!important}
+  body.mp #micBtn{z-index:22}
   #team .tm.talk b{color:#9fd18a}
   #team .tm.talk i{background:#9fd18a;box-shadow:0 0 10px #9fd18a}
   body.title #gearBtn{animation:pulse 2.1s ease-in-out infinite}
@@ -802,7 +803,7 @@
     <h3>LEADERBOARD</h3>
     <div class="lbtabs"><span data-lbtab="esc" class="on">FASTEST ESCAPES</span><span data-lbtab="time">MOST TIME PLAYED</span></div>
     <div class="lbtabs sub" id="lbDiffTabs"><span data-lbdiff="easy">EASY</span><span data-lbdiff="normal" class="on">NORMAL</span><span data-lbdiff="hard">HARD</span><span data-lbdiff="nightmare">NIGHTMARE</span></div>
-    <div class="lbtabs sub" id="lbModeTabs"><span data-lbmode="best" class="on">BEST PER PLAYER</span><span data-lbmode="all">ALL ENTRIES</span></div>
+    <div class="lbtabs sub" id="lbModeTabs"><span data-lbmode="best" class="on">BEST PER PLAYER &amp; TEAM</span><span data-lbmode="all">ALL ENTRIES</span></div>
     <p class="lbsub" id="lbSub"></p>
     <div id="lbBody"></div>
     <div id="lbClose">CLOSE</div>
@@ -6177,7 +6178,8 @@ function mpTeamCheck(){
   specStop();
   $('winStats').innerHTML='<span style="'+RUN_TITLE_CSS+'">'+escHTML(RUN.title)+'</span>'
     +escHTML(`TEAM TIME ${fmtTime(TEAM.time)} \u00b7 YOU GOT OUT AT ${fmtTime(TEAM.myOut)} \u00b7 SOULS LOST ${deaths} \u00b7 EMBERS ${got}/${TOTAL_EMBERS}`);
-  $('winPulse').textContent='TAP OR ENTER TO RETURN TO THE LOBBY';
+  $('winPulse').textContent='TAP OR ENTER TO GO BACK TO THE ROOM \u2014 THE NEXT NIGHT, SAME FRIENDS';
+  navSync();
   showOv(winOv);
   toast('EVERY SOUL IS OUT \u2014 THE TEAM ESCAPED IN '+fmtTime(TEAM.time),4.5);
   boardAfterTeamEscape(TEAM.time);
@@ -6190,7 +6192,7 @@ function advance(){
   if(settingsOpen){closeSettings();return;}
   if(state==='title'){if(MP)mpReadyClick();else startGame();}
   else if(state==='dead')riseOrRestart();
-  else if(state==='win'){if(MP){if(TEAM.done)(window.hmKeepTab&&window.hmKeepTab()),location.href='lobby.html';}else fullReset();}
+  else if(state==='win'){if(MP){if(TEAM.done)mpBackToRoom();}else fullReset();}
   else if(state==='play'&&!pauseOv.classList.contains('hidden')){showOv(null);lockMouse();}}
 document.addEventListener('click',()=>{try{advance();}catch(e){fatal('Click error: '+e.message);}});
 [deathOv,winOv,pauseOv,titleOv].forEach(ov=>ov.addEventListener('click',e=>{e.stopPropagation();try{advance();}catch(err){}}));
@@ -6217,10 +6219,20 @@ async function mpLeaveTo(url){
   try{await Promise.race([Promise.all([n.leaveGame(c),n.leaveRoom(c)]),new Promise(r=>setTimeout(r,2000))]);}catch(e){console.warn('Leave:',e);}
   (window.hmKeepTab&&window.hmKeepTab()),location.href=url+(DEBUG?(url.indexOf('?')<0?'?':'&')+'debug=1':'');
 }
+/* the night is over for the whole team: back to the same room (still in it) for the next night */
+async function mpBackToRoom(){
+  if(!MP||mpLeaving)return;
+  mpLeaving=true;closeSettings();toast('BACK TO THE ROOM\u2026',3);
+  try{if(VOICE.on)sessionStorage.setItem('hollowmere_mic_on','1');}catch(e){}
+  /* stop closing this page from marking us gone: we are only moving to the lobby */
+  try{await Promise.race([MP.net.keepPresence(MP.code),new Promise(r=>setTimeout(r,1500))]);}catch(e){}
+  (window.hmKeepTab&&window.hmKeepTab()),location.href='lobby.html?join='+MP.code+'&back='+MP.cfg.seed+(DEBUG?'&debug=1':'');
+}
 /* the labels say what each button does here */
 function navSync(){
   $('titleLeave').style.display=MP?'':'none';
   $('btnLobbyW').style.display=MP?'':'none';
+  $('btnLobbyW').textContent=MP&&TEAM.done?'BACK TO THE ROOM \u2014 NEXT NIGHT':'LEAVE THE TEAM \u2014 LOBBY';
   $('btnHomeD').textContent=MP?'LEAVE THE TEAM \u2014 TITLE SCREEN':'TITLE SCREEN';
   $('btnHomeW').textContent=MP?'LEAVE THE TEAM \u2014 TITLE SCREEN':'TITLE SCREEN';
   $('btnHomeP').textContent=MP?'LEAVE THE TEAM \u2014 TITLE SCREEN':'END THIS NIGHT \u2014 TITLE SCREEN';
@@ -6230,7 +6242,7 @@ function navSync(){
 }
 navSync();
 [['btnHomeD',goTitle],['btnHomeW',goTitle],['btnHomeP',goTitle],['setHome',goTitle],['titleLeave',goTitle],
- ['btnLobbyW',()=>mpLeaveTo('lobby.html')]].forEach(([id,fn])=>{const b=$(id);if(!b)return;
+ ['btnLobbyW',()=>{if(MP&&TEAM.done)mpBackToRoom();else mpLeaveTo('lobby.html');}]].forEach(([id,fn])=>{const b=$(id);if(!b)return;
   b.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();fn();});
   b.addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});});
 setObjective(OBJ_TEXT());hudEmbers();
@@ -7093,18 +7105,17 @@ setInterval(()=>{if(acctOpen&&cloudUser)updateAcctLive();},5000);
 const BOARD_SIZE=300;         /* rows shown in the panel (it scrolls) */
 const BOARD_MIN_TIME=20;      /* seconds; faster is impossible, so it is rejected (also in firestore.rules) */
 let lbOpen=false,lbData=null,lbErr='',lbMine=null,lbTab='esc',lbDiff='normal';
-/* FASTEST ESCAPES has two views: every run (a player can be on it many times) or each player once, at their best */
+/* FASTEST ESCAPES has two views: every run (a player can be on it many times) or each player and each team once, at their best */
 let lbMode='best';   /* every time the board opens it starts on BEST PER PLAYER */
 const lbKey=n=>String(n||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-/* each player's fastest run, once. A co-op run counts for everyone in it, so it stands as the best of any
-   member who has nothing faster; a player already shown further up is not shown again. */
+/* the board's best view: each player's fastest SOLO run once, and each co-op team's fastest run once.
+   A team is its set of players, so "A+B" and "B+A" are the same team and only its best night shows. */
+const teamSegs=r=>String(r.name||'').split('+').filter(sg=>lbKey(sg)).sort((a,b)=>lbKey(a)<lbKey(b)?-1:lbKey(a)>lbKey(b)?1:0);
+const lbWho=r=>r.team?'t:'+teamSegs(r).map(lbKey).join('+'):'s:'+(lbKey(r.name)||'u:'+r.uid);
+const lbName=r=>r.team?teamSegs(r).join('+')||String(r.name||''):String(r.name||'');
 function bestPerPlayer(list){
   const seen=new Set(),out=[];
-  for(const r of list){
-    /* usernames are unique, so the name is the player (co-op rows only carry the names) */
-    const who=r.team?String(r.name||'').split('+').map(lbKey).filter(Boolean):[lbKey(r.name)||'u:'+r.uid];
-    if(!who.length||who.every(k=>seen.has(k)))continue;
-    who.forEach(k=>seen.add(k));out.push(r);}
+  for(const r of list){const k=lbWho(r);if(seen.has(k))continue;seen.add(k);out.push(r);}
   return out;
 }
 const lbRows=()=>!lbData?null:(lbTab==='esc'&&lbMode==='best'?bestPerPlayer(lbData):lbData).slice(0,BOARD_SIZE);
@@ -7153,11 +7164,14 @@ async function boardAfterEscape(nt,newBest){
 
 /* co-op: the whole party goes up as one name, e.g. "user1+user2" */
 async function teamBoardName(members){
-  const names=[];
+  const ppl=[];
   for(const u of ((MP&&MP.cfg.order)||[])){
-    if(u===MP.uid){names.push(cloudUser.name);if(members)members.push(u);continue;}
+    if(u===MP.uid){ppl.push([cloudUser.name,u]);continue;}
     const nm=String(mpName(u));
-    if(await MP.net.isRegistered(u,nm)){names.push(nm);if(members)members.push(u);}}   /* guests are left out */
+    if(await MP.net.isRegistered(u,nm))ppl.push([nm,u]);}   /* guests are left out */
+  /* always in the same order (by name), so the same friends make the same team name however they joined */
+  ppl.sort((a,b)=>lbKey(a[0])<lbKey(b[0])?-1:lbKey(a[0])>lbKey(b[0])?1:0);
+  const names=ppl.map(p=>p[0]);if(members)ppl.forEach(p=>members.push(p[1]));
   let t=names.join('+');
   if(t.length>40){const each=Math.max(3,Math.floor((40-(names.length-1))/names.length));
     t=names.map(n=>n.slice(0,each)).join('+').slice(0,40);}
@@ -7185,14 +7199,19 @@ async function boardAfterTeamEscape(nt){
         if(!ex&&entry.members){const plain=Object.assign({},entry);delete plain.members;
           try{await cloud.addEscape(uid,plain,id);ex=plain;}catch(e2){ex=await cloud.loadEscape(id).catch(()=>null);}}
         if(!ex)throw e;}}
-    let rank=0;try{const list=await cloud.loadEscapes(BOARD_SIZE,dk0);rank=list.filter(r=>r.time<ex.time).length+1;}catch(e){}
-    el.textContent=team.toUpperCase()+' ARE ON THE '+DIFFS[dk0].n+' LEADERBOARD \u00b7 '+fmtTime(ex.time)+(rank?' \u00b7 #'+rank:'');
+    /* where the team stands on the best-per-team board (this night may not be the team's best) */
+    let rank=0,best=null;try{const b=bestPerPlayer(await cloud.loadEscapes(2000,dk0)),k=lbWho(Object.assign({team:true},ex)),j=b.findIndex(r=>lbWho(r)===k);
+      if(j>=0){rank=j+1;best=b[j];}}catch(e){}
+    const nm=lbName(Object.assign({team:true},ex)).toUpperCase();
+    el.textContent=(best&&best.time<ex.time-0.05
+      ?nm+' \u00b7 '+fmtTime(ex.time)+' \u00b7 TEAM BEST '+fmtTime(best.time)+' \u00b7 #'+rank+' ON THE '+DIFFS[dk0].n+' LEADERBOARD'
+      :nm+' ARE ON THE '+DIFFS[dk0].n+' LEADERBOARD \u00b7 '+fmtTime(ex.time)+(rank?' \u00b7 #'+rank:''));
   }catch(e){console.warn('Team escape post failed:',e);el.textContent='TEAM TIME '+fmtTime(nt);}
 }
 
 /* ---- the panel ---- */
 const LB_SUB={esc:'Every escape from Hollowmere, fastest first, on its own board for each difficulty. The clock runs from waking to the front door.',
-  best:'Each player once, at their fastest escape, on its own board for each difficulty. A co-op escape counts for everyone in it.',
+  best:'Each player once at their fastest solo escape, and each co-op team once at its fastest night, on its own board for each difficulty. The same friends count as one team whatever order they joined in.',
   time:'Time spent actually playing. Standing still, hiding too long, idling or repeating the same moves does not count.'};
 function openBoard(){
   if(lbOpen)return;
@@ -7254,7 +7273,7 @@ function renderBoard(){
     }else{meta='';val=fmtDur(r.seconds);}
     return '<div class="lbrow'+(i<3?' r'+(i+1):'')+(me?' me':'')+'">'
       +'<span class="lbrank">'+(i+1)+'</span>'
-      +'<span class="lbname">'+escHTML(r.name)+(me?' (you)':'')+(meta?'<span class="lbmeta">'+meta+'</span>':'')+'</span>'
+      +'<span class="lbname">'+escHTML(lbName(r))+(me?' (you)':'')+(meta?'<span class="lbmeta">'+meta+'</span>':'')+'</span>'
       +'<span class="lbtime">'+val+'</span></div>';
   }).join('')+'</div>';
   let foot='';
@@ -7684,7 +7703,7 @@ function mpTeamHud(){
 /* ---- the waiting room: everyone clicks in, then the night begins for all at once ---- */
 function mpBanner(){
   const el=$('mpBanner');if(!el||!MP)return;
-  const pl=(mpRoom&&mpRoom.players)||{},order=MP.cfg.order,present=order.filter(u=>pl[u]);
+  const pl=(mpRoom&&mpRoom.players)||{},order=MP.cfg.order,present=order.filter(u=>pl[u]&&pl[u].at!=='gone');
   const readyN=present.filter(u=>pl[u].ready).length;
   const names=present.map(u=>`${pl[u].ready?'◆':'◇'} ${escHTML(pl[u].name)}`).join(' &nbsp;&nbsp; ');
   const leader=present[0]===MP.uid;
@@ -7696,14 +7715,20 @@ function mpBanner(){
   if(pulse)pulse.innerHTML=mpGO?'THE NIGHT IS ABOUT TO BEGIN':mpReady?`WAITING FOR THE OTHERS · ${readyN}/${present.length} READY`:`TAP OR PRESS ENTER WHEN YOU ARE READY · ${readyN}/${present.length} READY`;
   const f=$('mpForce');
   if(f)f.onclick=e=>{e.stopPropagation();if(!mpForceSent){mpForceSent=true;MP.net.beginNight(MP.code,3500).catch(()=>{mpForceSent=false;});}};}
+let mpRoomBack=false;
 function mpOnRoom(r){
   mpRoom=r;if(!r||!r.meta)return;
   REMOTE.forEach((rm,uid)=>{const p=r.players&&r.players[uid];if(p&&p.name&&p.name!==rm.name){rm.name=p.name;
     const old=rm.label;rm.label=makeLabel(p.name);scene.remove(old);old.material.map.dispose();old.material.dispose();}});
+  const sameNight=!!(r.meta.config&&r.meta.config.seed===MP.cfg.seed&&r.meta.status!=='lobby');
+  if(!sameNight){
+    if(TEAM.done&&!mpRoomBack){mpRoomBack=true;$('winPulse').textContent='YOUR TEAM IS BACK IN THE ROOM \u2014 TAP OR ENTER TO JOIN THEM';
+      toast('YOUR FRIENDS ARE BACK IN THE ROOM FOR THE NEXT NIGHT',4);}
+    return;}
   if(mpStarted&&r.meta.go&&r.meta.go>mpGO+3000){mpResetNight(r.meta.go);return;}
   if(!mpStarted){
     if(r.meta.go&&mpReady)mpGO=r.meta.go;
-    const pl=r.players||{},present=MP.cfg.order.filter(u=>pl[u]);
+    const pl=r.players||{},present=MP.cfg.order.filter(u=>pl[u]&&pl[u].at!=='gone');
     /* the first soul still present starts the night once every soul is ready */
     if(mpReady&&!r.meta.go&&present[0]===MP.uid&&present.every(u=>pl[u].ready)&&!mpForceSent){
       mpForceSent=true;setTimeout(()=>MP.net.beginNight(MP.code,3500).catch(()=>{mpForceSent=false;}),900);}
@@ -7763,6 +7788,7 @@ function mpFrame(dt,t){
       if(left<=0)mpBegin();
       else{countEl.textContent=Math.ceil(left);countEl.style.opacity=1;}}
     if((mpBannerT-=dt)<=0){mpBannerT=1;mpBanner();}
+    voiceTick(performance.now());   /* talk to the team while everyone clicks in */
     return;}
   REMOTE.forEach(r=>mpUpdateRemote(r,dt,t));
   PUP.forEach(p=>mpUpdatePuppet(p,dt));
@@ -8516,7 +8542,7 @@ async function voiceCall(uid){
 }
 async function voiceMsg(m){
   if(m.lobby)return;                                     /* left over from the room's lobby */
-  if(!MP||!REMOTE.has(m.from)&&m.t!=='offer')return;
+  if(!MP||!voiceWant(m.from)&&m.t!=='offer')return;
   if(m.t==='offer'){
     voiceClose(m.from);
     const p=voicePeer(m.from,false);p.remoteSid=m.sid;
@@ -8548,15 +8574,22 @@ function voiceAttach(p,stream){
 }
 function rms(an,buf){an.getByteTimeDomainData(buf);let s=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;s+=v*v;}return Math.sqrt(s/buf.length);}
 /* once a second: call whoever is new, drop whoever left, retry a broken line. 10 times a second: who is talking */
+/* who to talk to: teammates seen in the house, and (before it begins) teammates on this night's title screen */
+function voiceWant(uid){
+  if(uid===MP.uid)return false;
+  if(REMOTE.has(uid))return true;
+  const p=mpRoom&&mpRoom.players&&mpRoom.players[uid];
+  return !!(p&&p.at==='night'&&MP.cfg.order.indexOf(uid)>=0);}
 function voiceTick(now){
-  if(!mpStarted)return;
   if(!VOICE.started){voiceStart();if(!VOICE.started)return;}
   if(now-VOICE.lastTick>1000){VOICE.lastTick=now;
-    REMOTE.forEach((r,uid)=>{
+    const want=new Set(REMOTE.keys());
+    if(mpRoom&&mpRoom.players)Object.keys(mpRoom.players).forEach(u=>{if(voiceWant(u))want.add(u);});
+    want.forEach(uid=>{
       const p=VOICE.peers.get(uid);
       if(!p){if(MP.uid<uid)voiceCall(uid).catch(e=>{console.warn('Voice call:',e);voiceClose(uid);});}
       else if(p.badAt&&now-p.badAt>6000){voiceClose(uid);}});   /* the caller tries again on the next tick */
-    Array.from(VOICE.peers.keys()).forEach(uid=>{if(!REMOTE.has(uid))voiceClose(uid);});}
+    Array.from(VOICE.peers.keys()).forEach(uid=>{if(!want.has(uid))voiceClose(uid);});}
   if(now-VOICE.lastLvl>100){VOICE.lastLvl=now;
     VOICE.peers.forEach(p=>{if(p.an&&rms(p.an,p.buf)>0.04)VOICE.speak[p.uid]=now;});
     const meTalk=VOICE.on&&VOICE.meLvl&&rms(VOICE.meLvl.an,VOICE.meLvl.buf)>0.04;

@@ -16,6 +16,17 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-19-same-room-next-night',
+    date: '2026-10-19',
+    tag: 'NEW',
+    title: 'Next night, same room, same friends',
+    body: 'When your whole team is out of the house, tap BACK TO THE ROOM and you all land in the same co-op room again, ready for the next night. No new code to share. ' +
+      'The host can switch the difficulty between nights, and everyone in the room now sees which difficulty is set before the night begins.\n\n' +
+      'Voice chat now works on the co-op title screen too, while everyone clicks in, not only once the night has started.\n\n' +
+      'Co-op teams have their own place on the leaderboard: under BEST PER PLAYER & TEAM each player shows once at their best solo escape, and each team once at its fastest night. ' +
+      'The same friends are always the same team, whoever joined first, so a team never takes two places.'
+  },
+  {
     id: '2026-10-19-lobby-voice',
     date: '2026-10-19',
     tag: 'NEW',

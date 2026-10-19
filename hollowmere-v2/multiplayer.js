@@ -4,8 +4,10 @@
    opened as  index.html?room=CODE  (the night itself).
 
    Database layout (see database.rules.json):
-     rooms/{code}/meta            { host, status: lobby|started|running, createdAt, config, go }
-     rooms/{code}/players/{uid}   { name, joinedAt, ready }
+     rooms/{code}/meta            { host, status: lobby|started|running, createdAt, diff, config, go }
+     rooms/{code}/players/{uid}   { name, joinedAt, ready, at: lobby|night|gone }
+   A room outlives its night: when the night is over the players go BACK TO THE ROOM (backToRoom),
+   the room is a lobby again, and the host can change the difficulty and begin the next night.
      live/{code}/state/{uid}      this player's position / pose (see mpPublish in index.html for how often)
      live/{code}/mon/{uid}        the monster this player owns, likewise
      live/{code}/embers/{index}   uid of whoever took that ember
@@ -146,12 +148,13 @@ const makeCode = () => Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Mat
 export const normCode = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
 
 /* ---------------------------------------------------------- lobby */
-export async function createRoom() {
+export async function createRoom(diff) {
   await checkGuestName({});
+  diff = DIFFICULTIES.indexOf(diff) >= 0 ? diff : 'normal';
   for (let i = 0; i < 6; i++) {
     const code = makeCode();
     const res = await D.runTransaction(R('rooms/' + code + '/meta'), cur =>
-      cur === null ? { host: me.uid, status: 'lobby', createdAt: srvNow() } : undefined);
+      cur === null ? { host: me.uid, status: 'lobby', createdAt: srvNow(), diff } : undefined);
     if (res.committed) { await addPlayer(code); return code; }
   }
   throw new Error('Could not find a free room code. Try again.');
@@ -159,9 +162,11 @@ export async function createRoom() {
 
 async function addPlayer(code) {
   const pr = R('rooms/' + code + '/players/' + me.uid);
-  await D.set(pr, { name: me.name, joinedAt: srvNow(), ready: false });
+  await D.set(pr, { name: me.name, joinedAt: srvNow(), ready: false, at: 'lobby' });
   D.onDisconnect(pr).remove();            /* closing the lobby tab leaves the room */
 }
+/* who is waiting in the room right now (not still in a night, not gone) */
+export const inLobby = p => !!p && p.at !== 'night' && p.at !== 'gone';
 
 export async function joinRoom(code) {
   code = normCode(code);
@@ -170,10 +175,11 @@ export async function joinRoom(code) {
   const room = snap.val();
   if (!room || !room.meta) throw new Error('No room with that code.');
   const players = room.players || {};
-  if (!players[me.uid]) {
+  const mine = players[me.uid];
+  if (!mine || (mine.at === 'gone' && room.meta.status === 'lobby')) {
     if (room.meta.status !== 'lobby') throw new Error('That night has already begun.');
     await checkGuestName(players);
-    if (Object.keys(players).length >= MAX_PLAYERS) throw new Error('That room is full (' + MAX_PLAYERS + ' players).');
+    if (Object.values(players).filter(p => p && p.at !== 'gone').length >= MAX_PLAYERS) throw new Error('That room is full (' + MAX_PLAYERS + ' players).');
     await addPlayer(code);
   }
   return code;
@@ -196,17 +202,26 @@ export async function leaveRoom(code) {
   if (!room) return;
   const rest = Object.entries(room.players || {}).filter(([u]) => u !== me.uid).sort((a, b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0));
   if (room.meta && room.meta.host === me.uid) {
-    if (rest.length && room.meta.status === 'lobby') await D.update(R('rooms/' + code + '/meta'), { host: rest[0][0] });
+    /* someone still waiting in the room is the best new host; else anyone still in it */
+    const next = rest.find(([, p]) => inLobby(p)) || rest.find(([, p]) => p && p.at !== 'gone') || rest[0];
+    if (next) await D.update(R('rooms/' + code + '/meta'), { host: next[0] });
     else if (!rest.length) await D.remove(R('rooms/' + code));
   }
 }
 
 /* host only: freeze the player list and decide how big (and how hard) the night is */
 export const DIFFICULTIES = ['easy', 'normal', 'hard', 'nightmare'];
+/* host only: the difficulty everyone in the room sees, and the next night is played at */
+export function setRoomDiff(code, diff) {
+  if (DIFFICULTIES.indexOf(diff) < 0) return Promise.resolve();
+  return D.update(R('rooms/' + code + '/meta'), { diff });
+}
 export async function startRoom(code, diff) {
   const room = (await D.get(R('rooms/' + code))).val();
   if (!room || !room.meta || room.meta.host !== me.uid) throw new Error('Only the host can begin the night.');
-  const order = Object.entries(room.players || {}).sort((a, b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0) || (a[0] < b[0] ? -1 : 1)).map(e => e[0]);
+  if (room.meta.status !== 'lobby') throw new Error('The last night is still being played.');
+  /* only those waiting in the room: a friend still reading the end of the last night sits this one out */
+  const order = Object.entries(room.players || {}).filter(([u, p]) => u === me.uid || inLobby(p)).sort((a, b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0) || (a[0] < b[0] ? -1 : 1)).map(e => e[0]);
   const n = order.length;
   const config = { seed: 1 + Math.floor(Math.random() * 2147483646), n, floors: floorsFor(n), monsters: n, order };
   if (DIFFICULTIES.indexOf(diff) >= 0 && diff !== 'normal') config.diff = diff;
@@ -232,7 +247,16 @@ export async function enterGame(code) {
   const room = await fetchRoom(code);
   if (!room || !room.meta || !room.meta.config) throw new Error('That night has not begun.');
   if (!(room.meta.config.order || []).includes(me.uid)) throw new Error('You are not part of this night.');
-  await D.update(R('rooms/' + code + '/players/' + me.uid), { name: me.name, ready: false });
+  const pr = R('rooms/' + code + '/players/' + me.uid);
+  await D.update(pr, { name: me.name, ready: false, at: 'night' });
+  /* closing the game marks this player as gone (a reload puts them back). The server runs onDisconnect
+     once, so after a dropped connection comes back it is armed again and the mark taken off. */
+  let wasOff = false;
+  D.onValue(R('.info/connected'), s => {
+    if (s.val() !== true) { wasOff = true; return; }
+    D.onDisconnect(pr).update({ at: 'gone' });
+    if (wasOff) D.update(pr, { at: 'night' }).catch(() => {});
+  });
   D.onDisconnect(R('live/' + code + '/state/' + me.uid)).remove();
   D.onDisconnect(R('live/' + code + '/mon/' + me.uid)).remove();
   return room;
@@ -240,6 +264,28 @@ export async function enterGame(code) {
 export const setReady = (code, v) => D.update(R('rooms/' + code + '/players/' + me.uid), { ready: !!v });
 export const beginNight = (code, delayMs) =>
   D.update(R('rooms/' + code + '/meta'), { status: 'running', go: srvNow() + delayMs });
+
+/* The night is over: go back to the room for the next one. The first player back turns the room into a
+   lobby again (only if it is still on the night this player was in, `seed`), keeping the host and the
+   difficulty; everyone else just takes their place in it. Returns the room code. */
+export async function backToRoom(code, seed) {
+  code = normCode(code);
+  await D.runTransaction(R('rooms/' + code + '/meta'), cur => {
+    if (!cur) return cur;            /* (not loaded yet: Firebase calls again with the real value) */
+    if (cur.status === 'lobby' || !cur.config || cur.config.seed !== seed) return undefined;   /* nothing to do */
+    return { host: cur.host, status: 'lobby', createdAt: cur.createdAt || srvNow(),
+      diff: DIFFICULTIES.indexOf(cur.config.diff) >= 0 ? cur.config.diff : (DIFFICULTIES.indexOf(cur.diff) >= 0 ? cur.diff : 'normal') };
+  });
+  const room = await fetchRoom(code);
+  if (!room || !room.meta) throw new Error('That room has closed.');
+  const pr = R('rooms/' + code + '/players/' + me.uid), mine = (room.players || {})[me.uid];
+  if (!mine) return joinRoom(code);
+  await D.update(pr, { name: me.name, ready: false, at: 'lobby' });
+  D.onDisconnect(pr).remove();
+  await leaveGame(code);
+  if (room.meta.status === 'lobby') D.remove(R('live/' + code + '/embers')).catch(() => {});
+  return code;
+}
 
 /* every soul was taken at once: start the shared night over. A new `go` restarts the clock
    for everyone (players who reload pick it up from meta), and the taken embers are cleared.

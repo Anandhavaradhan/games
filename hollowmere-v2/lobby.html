@@ -2,6 +2,8 @@
 <!--
   HOLLOWMERE — CO-OP LOBBY
   Make a room, share the five-letter code (or the link), and the host begins the night.
+  When the night is over everyone comes back here, to the same room, and the host can change the
+  difficulty and begin the next night with the same friends.
   The manor is built for the size of the party: the more souls, the more floors — and one
   hunter per soul. Everything here is light; the game itself loads when the night begins.
 -->
@@ -46,6 +48,11 @@
   li .tag{margin-left:auto;font-size:11px;letter-spacing:2px;color:#ffbe6f;font-family:'Cormorant SC',serif}
   .size{margin-top:16px;padding:12px;border:1px solid #2a2620;background:rgba(15,17,26,.5);text-align:center;font-size:15px;color:#a89f8a}
   .size b{color:#ffbe6f;font-weight:normal}
+  .diffbox{margin-top:16px;padding:12px;border:1px solid #2a2620;background:rgba(15,17,26,.5);text-align:center;font-size:15px;color:#a89f8a}
+  .diffbox .cap{font-size:12px;letter-spacing:4px;color:#6f6a5c;font-family:'Cormorant SC',serif}
+  .diffbox b{display:block;margin-top:4px;font-family:'Cormorant SC',serif;font-weight:600;font-size:26px;letter-spacing:6px;color:#ffbe6f}
+  .diffbox.d-hard b{color:#ff9a5c}.diffbox.d-nightmare b{color:#ff5c5c;text-shadow:0 0 14px rgba(255,60,60,.35)}.diffbox.d-easy b{color:#9fd18a}
+  li.away{opacity:.55}
   .back{display:inline-block;margin-top:18px;font-size:13px;color:#6f6a5c;letter-spacing:2px;text-decoration:none;font-family:'Cormorant SC',serif}
   .back:hover{color:#cfc8b8}
   .row{display:flex;gap:10px}
@@ -77,6 +84,9 @@
 import * as mp from './multiplayer.js';
 
 const card = document.getElementById('card');
+const DIFF_NAME = { easy: 'Easy', normal: 'Normal', hard: 'Hard', nightmare: 'Nightmare' };
+const DIFF_NOTE = { easy: 'Slower, half-blind hunters', normal: 'The house as it was meant to be', hard: 'Quicker hunters with sharper ears', nightmare: 'The fastest, sharpest hunters' };
+const roomDiff = () => (room && room.meta && DIFF_NAME[room.meta.diff]) ? room.meta.diff : (room && room.meta && room.meta.host === mp.me.uid ? lobbyDiff : 'normal');
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const qs = new URLSearchParams(location.search);
 let lobbyDiff = (() => { try { const d = localStorage.getItem('hollowmere_lobby_diff'); return ['easy','normal','hard','nightmare'].indexOf(d) >= 0 ? d : 'normal'; } catch (e) { return 'normal'; } })();
@@ -225,12 +235,12 @@ function vcTick() {
   if (!VC.code || !room) return;
   const now = performance.now(), inRoom = room.players || {};
   Object.keys(inRoom).forEach(uid => {
-    if (uid === mp.me.uid) return;
+    if (uid === mp.me.uid || !mp.inLobby(inRoom[uid])) return;
     const p = VC.peers.get(uid);
     if (!p) { if (mp.me.uid < uid) vcCall(uid).catch(e => { console.warn('Voice call:', e); vcClose(uid); }); }
     else if (p.badAt && now - p.badAt > 6000) vcClose(uid);    /* the caller tries again on the next tick */
   });
-  Array.from(VC.peers.keys()).forEach(uid => { if (!inRoom[uid]) vcClose(uid); });
+  Array.from(VC.peers.keys()).forEach(uid => { if (!mp.inLobby(inRoom[uid])) vcClose(uid); });
 }
 /* 10 times a second: who is talking */
 function vcLevels() {
@@ -299,7 +309,7 @@ function viewMenu() {
   document.getElementById('home').onclick = goHome;
   const name = document.getElementById('name'), codeIn = document.getElementById('code');
   const useName = () => { if (!mp.me.account) { const n = name.value.trim(); if (n) mp.saveName(n); } return mp.me.name; };
-  document.getElementById('create').onclick = () => go(async () => { useName(); code = await mp.createRoom(); enterLobby(); });
+  document.getElementById('create').onclick = () => go(async () => { useName(); code = await mp.createRoom(lobbyDiff); enterLobby(); });
   document.getElementById('join').onclick = () => go(async () => { useName(); code = await mp.joinRoom(codeIn.value); enterLobby(); });
   codeIn.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('join').click(); });
   codeIn.addEventListener('input', () => { codeIn.value = mp.normCode(codeIn.value); });
@@ -320,24 +330,31 @@ async function go(fn) {
 
 function viewLobby() {
   if (!room || !room.meta) return;
-  const players = Object.entries(room.players || {}).map(([uid, p]) => ({ uid, name: p.name || 'Ghost', t: p.joinedAt || 0 }))
+  const players = Object.entries(room.players || {}).filter(([, p]) => p && p.at !== 'gone')
+    .map(([uid, p]) => ({ uid, name: p.name || 'Ghost', t: p.joinedAt || 0, away: !mp.inLobby(p) }))
     .sort((a, b) => a.t - b.t || (a.uid < b.uid ? -1 : 1));
-  const n = Math.max(1, players.length), amHost = room.meta.host === mp.me.uid;
+  const here = players.filter(p => !p.away || p.uid === mp.me.uid);
+  const n = Math.max(1, here.length), amHost = room.meta.host === mp.me.uid, diff = roomDiff();
+  /* friends are in a night this player is not part of (they came back after it began) */
+  const busyNight = room.meta.status !== 'lobby';
   const link = location.origin + location.pathname + '?join=' + code;
   shell(`
     <div class="code-cap">ROOM CODE</div>
     <div class="code-big" id="bigcode">${esc(code)}</div>
     <button id="copy">Copy invite link</button>
-    <ul>${players.map(p => `<li data-uid="${esc(p.uid)}"><i class="dot"></i><span>${esc(p.name)}${p.uid === mp.me.uid ? ' (you)' : ''}</span>${p.uid === room.meta.host ? '<span class="tag">HOST</span>' : ''}</li>`).join('')}</ul>
+    <ul>${players.map(p => `<li data-uid="${esc(p.uid)}"${p.away && p.uid !== mp.me.uid ? ' class="away"' : ''}><i class="dot"></i><span>${esc(p.name)}${p.uid === mp.me.uid ? ' (you)' : ''}</span>${p.uid === room.meta.host ? '<span class="tag">HOST</span>' : p.away && p.uid !== mp.me.uid ? '<span class="tag" style="color:#8f8874">STILL IN THE NIGHT</span>' : ''}</li>`).join('')}</ul>
     ${vcOk() ? `<button class="mic${VC.on ? ' on' : ''}" id="mic">${VC.on ? 'MIC ON \u2014 your friends can hear you' : 'MIC OFF \u2014 tap to talk to the room'}</button>` : ''}
+    ${amHost && !busyNight ? '' : `<div class="diffbox d-${diff}"><div class="cap">${busyNight ? 'THEIR NIGHT IS ON' : 'DIFFICULTY'}</div><b>${esc(DIFF_NAME[diff].toUpperCase())}</b>${esc(DIFF_NOTE[diff])}${busyNight ? '' : ' \u00b7 chosen by the host'}</div>`}
     <div class="size"><b>${n}</b> ${n === 1 ? 'soul' : 'souls'} → a manor of <b>${mp.floorsFor(n)}</b> floors, <b>${n}</b> ${n === 1 ? 'hunter' : 'hunters'}, <b>${mp.floorsFor(n) * 2}</b> embers to gather.<br>
       <span style="font-size:13px;color:#6f6a5c">Up to ${mp.MAX_PLAYERS} players. Late arrivals can't join once the night begins.</span></div>
-    ${amHost ? `<label>DIFFICULTY</label>
+    ${busyNight ? '<p class="note small" style="text-align:center">Your friends are in a night right now. When they come back to the room, you can all begin the next one together.</p>'
+    : amHost ? `<label>DIFFICULTY</label>
     <select id="diff" style="width:100%;padding:10px;margin-bottom:10px;background:#0d0d12;color:#e5dcc2;border:1px solid rgba(160,150,130,.3);font-size:16px">
-      ${[['easy','Easy — slower, half-blind'],['normal','Normal'],['hard','Hard — quicker, sharper ears'],['nightmare','Nightmare — the fastest, sharpest hunter']].map(([k,t]) => `<option value="${k}"${k === lobbyDiff ? ' selected' : ''}>${t}</option>`).join('')}
+      ${[['easy','Easy — slower, half-blind'],['normal','Normal'],['hard','Hard — quicker, sharper ears'],['nightmare','Nightmare — the fastest, sharpest hunter']].map(([k,t]) => `<option value="${k}"${k === diff ? ' selected' : ''}>${t}</option>`).join('')}
     </select>
-    <p class="note small">Each difficulty has its own leaderboard. Co-op never has jumpscares.</p>
-    <button class="primary" id="start">Begin the night</button>` : '<p class="note small" style="text-align:center">Waiting for the host to choose the difficulty and begin…</p>'}
+    <p class="note small">Everyone in the room sees the difficulty you pick, and you can change it before every night. Each difficulty has its own leaderboard. Co-op never has jumpscares.</p>
+    ${players.some(p => p.away) ? '<p class="note small">Anyone still marked STILL IN THE NIGHT sits out the next one if you begin now.</p>' : ''}
+    <button class="primary" id="start">Begin the night</button>` : '<p class="note small" style="text-align:center">Waiting for the host to begin the night…</p>'}
     ${mp.me.account ? '<div class="inv" id="inv"></div>' : '<p class="note small">Sign in with a username to invite friends straight into this room. Or send them the code or link.</p>'}
     <div class="row"><button id="leave">Leave room</button><button id="leaveHome">Leave \u2014 title screen</button></div>
     <div class="err" id="msg"></div>`);
@@ -350,12 +367,15 @@ function viewLobby() {
   document.getElementById('leave').onclick = leave;
   const micB = document.getElementById('mic'); if (micB) micB.onclick = vcToggle;
   vcStart(code);
+  /* a room from before the difficulty was shared: the host puts theirs up for everyone to see */
+  if (amHost && !busyNight && !DIFF_NAME[room.meta.diff]) mp.setRoomDiff(code, lobbyDiff).catch(e => console.warn(e));
   const dsel = document.getElementById('diff');
-  if (dsel) dsel.onchange = () => { lobbyDiff = dsel.value; try { localStorage.setItem('hollowmere_lobby_diff', lobbyDiff); } catch (e) {} };
+  if (dsel) dsel.onchange = () => { lobbyDiff = dsel.value; try { localStorage.setItem('hollowmere_lobby_diff', lobbyDiff); } catch (e) {}
+    mp.setRoomDiff(code, lobbyDiff).catch(e => { console.warn(e); setMsg(mp.friendlyError(e)); }); };
   const st = document.getElementById('start');
   if (st) st.onclick = async () => {
     st.disabled = true; setMsg('');
-    try { await mp.startRoom(code, lobbyDiff); } catch (e) { console.warn(e); st.disabled = false; setMsg(mp.friendlyError(e)); }
+    try { await mp.startRoom(code, dsel ? dsel.value : diff); } catch (e) { console.warn(e); st.disabled = false; setMsg(mp.friendlyError(e)); }
   };
   setMsg(msg, msgOk);
 }
@@ -410,6 +430,14 @@ document.getElementById('backLink').onclick = goHome;
   catch (e) { console.warn(e); shell('<p class="note">' + esc(mp.friendlyError(e)) + '</p>'); return; }
   /* arriving by an invite link for a night this player is already part of drops straight back in */
   const j = mp.normCode(qs.get('join'));
+  /* back from a finished night: the same room, ready for the next one */
+  const back = Number(qs.get('back'));
+  if (j && back) {
+    history.replaceState(null, '', location.pathname + '?join=' + j);
+    friendsStart();
+    try { code = await mp.backToRoom(j, back); enterLobby(); return; }
+    catch (e) { console.warn(e); code = ''; viewMenu(); setMsg(mp.friendlyError(e)); return; }
+  }
   if (j) {
     try {
       const r = await mp.fetchRoom(j);
@@ -421,7 +449,7 @@ document.getElementById('backLink').onclick = goHome;
   const inv = qs.get('invite');
   if (inv && mp.me.account) {
     history.replaceState(null, '', location.pathname);
-    try { code = await mp.createRoom(); await mp.sendInvite(inv, code); FR.sent[inv] = code; msg = 'Invite sent. Waiting for your friend\u2026'; msgOk = true; enterLobby(); return; }
+    try { code = await mp.createRoom(lobbyDiff); await mp.sendInvite(inv, code); FR.sent[inv] = code; msg = 'Invite sent. Waiting for your friend\u2026'; msgOk = true; enterLobby(); return; }
     catch (e) { console.warn(e); viewMenu(); setMsg(mp.friendlyError(e)); return; }
   }
   /* from an invite accepted inside the game: join right away */
