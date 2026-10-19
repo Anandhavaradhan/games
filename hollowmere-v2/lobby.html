@@ -60,6 +60,10 @@
   .invin{margin-top:14px;padding:10px 12px;border:1px solid #8a7f60;background:rgba(40,32,20,.55)}
   .invin b{color:#ffcf8a}
   .invin .row2{display:flex;gap:8px}.invin .row2 button{margin-top:10px}
+  li.talk .dot{background:#9fd18a;box-shadow:0 0 10px #9fd18a}
+  li.talk span:first-of-type{color:#9fd18a}
+  button.mic.on{border-color:rgba(159,209,138,.6);color:#9fd18a}
+  button.mic.on.talk{box-shadow:0 0 12px rgba(159,209,138,.7)}
 </style>
 </head>
 <body>
@@ -121,6 +125,152 @@ function renderIncoming() {
   el.querySelectorAll('[data-ix]').forEach(b => b.onclick = () => mp.clearInvite(mp.me.uid, b.getAttribute('data-ix')));
 }
 
+/* ---------------- voice chat in the room ----------------
+   The same voice chat as in the night, so friends can talk while they wait for the host to begin.
+   Everyone in the room is connected to everyone else and you hear them straight away; your own mic
+   stays off until you press MIC (or M). Voices go straight between browsers (WebRTC); the database
+   only carries the connection messages, in the same live/{code}/rtc mailbox the night uses. Lobby
+   messages are marked lobby:1 so the night ignores any left over from here, and the lobby ignores the
+   night's. If your mic is on when the night begins, the game switches it back on for you. */
+const VC = { peers: new Map(), sid: Math.random().toString(36).slice(2, 10), mic: null, on: false, busy: false, code: '',
+  unsub: null, tick: 0, lvl: 0, speak: {}, ac: null, meLvl: null };
+const ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
+function vcOk() { return !!(window.RTCPeerConnection && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
+/* the VOICE CHAT VOLUME from the game's settings */
+function vcVol() {
+  try { const v = JSON.parse(localStorage.getItem('hollowmere_settings_v1') || '{}').voiceVol;
+    return typeof v === 'number' && isFinite(v) ? Math.max(0, Math.min(1, v)) : 1; } catch (e) { return 1; }
+}
+function vcAC() {
+  if (!VC.ac) { try { VC.ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { VC.ac = null; } }
+  if (VC.ac && VC.ac.state === 'suspended') VC.ac.resume().catch(() => {});
+  return VC.ac;
+}
+function vcStart(c) {
+  if (!vcOk() || !c || VC.code === c) return;
+  vcStop(true); VC.code = c;
+  mp.clearRtc(c).then(() => { if (VC.code === c) VC.unsub = mp.onRtc(c, m => { vcMsg(m).catch(e => console.warn('Voice:', e)); }); });
+  VC.tick = setInterval(vcTick, 1000); VC.lvl = setInterval(vcLevels, 100);
+}
+/* hang up on everyone; the mic goes off too unless keepMic */
+function vcStop(keepMic) {
+  clearInterval(VC.tick); clearInterval(VC.lvl); VC.tick = VC.lvl = 0;
+  if (VC.unsub) { VC.unsub(); VC.unsub = null; }
+  Array.from(VC.peers.keys()).forEach(vcClose); VC.code = '';
+  if (!keepMic && VC.mic) { VC.mic.getTracks().forEach(t => t.stop()); VC.mic = null; VC.meLvl = null; VC.on = false; }
+}
+function vcPeer(uid, initiator) {
+  const pc = new RTCPeerConnection(ICE), c = VC.code;
+  const p = { uid, pc, initiator, remoteSid: '', pend: [], tr: null, audio: null, an: null, buf: null, badAt: 0 };
+  VC.peers.set(uid, p);
+  pc.onicecandidate = e => { if (e.candidate) mp.sendRtc(c, uid, { sid: VC.sid, t: 'ice', d: JSON.stringify(e.candidate), lobby: 1 }); };
+  pc.ontrack = e => vcAttach(p, (e.streams && e.streams[0]) || new MediaStream([e.track]));
+  pc.onconnectionstatechange = () => { const s = pc.connectionState;
+    if (s === 'connected') p.badAt = 0;
+    else if ((s === 'failed' || s === 'disconnected') && !p.badAt) p.badAt = performance.now(); };
+  return p;
+}
+function vcClose(uid) {
+  const p = VC.peers.get(uid); if (!p) return;
+  VC.peers.delete(uid);
+  try { p.pc.close(); } catch (e) {}
+  if (p.audio) { p.audio.srcObject = null; p.audio.remove(); }
+  delete VC.speak[uid];
+}
+const vcTrack = () => VC.on && VC.mic ? VC.mic.getAudioTracks()[0] || null : null;
+/* the lower uid of each pair calls, the other answers */
+async function vcCall(uid) {
+  const p = vcPeer(uid, true), c = VC.code;
+  p.tr = p.pc.addTransceiver('audio', { direction: 'sendrecv' });
+  await p.tr.sender.replaceTrack(vcTrack());
+  await p.pc.setLocalDescription(await p.pc.createOffer());
+  mp.sendRtc(c, uid, { sid: VC.sid, t: 'offer', d: p.pc.localDescription.sdp, lobby: 1 });
+}
+async function vcMsg(m) {
+  if (!m.lobby || !VC.code) return;
+  const c = VC.code;
+  if (m.t === 'offer') {
+    vcClose(m.from);
+    const p = vcPeer(m.from, false); p.remoteSid = m.sid;
+    await p.pc.setRemoteDescription({ type: 'offer', sdp: m.d });
+    p.tr = p.pc.getTransceivers()[0];
+    if (p.tr) { p.tr.direction = 'sendrecv'; await p.tr.sender.replaceTrack(vcTrack()); }
+    await p.pc.setLocalDescription(await p.pc.createAnswer());
+    mp.sendRtc(c, m.from, { sid: VC.sid, t: 'answer', d: p.pc.localDescription.sdp, lobby: 1 });
+    for (const x of p.pend.splice(0)) await p.pc.addIceCandidate(x).catch(() => {});
+    return;
+  }
+  const p = VC.peers.get(m.from); if (!p) return;
+  if (m.t === 'answer') {
+    if (!p.initiator || p.pc.signalingState !== 'have-local-offer') return;
+    p.remoteSid = m.sid;
+    await p.pc.setRemoteDescription({ type: 'answer', sdp: m.d });
+    for (const x of p.pend.splice(0)) await p.pc.addIceCandidate(x).catch(() => {});
+  } else if (m.t === 'ice') {
+    if (p.remoteSid && m.sid !== p.remoteSid) return;          /* from an earlier connection */
+    let x; try { x = JSON.parse(m.d); } catch (e) { return; }
+    if (!p.pc.remoteDescription) p.pend.push(x); else await p.pc.addIceCandidate(x).catch(() => {});
+  }
+}
+function vcAttach(p, stream) {
+  if (!p.audio) { p.audio = document.createElement('audio'); p.audio.autoplay = true; p.audio.style.display = 'none'; document.body.appendChild(p.audio); }
+  p.audio.srcObject = stream; p.audio.volume = vcVol();
+  p.audio.play().catch(() => {});
+  /* how loud they are right now, for the "talking" light */
+  try { const ac = vcAC(); if (ac) { const src = ac.createMediaStreamSource(stream); p.an = ac.createAnalyser(); p.an.fftSize = 512; src.connect(p.an); p.buf = new Uint8Array(512); } } catch (e) { p.an = null; }
+}
+function vcRms(an, buf) { an.getByteTimeDomainData(buf); let s = 0; for (let i = 0; i < buf.length; i++) { const v = (buf[i] - 128) / 128; s += v * v; } return Math.sqrt(s / buf.length); }
+/* once a second: call whoever is new, drop whoever left, retry a broken line */
+function vcTick() {
+  if (!VC.code || !room) return;
+  const now = performance.now(), inRoom = room.players || {};
+  Object.keys(inRoom).forEach(uid => {
+    if (uid === mp.me.uid) return;
+    const p = VC.peers.get(uid);
+    if (!p) { if (mp.me.uid < uid) vcCall(uid).catch(e => { console.warn('Voice call:', e); vcClose(uid); }); }
+    else if (p.badAt && now - p.badAt > 6000) vcClose(uid);    /* the caller tries again on the next tick */
+  });
+  Array.from(VC.peers.keys()).forEach(uid => { if (!inRoom[uid]) vcClose(uid); });
+}
+/* 10 times a second: who is talking */
+function vcLevels() {
+  const now = performance.now();
+  VC.peers.forEach(p => { if (p.an && vcRms(p.an, p.buf) > 0.04) VC.speak[p.uid] = now; });
+  if (VC.on && VC.meLvl && vcRms(VC.meLvl.an, VC.meLvl.buf) > 0.04) VC.speak[mp.me.uid] = now;
+  document.querySelectorAll('li[data-uid]').forEach(el => el.classList.toggle('talk', now - (VC.speak[el.getAttribute('data-uid')] || 0) < 350));
+  const b = document.getElementById('mic'); if (b) b.classList.toggle('talk', now - (VC.speak[mp.me.uid] || 0) < 350);
+}
+async function vcToggle() {
+  if (VC.busy || !VC.code) return;
+  VC.busy = true;
+  try {
+    if (!VC.on) {
+      const ac = vcAC();
+      try { VC.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+      catch (e) { setMsg('The mic could not be opened. Allow it for this site in your browser, then try again.'); return; }
+      try { if (ac) { const src = ac.createMediaStreamSource(VC.mic), an = ac.createAnalyser(); an.fftSize = 512; src.connect(an); VC.meLvl = { an, buf: new Uint8Array(512) }; } } catch (e) {}
+      VC.on = true; setMsg('');
+    } else {
+      VC.on = false;
+      if (VC.mic) VC.mic.getTracks().forEach(t => t.stop());
+      VC.mic = null; VC.meLvl = null;
+    }
+    const tk = vcTrack();
+    for (const p of VC.peers.values()) if (p.tr) await p.tr.sender.replaceTrack(tk).catch(() => {});
+  } finally {
+    VC.busy = false;
+    const b = document.getElementById('mic');
+    if (b) { b.classList.toggle('on', VC.on); b.textContent = VC.on ? 'MIC ON \u2014 your friends can hear you' : 'MIC OFF \u2014 tap to talk to the room'; }
+  }
+}
+/* browsers only play sound after a tap or key: retry any voice that is waiting */
+['click', 'keydown', 'touchend'].forEach(ev => addEventListener(ev, () => {
+  if (VC.ac && VC.ac.state === 'suspended') VC.ac.resume().catch(() => {});
+  VC.peers.forEach(p => { if (p.audio && p.audio.paused && p.audio.srcObject) p.audio.play().catch(() => {}); });
+}, true));
+addEventListener('keydown', e => {
+  if (e.code === 'KeyM' && !e.repeat && VC.code && !(e.target && e.target.closest && e.target.closest('input,textarea,select'))) { e.preventDefault(); vcToggle(); }
+});
 
 function shell(html) { card.innerHTML = html; }
 function setMsg(t, ok) { msg = t || ''; msgOk = !!ok; const e = document.getElementById('msg'); if (e) { e.textContent = msg; e.classList.toggle('ok', msgOk); } }
@@ -178,7 +328,8 @@ function viewLobby() {
     <div class="code-cap">ROOM CODE</div>
     <div class="code-big" id="bigcode">${esc(code)}</div>
     <button id="copy">Copy invite link</button>
-    <ul>${players.map(p => `<li><i class="dot"></i><span>${esc(p.name)}${p.uid === mp.me.uid ? ' (you)' : ''}</span>${p.uid === room.meta.host ? '<span class="tag">HOST</span>' : ''}</li>`).join('')}</ul>
+    <ul>${players.map(p => `<li data-uid="${esc(p.uid)}"><i class="dot"></i><span>${esc(p.name)}${p.uid === mp.me.uid ? ' (you)' : ''}</span>${p.uid === room.meta.host ? '<span class="tag">HOST</span>' : ''}</li>`).join('')}</ul>
+    ${vcOk() ? `<button class="mic${VC.on ? ' on' : ''}" id="mic">${VC.on ? 'MIC ON \u2014 your friends can hear you' : 'MIC OFF \u2014 tap to talk to the room'}</button>` : ''}
     <div class="size"><b>${n}</b> ${n === 1 ? 'soul' : 'souls'} → a manor of <b>${mp.floorsFor(n)}</b> floors, <b>${n}</b> ${n === 1 ? 'hunter' : 'hunters'}, <b>${mp.floorsFor(n) * 2}</b> embers to gather.<br>
       <span style="font-size:13px;color:#6f6a5c">Up to ${mp.MAX_PLAYERS} players. Late arrivals can't join once the night begins.</span></div>
     ${amHost ? `<label>DIFFICULTY</label>
@@ -197,6 +348,8 @@ function viewLobby() {
     catch (e) { setMsg(link, true); }
   };
   document.getElementById('leave').onclick = leave;
+  const micB = document.getElementById('mic'); if (micB) micB.onclick = vcToggle;
+  vcStart(code);
   const dsel = document.getElementById('diff');
   if (dsel) dsel.onchange = () => { lobbyDiff = dsel.value; try { localStorage.setItem('hollowmere_lobby_diff', lobbyDiff); } catch (e) {} };
   const st = document.getElementById('start');
@@ -213,7 +366,7 @@ function enterLobby() {
   unsub = mp.watchRoom(code, async r => {
     if (leaving || launched) return;
     room = r;
-    if (!r || !r.meta) { room = null; code = ''; if (unsub) unsub(); viewMenu(); setMsg('That room has closed.'); return; }
+    if (!r || !r.meta) { room = null; code = ''; if (unsub) unsub(); vcStop(); viewMenu(); setMsg('That room has closed.'); return; }
     if (!r.players || !r.players[mp.me.uid]) {          /* removed (or never added) */
       if (r.meta.status !== 'lobby') { viewMenu(); setMsg('That night has already begun.'); return; }
       try { await mp.joinRoom(code); } catch (e) { viewMenu(); setMsg(mp.friendlyError(e)); }
@@ -226,6 +379,7 @@ function enterLobby() {
 
 async function launch() {
   if (launched) return; launched = true;
+  try { if (VC.on) sessionStorage.setItem('hollowmere_mic_on', '1'); } catch (e) {}
   shell('<p class="note" style="text-align:center">The night begins. The house is being built for you…</p>');
   await mp.keepPresence(code);
   (window.hmKeepTab&&window.hmKeepTab()),location.replace('index.html?room=' + code + (qs.get('debug') === '1' ? '&debug=1' : ''));
@@ -234,6 +388,7 @@ async function launch() {
 /* back to the game's title screen, leaving the room first if this player is in one */
 async function goHome(e) {
   if (e && e.preventDefault) e.preventDefault();
+  vcStop();
   if (code && room && !launched) {
     leaving = true; if (unsub) unsub();
     try { await Promise.race([mp.leaveRoom(code), new Promise(r => setTimeout(r, 2000))]); } catch (err) { console.warn(err); }
@@ -241,7 +396,7 @@ async function goHome(e) {
   (window.hmKeepTab&&window.hmKeepTab()),location.href = 'index.html' + (qs.get('debug') === '1' ? '?debug=1' : '');
 }
 async function leave() {
-  leaving = true; if (unsub) unsub();
+  leaving = true; if (unsub) unsub(); vcStop();
   try { await mp.leaveRoom(code); } catch (e) { console.warn(e); }
   leaving = false; code = ''; room = null; history.replaceState(null, '', location.pathname);
   qs.delete('join'); viewMenu();
@@ -277,7 +432,7 @@ document.getElementById('backLink').onclick = goHome;
   }
   viewMenu();
 })();
-addEventListener('pagehide', () => { /* the database drops this player from a lobby when the tab closes */ });
+addEventListener('pagehide', () => { /* the database drops this player from a lobby when the tab closes */ vcStop(); });
 </script>
 </body>
 </html>

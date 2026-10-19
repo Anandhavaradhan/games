@@ -8462,6 +8462,8 @@ function voiceStart(){
   VOICE.started=true;
   MP.net.clearRtc(MP.code).then(()=>{VOICE.unsub=MP.net.onRtc(MP.code,m=>{voiceMsg(m).catch(e=>console.warn('Voice:',e));});});
   micUI();
+  /* the mic was on in the lobby: keep it on into the night */
+  try{if(sessionStorage.getItem('hollowmere_mic_on')==='1'){sessionStorage.removeItem('hollowmere_mic_on');voiceToggle();}}catch(e){}
 }
 function voicePeer(uid,initiator){
   const pc=new RTCPeerConnection(ICE);
@@ -8513,6 +8515,7 @@ async function voiceCall(uid){
   MP.net.sendRtc(MP.code,uid,{sid:VOICE.sid,t:'offer',d:p.pc.localDescription.sdp});
 }
 async function voiceMsg(m){
+  if(m.lobby)return;                                     /* left over from the room's lobby */
   if(!MP||!REMOTE.has(m.from)&&m.t!=='offer')return;
   if(m.t==='offer'){
     voiceClose(m.from);

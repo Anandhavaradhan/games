@@ -16,6 +16,15 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-10-19-lobby-voice',
+    date: '2026-10-19',
+    tag: 'NEW',
+    title: 'Voice chat in the co-op lobby',
+    body: 'You can now talk to your friends while you wait in a co-op room, before the night begins. ' +
+      'Everyone in the room hears each other straight away; press MIC (or the M key) to switch your own mic on or off, and a name turns green while that person is talking.\n\n' +
+      'If your mic is on when the host begins the night, it stays on in the house too.'
+  },
+  {
     id: '2026-10-18-smoother-coop',
     date: '2026-10-18',
     tag: 'CHANGE',
