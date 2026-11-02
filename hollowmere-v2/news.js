@@ -25,6 +25,16 @@ export const NEWS = [
       'If you want no camera motion at all, set CAMERA MOTION to REDUCED in settings.'
   },
   {
+    id: '2026-10-25-new-house-every-night',
+    date: '2026-10-25',
+    tag: 'NEW',
+    title: 'A new house every night',
+    body: 'Hollowmere no longer keeps the same floor plan. Every night the walls between its rooms come down and go back up somewhere else: new rooms, new corridors, doorways where there were walls. ' +
+      'The stairs, the front door, the Heart in the cellar, the furniture and the hiding places stay where you know them, so you can still find your way up and out.\n\n' +
+      'Solo, every new night is a new house. In co-op the host\'s room picks the house for the night, so the whole team plays the same one, and friends watching you see it too.\n\n' +
+      'The leaderboard stays fair: a house is only used if the walk from the Heart to the attic, and the walk to every corner, is about as long as in the old house.'
+  },
+  {
     id: '2026-10-19-same-room-next-night',
     date: '2026-10-19',
     tag: 'NEW',
