@@ -937,10 +937,17 @@
     <div id="acctLine" class="acctline">Playing as a guest</div>
     <div class="pulse">TAP OR PRESS ENTER TO WAKE &nbsp;·&nbsp; HEADPHONES, LIGHTS OFF</div>
   </div>
+  <div id="nextOv" class="overlay hidden">
+    <h1>NIGHT FALLS</h1>
+    <h2>THE HOUSE HAS SHIFTED</h2>
+    <p>The stairs are where they always were, and the Heart still beats in the cellar. Everything between them has moved:
+    new rooms, new corridors, doors where there were walls. Learn it again.</p>
+    <div class="pulse">TAP OR PRESS ENTER TO BEGIN THE NIGHT</div>
+  </div>
   <div id="deathOv" class="overlay hidden">
     <h1>DEVOURED</h1>
     <p id="deathLine"></p>
-    <p id="deathNote" style="color:#7d7663">The night is over. Every ember scatters back into the dark and the seal re-forms. The next night begins from nothing.</p>
+    <p id="deathNote" style="color:#7d7663">The night is over. Every ember scatters back into the dark and the seal re-forms. The next night begins from nothing, in a house that has shifted.</p>
     <div class="stat" id="deathTime"></div>
     <div class="stat" id="runSum"></div>
     <button id="btnVaultD" class="ovbtn">THE VAULT — SPEND YOUR ETHER</button>
@@ -1032,7 +1039,7 @@ setTimeout(function(){
      VAULT OF LEGENDS  the 41 legends: stats, looks, abilities
      SAVE ............ local save format, cleaning, league progression
      LEGEND UPGRADES . ash (earned in the house) buys levels: higher stats, shorter cooldowns
-     CONSTANTS & MAPS  the four floors as text maps, stairs, nav graph, pathfinding
+     CONSTANTS & MAPS  the four floors as text maps, stairs, a new house every night (seeded), nav graph, pathfinding
      THREE SETUP ..... renderer + post pass, generated PBR surfaces, the house, furniture, light pool, flashlight
      LEGEND MANNEQUIN  the player's ghost model and its animation rig
      ENTITIES ........ the monster (rigged, wears the jumpscare face), embers (coals), memories (photographs)
@@ -1134,12 +1141,17 @@ if(ROOM){
 const NF_WANT=MP?Math.max(4,Math.min(11,MP.cfg.floors|0)):((DEBUG||WATCH)&&(+QS.get('floors')>=4)?Math.min(11,+QS.get('floors')|0):4);
 /* every client builds the same house: the room's seed drives anything that is random on purpose */
 const mpRnd=MP?mulberry32(MP.cfg.seed):Math.random;
+/* which house tonight (see A NEW HOUSE EVERY NIGHT). Co-op: the room's seed, new every night the host begins.
+   Watching a friend: theirs (?house=). Solo: a new one on every page, and a solo page plays one night only
+   (freshNight). ?debug=1&house=N pins one for testing; house=0 is the classic house. */
+const HOUSE_SEED=MP?(MP.cfg.seed|0):WATCH?(+QS.get('house')|0):(DEBUG&&QS.has('house'))?(+QS.get('house')|0):
+  1+Math.floor(Math.random()*2147483646);
 /* the difficulty of THIS night. Solo: picked on the title / death / win screens, applied when a night
    begins. Co-op: the host's choice from the lobby. */
 let runDiff=MP?(DIFFS[MP.cfg.diff]?MP.cfg.diff:'normal'):settings.diff;
 const DF=()=>DIFFS[runDiff]||DIFFS.normal;
 /* only the standard solo house counts for the personal best and the leaderboard */
-const SOLO_RANKED=!MP&&NF_WANT===4;
+const SOLO_RANKED=!MP&&NF_WANT===4&&!(DEBUG&&QS.has('house'));   /* (and not a house pinned for testing) */
 
 /* =========================================================
    THE VAULT OF LEGENDS  —  41 ghosts, ported into the manor
@@ -1871,6 +1883,107 @@ for(let f=3;f<NF-1;f++)FLOOR_FOG.push(f%2?0x020203:0x020204);
 FLOOR_FOG.push(0x030304);
 /* which of the four original looks a floor wears: cellar, ground, upper, attic */
 const SF=f=>f<=2?f:(f===NF-1?3:(f%2===1?1:2));
+const nk=(f,x,z)=>f+','+x+','+z;
+/* the walking graph of a set of floor plans: open cells, the stairs, and how they join */
+function navFor(maps){
+  const nodes=new Map();
+  for(let f=0;f<NF;f++)for(let z=0;z<D;z++)for(let x=0;x<W;x++)
+    if(maps[f][z][x]!=='#')nodes.set(nk(f,x,z),{f,x,z,ramp:null});
+  stairs.forEach(s=>{for(let z=s.zMin;z<=s.zMax;z++)nodes.get(nk(s.floor,s.x,z)).ramp=s.id;});
+  const adj=new Map(); nodes.forEach((n,k)=>adj.set(k,new Set()));
+  const link=(a,b)=>{if(adj.has(a)&&adj.has(b)){adj.get(a).add(b);adj.get(b).add(a);}};
+  nodes.forEach((n,k)=>{
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
+      const m=nodes.get(nk(n.f,n.x+d[0],n.z+d[1])); if(!m)return; const mk=nk(m.f,m.x,m.z);
+      if(n.ramp==null&&m.ramp==null)return link(k,mk);
+      if(n.ramp!=null&&m.ramp!=null){if(n.ramp===m.ramp&&Math.abs(n.z-m.z)===1&&n.x===m.x)link(k,mk);return;}
+    });
+  });
+  stairs.forEach(s=>{
+    const topK=nk(s.floor,s.x,s.zMin), botK=nk(s.floor,s.x,s.zMax);
+    s.topLinks.forEach(l=>link(topK,nk(l[2],l[0],l[1])));
+    s.bottomLinks.forEach(l=>link(botK,nk(l[2],l[0],l[1])));
+    const fk=nk(s.floor+1,s.x,s.zMin-1);        // walk straight forward off the top step
+    if(nodes.has(fk))link(topK,fk);
+    /* the bottom step is almost at floor level: it can be stepped onto (and off) from either side too,
+       so its corners are not a wall you catch on */
+    for(const dx of[-1,1]){const sk=nk(s.floor,s.x+dx,s.zMax),sn=nodes.get(sk);if(sn&&sn.ramp==null)link(botK,sk);}});
+  return {nodes,adj};}
+
+/* ================= A NEW HOUSE EVERY NIGHT =================
+   The plans above are the classic house. Each night the walls between its rooms are pulled down and
+   built again from HOUSE_SEED: same stairs, same front door, same Heart in the cellar, same furniture
+   and hiding places, but the rooms, corridors and doorways around them are new. Every client with the
+   same seed builds the same house (co-op: the host's room seed; spectators: the seed their friend
+   publishes). HOUSE_SEED 0 is the classic house.
+   - KEEP: cells copied from the classic plan as they are: every staircase and the landing it arrives
+     on, the patrol posts, the furniture, the Heart, the great hall and the entrance hall.
+   - everything else is open floor, cut into rooms by recursive division: walls on even rows/columns,
+     doorways on odd ones, so a doorway never opens into the end of another wall.
+   - a plan is only kept if every open cell can be walked to, and (for a fair leaderboard) the walk
+     from the Heart to the attic and the average walk to any cell stay close to the classic house's. */
+function houseKeep(f){
+  const K=new Set(),rect=(x0,z0,x1,z1)=>{for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++)K.add(x+','+z);};
+  stairs.forEach(s=>{if(s.floor===f||s.floor+1===f)rect(s.x-1,s.zMin-1,s.x+1,s.zMax+1);});
+  PATROL.forEach(p=>{if(p[2]===f)rect(p[0],p[1],p[0],p[1]);});
+  if(MONSTER_START[2]===f)rect(MONSTER_START[0],MONSTER_START[1],MONSTER_START[0],MONSTER_START[1]);
+  if(f===0){rect(9,6,13,10);                                    /* the Heart */
+    [[5,5],[17,5],[5,12],[17,12],[11,3],[4,14],[18,14],[3,3],[19,3],[3,13]].forEach(([x,z])=>rect(x,z,x,z));}
+  else if(f===1){rect(3,1,5,3);rect(10,1,12,2);rect(16,2,18,3);   /* dining table, sideboard, bookcases */
+    rect(8,5,14,11);rect(8,12,14,16);}                            /* the great hall (hearth), the entrance hall */
+  else if(f===NF-1){[[5,7],[15,7],[6,12],[15,12],[3,10],[17,3]].forEach(([x,z])=>rect(x,z,x,z));
+    rect(8,2,10,4);rect(18,10,20,12);rect(7,14,9,15);rect(5,11,7,13);}   /* sheeted shapes, the chalk circle */
+  else{rect(2,2,4,4);rect(17,2,19,4);rect(2,13,4,15);rect(17,13,19,15);  /* four beds */
+    rect(4,1,6,1);rect(10,7,12,9);rect(18,14,18,14);if(f%2===0)rect(1,7,2,9);}  /* wardrobe, rug, lamp, mirror */
+  return K;}
+function houseMetrics(maps){
+  const {nodes,adj}=navFor(maps),start=nk(0,11,8),dist=new Map([[start,0]]),q=[start];
+  for(let i=0;i<q.length;i++){const c=q[i],d=dist.get(c);adj.get(c).forEach(n=>{if(!dist.has(n)){dist.set(n,d+1);q.push(n);}});}
+  let attic=1e9,sum=0;const lost=[];
+  nodes.forEach((n,k)=>{const d=dist.get(k);if(d===undefined){lost.push(n);return;}sum+=d;if(n.f===NF-1&&d<attic)attic=d;});
+  return {lost,attic,mean:sum/Math.max(1,dist.size)};}
+function shuffleHouse(maps,seed){
+  if(!seed)return;
+  const R=mulberry32(seed^0x6a09e667),ri=(a,b)=>a+Math.floor(R()*(b-a+1));
+  const base=houseMetrics(maps),plan=maps.map(g=>g.map(r=>r.slice())),keeps=maps.map((g,f)=>houseKeep(f));
+  for(let attempt=0;attempt<60;attempt++){
+    const out=plan.map((g,f)=>{
+      const K=keeps[f],look=f===0?'cellar':(f===NF-1?'attic':'rooms'),grid=g.map(r=>r.slice());
+      for(let z=1;z<D-1;z++)for(let x=1;x<W-1;x++)if(!K.has(x+','+z))grid[z][x]='.';
+      const wall=(x,z)=>{if(!K.has(x+','+z))grid[z][x]='#';};
+      /* the open chamber x0..x1 / z0..z1 (odd bounds) is cut by one wall, then each half again */
+      const stopAt=look==='rooms'?0.18:0.45;
+      (function divide(x0,z0,x1,z1,depth){
+        const w=x1-x0+1,h=z1-z0+1;if(w<7&&h<7)return;   /* no room narrower than three cells */
+        if(depth>1&&w*h<=63&&R()<stopAt)return;
+        const vert=w>=7&&(h<7||(w>h?R()<0.8:w===h?R()<0.5:R()<0.2));
+        if(vert){const wx=2*ri((x0+3)/2,(x1-3)/2);
+          const gaps=new Set([2*ri((z0-1)/2,(z1-1)/2)+1]);
+          if(h>=9&&R()<0.5)gaps.add(2*ri((z0-1)/2,(z1-1)/2)+1);
+          if(R()<0.22){const g0=[...gaps][0];if(g0+2<=z1){gaps.add(g0+1);gaps.add(g0+2);}}  /* a wide arch */
+          for(let z=z0;z<=z1;z++)if(!gaps.has(z))wall(wx,z);
+          divide(x0,z0,wx-1,z1,depth+1);divide(wx+1,z0,x1,z1,depth+1);}
+        else{const wz=2*ri((z0+3)/2,(z1-3)/2);
+          const gaps=new Set([2*ri((x0-1)/2,(x1-1)/2)+1]);
+          if(w>=9&&R()<0.5)gaps.add(2*ri((x0-1)/2,(x1-1)/2)+1);
+          if(R()<0.22){const g0=[...gaps][0];if(g0+2<=x1){gaps.add(g0+1);gaps.add(g0+2);}}
+          for(let x=x0;x<=x1;x++)if(!gaps.has(x))wall(x,wz);
+          divide(x0,z0,x1,wz-1,depth+1);divide(x0,wz+1,x1,z1,depth+1);}
+      })(1,1,W-2,D-2,0);
+      /* the cellar and the attic stay rough and open: a few lone pillars among their few walls */
+      if(look!=='rooms')for(let n=ri(2,5);n>0;n--){const x=2*ri(1,10),z=2*ri(1,7);wall(x,z);}
+      return grid;});
+    const m=houseMetrics(out);
+    /* a sealed-off pocket of plain floor is just walled in; one holding anything that matters is not allowed */
+    if(m.lost.length>10||m.lost.some(n=>keeps[n.f].has(n.x+','+n.z)))continue;
+    m.lost.forEach(n=>{out[n.f][n.z][n.x]='#';});
+    if(m.attic<base.attic*0.92||m.attic>base.attic*1.12||m.mean<base.mean*0.9||m.mean>base.mean*1.15)continue;
+    out.forEach((g,f)=>g.forEach((r,z)=>{maps[f][z]=r;}));
+    HOUSE.attempt=attempt;HOUSE.attic=m.attic;HOUSE.mean=Math.round(m.mean*10)/10;
+    return;}
+  HOUSE.seed=0;}   /* no fair plan came out of this seed: the classic house it is */
+const HOUSE={seed:HOUSE_SEED,attempt:-1,attic:0,mean:0};
+shuffleHouse(maps,HOUSE_SEED);
 
 let spawnDef=[11,8,0], exitCell=[11,15,1];
 maps.forEach((g,f)=>{for(let z=0;z<D;z++)for(let x=0;x<W;x++){const c=g[z][x];
@@ -1879,29 +1992,8 @@ maps.forEach((g,f)=>{for(let z=0;z<D;z++)for(let x=0;x<W;x++){const c=g[z][x];
   else if(c==='D'){if(f===1&&z===15){exitCell=[x,z,f];}g[z][x]='.';}}});
 const holeSet=new Set();
 stairs.forEach(s=>{for(let z=s.zMin;z<=s.zMax;z++)holeSet.add(`${s.floor+1},${s.x},${z}`);});
-const nk=(f,x,z)=>f+','+x+','+z;
-const nodes=new Map();
-for(let f=0;f<NF;f++)for(let z=0;z<D;z++)for(let x=0;x<W;x++)
-  if(maps[f][z][x]!=='#')nodes.set(nk(f,x,z),{f,x,z,ramp:null});
-stairs.forEach(s=>{for(let z=s.zMin;z<=s.zMax;z++)nodes.get(nk(s.floor,s.x,z)).ramp=s.id;});
-const adj=new Map(); nodes.forEach((n,k)=>adj.set(k,new Set()));
+const {nodes,adj}=navFor(maps);
 function link(a,b){if(adj.has(a)&&adj.has(b)){adj.get(a).add(b);adj.get(b).add(a);}}
-nodes.forEach((n,k)=>{
-  [[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{
-    const m=nodes.get(nk(n.f,n.x+d[0],n.z+d[1])); if(!m)return; const mk=nk(m.f,m.x,m.z);
-    if(n.ramp==null&&m.ramp==null)return link(k,mk);
-    if(n.ramp!=null&&m.ramp!=null){if(n.ramp===m.ramp&&Math.abs(n.z-m.z)===1&&n.x===m.x)link(k,mk);return;}
-  });
-});
-stairs.forEach(s=>{
-  const topK=nk(s.floor,s.x,s.zMin), botK=nk(s.floor,s.x,s.zMax);
-  s.topLinks.forEach(l=>link(topK,nk(l[2],l[0],l[1])));
-  s.bottomLinks.forEach(l=>link(botK,nk(l[2],l[0],l[1])));
-  const fk=nk(s.floor+1,s.x,s.zMin-1);        // walk straight forward off the top step
-  if(nodes.has(fk))link(topK,fk);
-  /* the bottom step is almost at floor level: it can be stepped onto (and off) from either side too,
-     so its corners are not a wall you catch on */
-  for(const dx of[-1,1]){const sk=nk(s.floor,s.x+dx,s.zMax),sn=nodes.get(sk);if(sn&&sn.ramp==null)link(botK,sk);}});
 function blocksSight(f,x,z){ if(x<0||z<0||x>=W||z>=D)return true;
   if(holeSet.has(`${f},${x},${z}`))return false; return maps[f][z][x]==='#';}
 function rampH(s,x,z){const zc=z/CS;const t=Math.min(1,Math.max(0,((s.zMax+0.5)-zc)/(s.zMax-s.zMin+1)));return s.floor*FH+t*FH;}
@@ -4154,7 +4246,7 @@ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updat
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
-const titleOv=$('titleOv'),deathOv=$('deathOv'),winOv=$('winOv'),pauseOv=$('pauseOv');
+const titleOv=$('titleOv'),deathOv=$('deathOv'),winOv=$('winOv'),pauseOv=$('pauseOv'),nextOv=$('nextOv');
 const setPanel=$('setPanel'),gearBtn=$('gearBtn'),sensRange=$('sensRange'),sensVal=$('sensVal'),invertBtn=$('invertBtn');
 const volRange=$('volRange'),volVal=$('volVal'),flashBtn=$('flashBtn');
 const embersEl=$('embers'),objEl=$('objective'),floorEl=$('floorlabel'),essEl=$('essfill');
@@ -4199,7 +4291,7 @@ let ovShownAt=0;
 const ovSettling=()=>(state==='dead'||state==='win')&&performance.now()-ovShownAt<900;
 function showOv(ov){
   if(ov&&(ov===deathOv||ov===winOv)&&ov.classList.contains('hidden'))ovShownAt=performance.now();
-  [titleOv,deathOv,winOv,pauseOv].forEach(o=>o.classList.add('hidden'));
+  [titleOv,deathOv,winOv,pauseOv,nextOv].forEach(o=>o.classList.add('hidden'));
   if(ov)ov.classList.remove('hidden');}
 function setScreenState(){document.body.classList.toggle('title',state==='title');}
 {const c=document.createElement('canvas');c.width=c.height=140;const g=c.getContext('2d');
@@ -6003,7 +6095,7 @@ document.addEventListener('click',e=>{
 
 function startGame(){ if(state!=='title')return;
   if(storyDue()){playStory(startGame);return;}
-  if(!MP)runDiff=settings.diff;
+  if(!MP){runDiff=settings.diff;soloNightUsed=true;}
   try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){console.warn(e);}
   closeSettings();
   state='play';showOv(null);setScreenState();lockMouse();elapsed=0;nextScareAt=20+Math.random()*20;fpPitch=0;
@@ -6011,7 +6103,7 @@ function startGame(){ if(state!=='title')return;
   skipFloorToast=true;toast('THE HEART OF HOLLOWMERE \u00b7 '+DF().n,3.5);
   cloudPush();
   /* (only if the night is still going: not over the title screen after a quick quit) */
-  setTimeout(()=>{if(state==='play')subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor, never where they were before.');},3800);
+  setTimeout(()=>{if(state==='play')subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor. Tonight the rooms are not where they were.');},3800);
   setTimeout(()=>{if(state==='play')subtitle('Something else walks these floors. Listen to its steps.');},8200);
   heatNote();}
 /* ================= BACKSTORY =================
@@ -6021,7 +6113,7 @@ function startGame(){ if(state!=='title')return;
    - a guest sees it on every visit (once per page load)
    - THE BACKSTORY on the title screen replays it at any time
    Co-op nights start on a shared clock, so it never plays automatically there. */
-let storyThisVisit=false;
+let storyThisVisit=(function(){try{const v=sessionStorage.getItem('hm_fresh_night')==='1';sessionStorage.removeItem('hm_fresh_night');return v;}catch(e){return false;}})();
 function storyDue(){
   if(MP||storyThisVisit||!window.HMStory)return false;
   return !cloudUser||!(save.stats.story>0);
@@ -6059,7 +6151,20 @@ function respawn(){
   ghost.g.scale.setScalar(0.92);ghost.g.visible=true;ghost.mat.opacity=0;
   redEl.style.opacity=0;state='play';showOv(null);setScreenState();fpPitch=0;
   skipFloorToast=true;toast('THE HEART PULLS YOU BACK',3);lockMouse();cloudPush();}
-function fullReset(){if(!MP)runDiff=settings.diff;deaths=0;respawn();elapsed=0;nextScareAt=20+Math.random()*20;heatNote();}
+/* SOLO: a page builds its house once, so a page holds one night. The next night is a fresh page with a
+   fresh house (HOUSE_SEED); everything kept between nights is already saved. toTitle: land on the title screen
+   instead of the short NIGHT FALLS screen. */
+let soloNightUsed=false;
+function freshNight(toTitle){
+  const q=new URLSearchParams();
+  ['debug','floors','dtcap'].forEach(k=>{if(QS.has(k))q.set(k,QS.get(k));});
+  if(DEBUG&&QS.has('house')&&QS.get('pin')==='1'){q.set('house',QS.get('house'));q.set('pin','1');}
+  if(!toTitle)q.set('next','1');
+  try{if(storyThisVisit)sessionStorage.setItem('hm_fresh_night','1');}catch(e){}
+  try{document.exitPointerLock();}catch(e){}
+  (window.hmKeepTab&&window.hmKeepTab()),location.replace('index.html'+(q.toString()?'?'+q:''));}
+function fullReset(){if(!MP&&soloNightUsed){freshNight(false);return;}
+  if(!MP)runDiff=settings.diff;deaths=0;respawn();elapsed=0;nextScareAt=20+Math.random()*20;heatNote();}
 /* R / HEART: teleports ONLY the player — embers, door and monster untouched */
 function heartShift(){
   const keepEss=P.ess;
@@ -6195,7 +6300,7 @@ function advance(){
   else if(state==='win'){if(MP){if(TEAM.done)mpBackToRoom();}else fullReset();}
   else if(state==='play'&&!pauseOv.classList.contains('hidden')){showOv(null);lockMouse();}}
 document.addEventListener('click',()=>{try{advance();}catch(e){fatal('Click error: '+e.message);}});
-[deathOv,winOv,pauseOv,titleOv].forEach(ov=>ov.addEventListener('click',e=>{e.stopPropagation();try{advance();}catch(err){}}));
+[deathOv,winOv,pauseOv,titleOv,nextOv].forEach(ov=>ov.addEventListener('click',e=>{e.stopPropagation();try{advance();}catch(err){}}));
 /* ---- WAYS BACK ----
    Solo: end the night (or leave the finished one) and stand on the title screen again.
    Co-op: leave the team and the room, and go back to the title screen (or the lobby). */
@@ -6204,6 +6309,7 @@ function goTitle(){
   if(MP){mpLeaveTo('index.html');return;}
   if(midNight()&&!confirm('End this night and go back to the title screen? What you found tonight is lost.'))return;
   closeSettings();
+  if(state!=='title'&&soloNightUsed){freshNight(true);return;}
   if(state!=='title'){fullReset();state='title';}
   showOv(titleOv);setScreenState();
   try{document.exitPointerLock();}catch(e){}
@@ -7974,7 +8080,7 @@ const inNightState=()=>state==='play'||state==='caught'||state==='dead'||state==
 /* what friends see next to your name */
 function socialPresence(force){
   if(!SOC.net||!SOC.uid||WATCH)return;
-  const o={n:cloudUser.name,st:inNightState()?'night':'title',mp:MP?MP.code:'',d:runDiff,nf:NF};
+  const o={n:cloudUser.name,st:inNightState()?'night':'title',mp:MP?MP.code:'',d:runDiff,nf:NF,hs:HOUSE_SEED};
   const sig=JSON.stringify(o);
   if(!force&&sig===SOC.lastPres&&Date.now()-SOC.lastPresAt<120000)return;
   SOC.lastPres=sig;SOC.lastPresAt=Date.now();
@@ -7996,7 +8102,7 @@ function socialTick(now){
   REMOTE.forEach(r=>{if(r.ph===1&&r.lg)mates.push([q(r.ent.x),q(r.ent.y),q(r.ent.z),r.ent.floor,q(r.gy||r.yaw||0),r.lg,String(r.name).slice(0,24),
     (r.ent.hiding?1:0)|(r.ent.veiling?2:0)|(r.ent.dashing?4:0)|(r.ent.moving?8:0)]);});
   SOC.net.publishWatch(SOC.uid,{
-    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,mp:MP?MP.code:'',lg:pubLegend(),n:cloudUser.name,ts:Math.round(performance.now()),
+    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,hs:HOUSE_SEED,mp:MP?MP.code:'',lg:pubLegend(),n:cloudUser.name,ts:Math.round(performance.now()),
     p:[q(P.x),q(P.y),q(P.z),P.floor,q(ghostYaw),fl],
     m:[monRow(M)].concat(PUP.map(p=>monRow(p.M))),
     o:mates,
@@ -8085,7 +8191,7 @@ async function frAction(act,u){
     }else if(act==='watch'){
       const v=SOC.pres[u];if(!v)return;
       if(state==='play'||state==='caught'){frMsg('Finish or leave your own night first.');return;}
-      (window.hmKeepTab&&window.hmKeepTab()),location.href='index.html?watch='+encodeURIComponent(u)+'&floors='+Math.max(4,Math.min(11,v.nf|0||4));
+      (window.hmKeepTab&&window.hmKeepTab()),location.href='index.html?watch='+encodeURIComponent(u)+'&floors='+Math.max(4,Math.min(11,v.nf|0||4))+'&house='+(v.hs|0);
     }
   }catch(e){console.warn('Friends:',e);frMsg(cloud.friendlyError(e));}
   finally{SOC.busy=false;}
@@ -8412,8 +8518,9 @@ function watchFrame(dt,t){
   if(!WV.ok)return;
   if(!s){watchBar('WAITING FOR YOUR FRIEND','They are not in a night right now — this page will follow them when they start one');return;}
   if(performance.now()-WV.at>10000){watchBar(String(s.n||'YOUR FRIEND').toUpperCase()+' HAS GONE QUIET','Waiting for their night to come back…');}
-  /* a different house size (co-op ↔ solo): rebuild for it */
-  if(s.nf&&s.nf!==NF&&!WV.reloading){WV.reloading=true;(window.hmKeepTab&&window.hmKeepTab()),location.replace('index.html?watch='+encodeURIComponent(WATCH)+'&floors='+s.nf);return;}
+  /* a different house (size, or a new night's layout): rebuild for it. A friend on an older version sends no hs: the classic house */
+  if(((s.nf&&s.nf!==NF)||(s.hs|0)!==HOUSE_SEED)&&!WV.reloading){WV.reloading=true;(window.hmKeepTab&&window.hmKeepTab()),
+    location.replace('index.html?watch='+encodeURIComponent(WATCH)+'&floors='+(s.nf||NF)+'&house='+(s.hs|0));return;}
   const k=Math.min(1,dt*8),p=s.p||[0,0,0,0,0,0];
   let wy=p[4];
   {const q=ipAt(WV.pb);if(q){P.x=q.x;P.y=q.y;P.z=q.z;P.floor=q.f;wy=q.r;}
@@ -8635,8 +8742,11 @@ if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return s
   get MP(){return MP;},embers,stairs,nodes,adj,findPath,nk,NF,CS,FH,PATROL,maps,entAt,TOTAL_EMBERS,startGame,warpTo,openDoor,camera,scene,get REMOTE(){return typeof REMOTE!=='undefined'?REMOTE:null;},
   get PUP(){return typeof PUP!=='undefined'?PUP:null;},
   get graceT(){return graceT;},triggerJumpscare,doDeath,settings,keys,setDiff(d){runDiff=d;}};
-if(DEBUG)Object.assign(window.__hm,{ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare,DAILY,dailyDefs,btyToday,dailyAdd,openBty,doWin,doDeath,getSave:()=>save,setGot:v=>{got=v;}});
+if(DEBUG)Object.assign(window.__hm,{HOUSE,ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare,DAILY,dailyDefs,btyToday,dailyAdd,openBty,doWin,doDeath,getSave:()=>save,setGot:v=>{got=v;}});
 window.__HM_BOOTED=true;
+/* arrived from freshNight: the short NIGHT FALLS screen instead of the whole title screen */
+if(!MP&&!WATCH&&QS.get('next')==='1'){showOv(nextOv);
+  try{const q=new URLSearchParams(location.search);q.delete('next');history.replaceState(null,'',location.pathname+(q.toString()?'?'+q:''));}catch(e){}}
 /* fetch the backstory's narrator early, so its first words aren't lost to the download */
 try{if(storyDue())HMStory.preload();}catch(e){}
 ['pointerenter','focus','touchstart'].forEach(ev=>$('titleStory').addEventListener(ev,()=>{try{HMStory.preload();}catch(e){}},{once:true,passive:true}));
