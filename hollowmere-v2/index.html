@@ -1086,11 +1086,14 @@ const settings={sens:isTouch?1.3:1.0, invertY:false, vol:0.8, reduceFlash:PREFER
    scare   jumpscares: 0 none · 1 the face only · 2 the TELEPORTING jumpscare (it appears in front of you and hunts)
    every   how often a scare comes (× the usual gap; lower = more often)
    Each difficulty has its own fastest-escapes leaderboard. Co-op uses the host's choice (and never has jumpscares). */
+/* EASY is the classic night: the old fixed house and its one hunter that roams every floor.
+   NORMAL, HARD and NIGHTMARE are a new house every night with a hunter bound to each floor
+   (see ONE HUNTER PER FLOOR). Normal carries what used to be Easy's tuning, Hard what used to be Normal's. */
 const DIFFS={
-  easy:     {n:'EASY',     speed:0.85,sight:0.8, hear:0.75,notice:1.4, cap:0.85,scare:0,every:1,  d:'A slower, half-blind thing. No jumpscares.'},
-  normal:   {n:'NORMAL',   speed:1,   sight:1,   hear:1,   notice:1,   cap:0,   scare:1,every:1,  d:'The house as it was meant to be. The face, but it stays where it is.'},
-  hard:     {n:'HARD',     speed:1.12,sight:1.15,hear:1.25,notice:0.75,cap:0.97,scare:1,every:0.8,d:'Quicker, sharper ears, and the face comes more often.'},
-  nightmare:{n:'NIGHTMARE',speed:1.2, sight:1.25,hear:1.4, notice:0.6, cap:0.97,scare:2,every:0.7,d:'The thing teleports in front of you when it scares you \u2014 and then it hunts.'}
+  easy:     {n:'EASY',     speed:0.85,sight:0.8, hear:0.75,notice:1.4, cap:0.85,scare:0,every:1,  classic:1,d:'The old house, the same every night, and one slow, half-blind thing that roams every floor. No jumpscares.'},
+  normal:   {n:'NORMAL',   speed:0.85,sight:0.8, hear:0.75,notice:1.4, cap:0.85,scare:0,every:1,  d:'A new house every night and a hunter on every floor \u2014 slower, half-blind ones. No jumpscares.'},
+  hard:     {n:'HARD',     speed:1,   sight:1,   hear:1,   notice:1,   cap:0,   scare:1,every:1,  d:'A new house every night and a hunter on every floor. The face, but it stays where it is.'},
+  nightmare:{n:'NIGHTMARE',speed:1.2, sight:1.25,hear:1.4, notice:0.6, cap:0.97,scare:2,every:0.7,d:'A new house, a hunter on every floor, and one teleports in front of you when it scares you \u2014 and then it hunts.'}
 };
 const DIFF_ORDER=['easy','normal','hard','nightmare'];
 /* spectating a teammate after you are taken (co-op) — see SPECTATING A TEAMMATE */
@@ -1144,8 +1147,13 @@ const mpRnd=MP?mulberry32(MP.cfg.seed):Math.random;
 /* which house tonight (see A NEW HOUSE EVERY NIGHT). Co-op: the room's seed, new every night the host begins.
    Watching a friend: theirs (?house=). Solo: a new one on every page, and a solo page plays one night only
    (freshNight). ?debug=1&house=N pins one for testing; house=0 is the classic house. */
-const HOUSE_SEED=MP?(MP.cfg.seed|0):WATCH?(+QS.get('house')|0):(DEBUG&&QS.has('house'))?(+QS.get('house')|0):
-  1+Math.floor(Math.random()*2147483646);
+/* the difficulty this page is built for: EASY is the classic house with one roaming hunter; the rest are a new
+   house every night with a hunter on each floor. Solo changes of difficulty across that line load a fresh page. */
+const LOAD_DIFF=MP?(MP.cfg.diff||'normal'):settings.diff;
+const LOAD_CLASSIC=!WATCH&&!!(DIFFS[LOAD_DIFF]||DIFFS.normal).classic;
+const PER_FLOOR=!LOAD_CLASSIC&&!WATCH;   /* (a spectator only draws the hunters it is sent) */
+const HOUSE_SEED=MP?(LOAD_CLASSIC?0:(MP.cfg.seed|0)):WATCH?(+QS.get('house')|0):(DEBUG&&QS.has('house'))?(+QS.get('house')|0):
+  LOAD_CLASSIC?0:1+Math.floor(Math.random()*2147483646);
 /* the difficulty of THIS night. Solo: picked on the title / death / win screens, applied when a night
    begins. Co-op: the host's choice from the lobby. */
 let runDiff=MP?(DIFFS[MP.cfg.diff]?MP.cfg.diff:'normal'):settings.diff;
@@ -3785,10 +3793,24 @@ for(let i=0;i<NF*2;i++){const grp=new THREE.Group();
   grp.position.set(0,-10,0);scene.add(grp);
   embers.push({x:0,z:0,f:0,grp,taken:false,halo,spot:lightSpot(0,-10,0,0,0xff6a1a,1.4,0.35)});}
 
+/* where an ember or a memory may lie: only floor you can walk to from the Heart (tonight's house is
+   checked, not assumed), and never inside the furniture — a crate, a bed, the hearth, a bookcase, a
+   sheeted shape — or a hiding place, where it would look out of reach. */
+const FURN_CELLS=(()=>{const S=new Set(),c=(f,x,z)=>S.add(nk(f,x,z)),r=(f,x0,z0,x1,z1)=>{for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++)c(f,x,z);};
+  [[5,5],[17,5],[5,12],[17,12],[11,3],[4,14],[18,14],[3,3],[19,3],[3,13]].forEach(([x,z])=>c(0,x,z));   /* cellar crates, barrels */
+  r(1,2,1,6,3);r(1,10,1,12,1);r(1,16,2,18,3);r(1,9,7,9,9);                                              /* table, sideboard, bookcases, hearth */
+  for(let f=2;f<NF-1;f++){[[3,3],[18,3],[3,14],[18,14],[5,1]].forEach(([x,z])=>c(f,x,z));if(f%2===0)r(f,1,7,2,9);}  /* beds, wardrobe, mirror */
+  [[5,7],[15,7],[6,12],[15,12],[3,10],[17,3]].forEach(([x,z])=>c(NF-1,x,z));                              /* attic crates */
+  r(NF-1,8,2,10,4);r(NF-1,18,10,20,12);r(NF-1,7,14,9,15);                                                /* sheeted shapes */
+  hideSpots0.forEach(h=>c(h.f,Math.floor(h.x/CS),Math.floor(h.z/CS)));
+  return S;})();
+const REACH=(()=>{const st=nk(spawnDef[2],spawnDef[0],spawnDef[1]),seen=new Set([st]),q=[st];
+  for(let i=0;i<q.length;i++)(adj.get(q[i])||[]).forEach(k=>{if(!seen.has(k)){seen.add(k);q.push(k);}});
+  return seen;})();
 const emberPools=[];
 for(let f=0;f<NF;f++){const list=[];
   for(let z=1;z<D-1;z++)for(let x=1;x<W-1;x++){
-    const n=nodes.get(nk(f,x,z));if(!n||n.ramp!=null)continue;
+    const n=nodes.get(nk(f,x,z));if(!n||n.ramp!=null||!REACH.has(nk(f,x,z))||FURN_CELLS.has(nk(f,x,z)))continue;
     if(f===spawnDef[2]&&Math.abs(x-spawnDef[0])+Math.abs(z-spawnDef[1])<=2)continue;
     if(f===exitCell[2]&&x===exitCell[0]&&z===exitCell[1])continue;
     list.push([x,z]);}
@@ -3876,6 +3898,135 @@ let catcher=null;            /* a puppet hunter that is eating you (null: your o
 Object.assign(P,{ess:100,veiling:false,dashing:false,moving:false,hiding:false});
 Object.assign(M,{state:'patrol',wpIdx:0,path:null,pathI:0,repathT:0,lastSeen:null,losLostT:0,searchT:0,invT:0,
   tx:null,tz:null,tf:null,stepPhase:0,yaw:0,noticeT:-1});
+let catchM=null;             /* the hunter (of this page) that is eating you */
+
+/* ================= ONE HUNTER PER FLOOR =================
+   Normal, Hard and Nightmare (PER_FLOOR): every floor has a hunter of its own, bound to it (M.home).
+   - it walks only its own floor and never steps off onto another;
+   - a staircase is shared ground: a hunter may follow a soul up or down the WHOLE staircase that touches its
+     floor, but only one hunter holds a staircase at a time (STAIRHOLD). While one holds it, and for a few
+     seconds after, the hunter at the other end keeps clear of its landing, so a soul on the stairs never has a
+     hunter waiting at both ends. A soul standing on the stairs with nobody chasing counts too: the first hunter
+     near either end holds them and the other stays back.
+   - solo, this page runs every hunter. Co-op: each floor's hunter is run by one of the players still in the
+     house (floor % players) and the rest see it as a puppet, as before. Extra hunters this page runs sit in
+     PUP with local:true; M is always one of this page's own, swapped each frame to the one nearest you, so
+     everything that speaks of "the thing" (powers, the danger at the edge of the screen, the heartbeat, a
+     jumpscare) means the hunter of your floor.
+   ======================================================= */
+const HOME_WP=[];for(let f=0;f<NF;f++)HOME_WP.push(PATROL.filter(w=>w[2]===f));
+const STAIRHOLD=new Map();     /* stair id -> {h: the home floor of the hunter holding it, t: when it last held it (ms)} */
+const HOLD_MS=3000,KEEP_R=4.5;
+const touchesHome=(s,h)=>s.floor===h||s.floor+1===h;
+const rampOf=e=>{const n=e&&nodes.get(e.nodeKey);return n&&n.ramp!=null?n.ramp:null;};
+function stairHolder(id){const h=STAIRHOLD.get(id);return h&&performance.now()-h.t<HOLD_MS?h.h:null;}
+/* the end of staircase s that opens onto floor h (in cells) */
+const stairEnd=(s,h)=>s.floor===h?[s.x,s.zMax+1]:[s.x,s.zMin-1];
+/* is this cell of floor h too close to a staircase another floor's hunter is holding? */
+function keepAway(h,x,z){
+  for(const s of stairs){if(!touchesHome(s,h))continue;const o=stairHolder(s.id);if(o==null||o===h)continue;
+    const e=stairEnd(s,h);if(Math.hypot(x-e[0],z-e[1])<=KEEP_R)return true;}
+  return false;}
+/* may M (a floor-bound hunter) stand on node k? */
+function hunterAllows(k){
+  const n=nodes.get(k);if(!n)return false;
+  if(n.ramp==null)return n.f===M.home&&(M.kaIn||!keepAway(M.home,n.x,n.z));
+  if(!touchesHome(stairs[n.ramp],M.home))return false;
+  return rampOf(M)===n.ramp||stairHolder(n.ramp)===M.home;}
+/* is this soul somewhere M could get to? */
+function onTurf(c,h=M.home){const n=nodes.get(c.nodeKey);if(!n)return false;
+  if(n.ramp==null)return n.f===h;
+  if(!touchesHome(stairs[n.ramp],h))return false;
+  const o=stairHolder(n.ramp);return o==null||o===h;}
+/* a soul on a staircase is in plain view of the hunter standing on it, or at the end of it on its own floor
+   (the stairs belong to two floors at once, so the usual same-floor rule does not apply there) */
+function seesOnStairs(c){
+  if(M.home==null||M.floor===c.floor)return false;
+  const r=rampOf(c);if(r==null||!touchesHome(stairs[r],M.home))return false;
+  if(rampOf(M)===r)return true;
+  const e=stairEnd(stairs[r],M.home),[cx,cz]=cellOf(M.x,M.z);
+  return M.floor===M.home&&Math.hypot(cx-e[0],cz-e[1])<=3;}
+function hunterStart(h){const w=HOME_WP[h];
+  if(h===spawnDef[2]){let b=w[0],bd=-1;w.forEach(p=>{const d=Math.hypot(p[0]-spawnDef[0],p[1]-spawnDef[1]);if(d>bd){bd=d;b=p;}});return b;}
+  return h===MONSTER_START[2]?MONSTER_START:w[(h*5)%w.length];}
+function newHunter(h){const s=hunterStart(h);
+  return Object.assign(entAt(s[0],s[1],s[2]),{state:'patrol',wpIdx:Math.max(0,HOME_WP[h].indexOf(s)+1),path:null,pathI:0,repathT:0,
+    lastSeen:null,losLostT:0,searchT:0,invT:0,tx:null,tz:null,tf:null,stepPhase:0,yaw:0,noticeT:-1,
+    goneT:0,stunT:0,stunWake:false,slowT:0,slowMul:1,back:null,home:h});}
+function addLocalHunter(m){const e={uid:MP?MP.uid:'me',key:'L#'+m.home,local:true,M:m,mon:buildMonster(),seen:true};
+  e.mon.mute=true;PUP.push(e);return e;}
+const localHunters=()=>PUP.filter(p=>p.local);
+/* which floors this page runs: solo all of them; co-op its share of the players still here */
+function mpPresent(early){
+  const ord=MP.cfg.order;
+  const pr=ord.filter(u=>u===MP.uid||REMOTE.has(u)||early);
+  return pr.length?pr:[MP.uid];}
+function myHomes(early){const out=[];
+  if(!MP){for(let f=0;f<NF;f++)out.push(f);return out;}
+  const pr=mpPresent(early);for(let f=0;f<NF;f++)if(pr[f%pr.length]===MP.uid)out.push(f);return out;}
+if(PER_FLOOR){
+  const mine=myHomes(true),first=mine.length?mine[0]:0;
+  M=newHunter(first);
+  mine.slice(1).forEach(h=>addLocalHunter(newHunter(h)));}
+/* every hunter this page runs, back where it starts (a solo death, a co-op night begun again) */
+function resetHunters(){M=newHunter(M.home);localHunters().forEach(e=>{e.M=newHunter(e.M.home);e.mon.g.visible=true;});catchM=null;}
+/* run fn once for each hunter this page runs, with that hunter as M */
+function eachLocal(fn){
+  fn();
+  if(!PER_FLOOR)return;
+  for(const e of localHunters()){const sM=M,sm=mon;M=e.M;mon=e.mon;try{fn(e);}finally{M=sM;mon=sm;}}}
+/* the hunter nearest you becomes M (only while you are playing: a hunter that is eating you stays put) */
+function swapPrimary(){
+  if(!PER_FLOOR||state!=='play')return;
+  const sc=m=>Math.hypot(m.x-P.x,m.z-P.z)+(Math.abs(m.y-P.y)>2.2?40:0)+(m.goneT>0?30:0);
+  let best=null,bs=sc(M)-0.5;
+  for(const e of localHunters()){const v=sc(e.M);if(v<bs){bs=v;best=e;}}
+  if(!best)return;
+  const m=M,mo=mon;M=best.M;mon=best.mon;best.M=m;best.mon=mo;
+  mon.mute=false;best.mon.mute=true;}
+/* which staircase each of this page's hunters holds, refreshed every frame */
+/* A hunter on a staircase, or hunting a soul who is on one, holds it ("c": a chase, which wins over a
+   hold that is only standing near). A hunter close to its end of a staircase a soul is standing on holds
+   it too, if nobody else does. */
+function holdStairs(){
+  const now=performance.now(),souls=monTargetsAll();
+  const take=(sid,c)=>{const o=STAIRHOLD.get(sid),live=o&&now-o.t<HOLD_MS;
+    if(!live||o.h===M.home||(c&&!o.c)){STAIRHOLD.set(sid,{h:M.home,t:now,c:c?1:0});M.holds=sid;M.holdC=c?1:0;}};
+  eachLocal(()=>{M.holds=-1;M.holdC=0;
+    let sid=rampOf(M),c=sid!=null;   /* standing on it counts as much as a chase: nobody else comes on */
+    if(sid==null&&M.state==='chase'&&M.tgt&&M.goneT<=0&&M.stunT<=0){const r=rampOf(M.tgt);if(r!=null&&touchesHome(stairs[r],M.home)){sid=r;c=true;}}
+    if(sid!=null)take(sid,c);});
+  eachLocal(()=>{
+    if(M.holds>=0||M.goneT>0||M.stunT>0||M.floor!==M.home)return;
+    const[cx,cz]=cellOf(M.x,M.z);
+    for(const s of souls){const r=rampOf(s);if(r==null||!touchesHome(stairs[r],M.home))continue;
+      const e=stairEnd(stairs[r],M.home);if(Math.hypot(cx-e[0],cz-e[1])<=KEEP_R){take(r,false);break;}}});}
+function monTargetsAll(){const a=[];if(state==='play')a.push(P);REMOTE.forEach(r=>{if(r.alive)a.push(r.ent);});return a;}
+/* a hunter caught inside the landing it must keep clear of walks away from it, to the far end of its floor */
+function keepClear(){
+  const[cx,cz]=cellOf(M.x,M.z);
+  M.kaIn=M.floor===M.home&&rampOf(M)==null&&keepAway(M.home,cx,cz);
+  if(!M.kaIn){M.kaSent=false;return false;}
+  if(!M.kaSent){M.kaSent=true;
+    if(M.state==='chase'){M.state='search';M.searchT=2;}
+    else M.state='investigate';
+    M.invT=0;M.losLostT=0;
+    const w=HOME_WP[M.home];let b=w[0],bd=-1;
+    stairs.forEach(s=>{if(!touchesHome(s,M.home)||stairHolder(s.id)==null||stairHolder(s.id)===M.home)return;
+      const e=stairEnd(s,M.home);w.forEach(p=>{const d=Math.hypot(p[0]-e[0],p[1]-e[1]);if(d>bd){bd=d;b=p;}});});
+    setTargetCell(b[0],b[1],b[2]);}
+  return true;}
+/* every hunter this page runs, once a frame */
+function updateHunters(dt,t){
+  graceT-=dt;if(scareSpeedT>0)scareSpeedT-=dt;
+  if(!PER_FLOOR){updateMonster(dt,t);return;}
+  swapPrimary();
+  holdStairs();
+  updateMonster(dt,t);
+  for(const e of localHunters()){
+    const sM=M,sm=mon,was=state;M=e.M;mon=e.mon;
+    try{if(M.slowT>0)M.slowT-=dt;updateMonster(dt,t);}finally{M=sM;mon=sm;}
+    if(was==='play'&&state==='caught')catcher=e;}}
 let got=0,doorOpen=false,deaths=0,graceT=5,state='title',caughtT=0,elapsed=0,hintT=0,shardsFound=0;
 let nextScareAt=20+Math.random()*20,scareShakeT=0,scareSpeedT=0;
 function diffMult(){return 1+Math.min(0.18,deaths*0.035);}
@@ -4457,7 +4608,8 @@ function resetRun(){
   DECOY.t=0;decoyMesh.visible=false;clearDecoyCopy();
   TRAP.t=0;trapMesh.visible=false;
   DARK.t=0;
-  M.goneT=0;M.stunT=0;M.stunWake=false;M.slowT=0;M.slowMul=1;M.back=null;mon.g.visible=true;
+  eachLocal(()=>{M.goneT=0;M.stunT=0;M.stunWake=false;M.slowT=0;M.slowMul=1;M.back=null;mon.g.visible=true;});
+  STAIRHOLD.clear();
   revealPool.forEach(s=>s.visible=false);
   engReset();
 }
@@ -4514,6 +4666,9 @@ function farCellFrom(x,z,f){
 }
 function lureTo(cell){
   graceT=Math.max(graceT,1.5);
+  /* a floor-bound hunter is lured to the far end of its own floor */
+  if(M.home!=null&&cell[2]!==M.home){const w=HOME_WP[M.home];let b=w[0],bd=-1;
+    w.forEach(p=>{const d=Math.hypot((p[0]+.5)*CS-P.x,(p[1]+.5)*CS-P.z);if(d>bd){bd=d;b=p;}});cell=b;}
   M.state='investigate';M.invT=0;M.losLostT=0;M.path=null;
   setTargetCell(cell[0],cell[1],cell[2]);
 }
@@ -4521,9 +4676,10 @@ function banishReturn(){
   M.state='patrol';M.path=null;M.pathI=0;M.losLostT=0;M.stunT=0;
   if(M.back==='far'){
     let bi=0,bs=-1;
-    PATROL.forEach((w,i)=>{const d=Math.hypot((w[0]+.5)*CS-P.x,(w[1]+.5)*CS-P.z)+(w[2]!==P.floor?14:0);
+    const WP=M.home!=null?HOME_WP[M.home]:PATROL;
+    WP.forEach((w,i)=>{const d=Math.hypot((w[0]+.5)*CS-P.x,(w[1]+.5)*CS-P.z)+(w[2]!==P.floor?14:0);
       if(d>bs){bs=d;bi=i;}});
-    const w=PATROL[bi];
+    const w=WP[bi];
     M.floor=w[2];M.x=(w[0]+.5)*CS;M.z=(w[1]+.5)*CS;M.y=w[2]*FH;
     M.nodeKey=nk(w[2],w[0],w[1]);M.wpIdx=bi;
   }
@@ -6093,7 +6249,11 @@ document.addEventListener('click',e=>{
 },true);
 ['touchstart','touchend'].forEach(t=>document.addEventListener(t,e=>{if(e.target.closest&&e.target.closest('.diffRow'))e.stopPropagation();},{capture:true,passive:true}));
 
+/* solo: Easy is built as the classic house with one hunter, the rest as a new house with a hunter per floor,
+   and a page is built once, so crossing that line loads a fresh page for the new difficulty */
+const diffNeedsNewPage=()=>!MP&&!WATCH&&!!(DIFFS[settings.diff]||DIFFS.normal).classic!==LOAD_CLASSIC;
 function startGame(){ if(state!=='title')return;
+  if(diffNeedsNewPage()){saveSettings();freshNight(false);return;}
   if(storyDue()){playStory(startGame);return;}
   if(!MP){runDiff=settings.diff;soloNightUsed=true;}
   try{initAudio();if(AC&&AC.resume)AC.resume();}catch(e){console.warn(e);}
@@ -6104,7 +6264,7 @@ function startGame(){ if(state!=='title')return;
   cloudPush();
   /* (only if the night is still going: not over the title screen after a quick quit) */
   setTimeout(()=>{if(state==='play')subtitle(MP?TOTAL_EMBERS+' embers hide here \u2014 two on each floor. The whole house must be searched, together.':'Eight embers hide here \u2014 two on each floor. Tonight the rooms are not where they were.');},3800);
-  setTimeout(()=>{if(state==='play')subtitle('Something else walks these floors. Listen to its steps.');},8200);
+  setTimeout(()=>{if(state==='play')subtitle(PER_FLOOR?'Something walks every floor of this house \u2014 one to each, and none will leave its own. Listen to their steps.':'Something else walks these floors. Listen to its steps.');},8200);
   heatNote();}
 /* ================= BACKSTORY =================
    backstory.js draws the opening cinematic. It plays as you wake for your first night:
@@ -6144,8 +6304,10 @@ function respawn(){
   if(!MP){randomizeEmbers();randomizeShards();}
   P=Object.assign(entAt(spawnDef[0],spawnDef[1],spawnDef[2]),{ess:100,veiling:false,dashing:false,moving:false,hiding:false});
   if(MP){const a=MP.slot/Math.max(1,MP.n)*Math.PI*2;P.x+=Math.cos(a)*0.8;P.z+=Math.sin(a)*0.8;}
-  if(!MP)M=Object.assign(entAt(MONSTER_START[0],MONSTER_START[1],MONSTER_START[2]),
+  if(!MP&&PER_FLOOR)resetHunters();
+  else if(!MP)M=Object.assign(entAt(MONSTER_START[0],MONSTER_START[1],MONSTER_START[2]),
     {state:'patrol',wpIdx:0,path:null,pathI:0,repathT:0,lastSeen:null,losLostT:0,searchT:0,invT:0,tx:null,tz:null,tf:null,stepPhase:0,yaw:0,noticeT:-1});
+  catchM=null;
   graceT=Math.max(3,5-deaths*0.2);caughtT=0;updateCaught._g=false;veilHeld=false;touchBurst=false;scareSpeedT=0;
   resetRun();refreshLegendHUD();
   ghost.g.scale.setScalar(0.92);ghost.g.visible=true;ghost.mat.opacity=0;
@@ -6163,7 +6325,7 @@ function freshNight(toTitle){
   try{if(storyThisVisit)sessionStorage.setItem('hm_fresh_night','1');}catch(e){}
   try{document.exitPointerLock();}catch(e){}
   (window.hmKeepTab&&window.hmKeepTab()),location.replace('index.html'+(q.toString()?'?'+q:''));}
-function fullReset(){if(!MP&&soloNightUsed){freshNight(false);return;}
+function fullReset(){if(!MP&&(soloNightUsed||diffNeedsNewPage())){saveSettings();freshNight(false);return;}
   if(!MP)runDiff=settings.diff;deaths=0;respawn();elapsed=0;nextScareAt=20+Math.random()*20;heatNote();}
 /* R / HEART: teleports ONLY the player — embers, door and monster untouched */
 function heartShift(){
@@ -6174,8 +6336,8 @@ function heartShift(){
 function threatInfo(){
   let chase=M.goneT<=0&&M.state==='chase'&&(!MP||!M.tgt||M.tgt===P),near=M.goneT<=0&&distPM()<10;
   PUP.forEach(p=>{if(p.M.goneT>0)return;
-    if(p.M.state==='chase'&&p.M.tg===MP.uid)chase=true;
-    if(Math.hypot(P.x-p.M.x,P.z-p.M.z)<10)near=true;});
+    if(p.M.state==='chase'&&(p.local?p.M.tgt===P:MP&&p.M.tg===MP.uid))chase=true;
+    if(Math.hypot(P.x-p.M.x,P.z-p.M.z)<10&&Math.abs(p.M.y-P.y)<2.2)near=true;});
   return chase?'chase':near?'near':'';}
 function tryHeart(){
   if(vaultOpen)return;
@@ -6205,7 +6367,7 @@ function openDoor(){doorOpen=true;SFX.boom();SFX.creak();
   if(M.floor===1&&distPM()<30){M.state='investigate';setTargetCell(11,15,1);}}
 function startCaught(){if(state!=='play')return;
   if(AB.ward>0){consumeWard();return;}
-  state='caught';caughtT=0.0001;mon.caughtYaw=Math.atan2(P.x-M.x,P.z-M.z);SFX.roar();
+  state='caught';catchM=M;caughtT=0.0001;mon.caughtYaw=Math.atan2(P.x-M.x,P.z-M.z);SFX.roar();
   veilHeld=false;touchBurst=false;
   ghost.mat.opacity=.9;seenEl.classList.remove('on');}
 function runTitle(){
@@ -6354,15 +6516,20 @@ navSync();
 setObjective(OBJ_TEXT());hudEmbers();
 
 /* ================= MONSTER AI ================= */
-function setTargetCell(x,z,f){M.tx=(x+.5)*CS;M.tz=(z+.5)*CS;M.tf=f;M.path=null;M.pathI=0;}
+function setTargetCell(x,z,f){
+  /* a floor-bound hunter does not go where it may not stand: it stays where it is and looks about */
+  if(M.home!=null&&!hunterAllows(nk(f,x,z))){const n=nodes.get(M.nodeKey);if(n){x=n.x;z=n.z;f=n.f;}}
+  M.tx=(x+.5)*CS;M.tz=(z+.5)*CS;M.tf=f;M.path=null;M.pathI=0;}
 function zoneBlocks(k){const n=nodes.get(k);if(!n||ZONE.t<=0||n.f!==ZONE.f)return false;
   return Math.hypot((n.x+.5)*CS-ZONE.x,(n.z+.5)*CS-ZONE.z)<ZONE.r+1.3;}
 function repathTo(x,z,f){
-  const goal=nk(f,x,z);
-  let p=findPath(M.nodeKey,goal,ZONE.t>0?zoneBlocks:null);
+  const goal=nk(f,x,z),bound=M.home!=null;
+  const av=bound?(ZONE.t>0?k=>!hunterAllows(k)||zoneBlocks(k):k=>!hunterAllows(k)):(ZONE.t>0?zoneBlocks:null);
+  let p=findPath(M.nodeKey,goal,av);
   /* a patrol gives up a waypoint inside the circle; a hunt still presses up to its edge */
-  if(!p&&ZONE.t>0&&M.state!=='patrol')p=findPath(M.nodeKey,goal);
-  if(!p)return false;
+  if(!p&&ZONE.t>0&&M.state!=='patrol')p=findPath(M.nodeKey,goal,bound?k=>!hunterAllows(k):null);
+  /* nowhere it may go: it stands where it is (so a search or a look about still runs out) */
+  if(!p){if(bound){M.path=[M.nodeKey];M.pathI=1;}return false;}
   M.path=p;M.pathI=(p.length>1||M.state==='chase')?1:0;
   return true;}
 /* in co-op the house holds several souls: a hunter weighs every one that is still playing */
@@ -6379,8 +6546,8 @@ function pickTarget(cand){
   for(let i=1;i<cand.length;i++){const d=monDist(cand[i]);if(d<bd){bd=d;best=cand[i];}}
   return best;}
 function monsterSees(c){
-  const isMe=c===P;
-  if((isMe&&graceT>0)||M.floor!==c.floor||c.hiding){M.noticeT=-1;return false;}
+  const isMe=c===P,st=seesOnStairs(c);
+  if((isMe&&graceT>0)||(M.floor!==c.floor&&!st)||c.hiding){M.noticeT=-1;return false;}
   if(M.goneT>0||M.stunT>0||(isMe?AB.invisT>0:c.invis)){M.noticeT=-1;return false;}
   const dx=c.x-M.x,dz=c.z-M.z,d=Math.hypot(dx,dz);
   if(DECOY.t>0&&d>4){M.noticeT=-1;return false;}
@@ -6388,26 +6555,27 @@ function monsterSees(c){
   if(d<Math.min(1.9,R)){if(M.noticeT>0)M.noticeT=0;return true;} if(d>R){M.noticeT=-1;return false;} if(c.veiling&&d>2.3){M.noticeT=-1;return false;}
   const fx=Math.sin(M.yaw),fz=Math.cos(M.yaw);
   if(d>3.5&&(dx*fx+dz*fz)/d<0.55-0.1*heat()){M.noticeT=-1;return false;}
-  if(!losClear(M.floor,M.x,M.z,c.x,c.z)){M.noticeT=-1;return false;}
+  if(!st&&!losClear(M.floor,M.x,M.z,c.x,c.z)){M.noticeT=-1;return false;}
   /* first sight: it notices you before it commits — a short tell */
   if(M.state!=='chase'&&M.noticeT<0){M.noticeT=(0.55+Math.random()*0.35)*(1-0.35*heat())*DF().notice;if(isMe)SFX.click();}
   return true;}
 function updateMonster(dt,t){
-  graceT-=dt;if(scareSpeedT>0)scareSpeedT-=dt;
   /* banished — the house is briefly empty of it */
   if(M.goneT>0){
     M.goneT-=dt;mon.g.visible=false;
     if(M.goneT<=0){mon.g.visible=true;banishReturn();}
     return;}
   /* held in stopped time */
-  const cand=monTargets();
+  /* a floor-bound hunter only weighs the souls it could get to; one keeping clear of the stairs weighs nobody */
+  const bound=M.home!=null,away=bound&&keepClear();
+  const cand=away?[]:bound?monTargets().filter(c=>onTurf(c)):monTargets();
   if(M.stunT>0){
     M.stunT-=dt;M.yaw+=dt*0.5;
     if(M.stunT<=0&&M.stunWake){M.stunWake=false;M.state='investigate';M.invT=0;
       const w=pickTarget(cand)||P;setTargetCell(cellOf(w.x,w.z)[0],cellOf(w.x,w.z)[1],w.floor);}
     return;}
   /* it is eating you: it stays with you until the screen goes dark */
-  if(MP&&state==='caught'&&!catcher)return;
+  if((MP||PER_FLOOR)&&state==='caught'&&M===catchM)return;
   /* ground it will not stand on */
   if(ZONE.t>0&&M.floor===ZONE.f){
     const zd=Math.hypot(M.x-ZONE.x,M.z-ZONE.z);
@@ -6474,7 +6642,7 @@ function updateMonster(dt,t){
   let speed=2.0;
   if(M.state==='chase'){speed=scareSpeedT>0?3.5:4.35;
     M.repathT-=dt;if(M.repathT<=0){M.repathT=0.45;repathTo(cellOf(T.x,T.z)[0],cellOf(T.x,T.z)[1],T.floor);}}
-  else if(M.state==='investigate'){speed=2.6;
+  else if(M.state==='investigate'){speed=M.kaIn?5.0:2.6;   /* (keeping clear of a held staircase: briskly) */
     if(!M.path)repathTo(cellOf(M.tx,M.tz)[0],cellOf(M.tx,M.tz)[1],M.tf);
     if(M.path&&M.pathI>=M.path.length){M.invT+=dt;M.yaw+=dt*1.7;if(M.invT>2.8+1.2*heat()){M.state='patrol';M.invT=0;M.path=null;}}}
   else if(M.state==='search'){speed=2.3;
@@ -6485,12 +6653,13 @@ function updateMonster(dt,t){
         if(!MP||cand.length)subtitle('It stops looking.',2.6);}}}
   else{
     if(!M.path||M.pathI>=M.path.length){
-      let wp=PATROL[M.wpIdx];
-      if(Math.hypot((wp[0]+.5)*CS-M.x,(wp[1]+.5)*CS-M.z)<0.9){
+      const WP=bound?HOME_WP[M.home]:PATROL;M.wpIdx%=WP.length;
+      let wp=WP[M.wpIdx];
+      if(Math.hypot((wp[0]+.5)*CS-M.x,(wp[1]+.5)*CS-M.z)<0.9||(bound&&M.floor!==M.home)){
         const jump=Math.random()<0.3?1+Math.floor(Math.random()*3):1;
-        M.wpIdx=(M.wpIdx+jump)%PATROL.length;
-        wp=PATROL[M.wpIdx];setTargetCell(wp[0],wp[1],wp[2]);}
-      if(!repathTo(wp[0],wp[1],wp[2]))M.wpIdx=(M.wpIdx+1)%PATROL.length;}}
+        M.wpIdx=(M.wpIdx+jump)%WP.length;
+        wp=WP[M.wpIdx];setTargetCell(wp[0],wp[1],wp[2]);}
+      if(!repathTo(wp[0],wp[1],wp[2]))M.wpIdx=(M.wpIdx+1)%WP.length;}}
   speed*=(scareSpeedT>0?1:diffMult()*DF().speed)*(M.slowT>0?M.slowMul:1);
   /* escapes make it quicker too — but never enough that your burst can't pull away */
   if(scareSpeedT<=0&&!(M.slowT>0)){const hs=speed*(1+0.12*heat());
@@ -6515,7 +6684,7 @@ function updateMonster(dt,t){
   /* footfalls are played by animateMonster, in step with its legs */
   M.stepPhase+=speed*dt/1.9;if(M.stepPhase>1)M.stepPhase=0;
   /* (hunting a friend, it is their screen that closes — they test for it against this one's reported position) */
-  if(state==='play'&&graceT<=0&&Math.hypot(P.x-M.x,P.z-M.z)<1.15&&M.floor===P.floor&&!P.hiding)startCaught();}
+  if(state==='play'&&graceT<=0&&Math.hypot(P.x-M.x,P.z-M.z)<1.15&&M.floor===P.floor&&!P.hiding&&(M.home==null||onTurf(P)))startCaught();}
 
 /* ================= PLAYER UPDATE ================= */
 let trailT=0;
@@ -6814,12 +6983,12 @@ function loop(now){requestAnimationFrame(loop);
   const dt=Math.min(DT_CAP,(now-last)/1000);last=now;const t=now/1000;
   /* the night does not wait for anyone in co-op, so a menu never freezes the house */
   const paused=(settingsOpen||vaultOpen)&&!MP;
-  if(state==='play'){if(!paused){elapsed=MP?mpElapsed():elapsed+dt;save.stats.playTime+=dt;if(!cloudUser&&!acctIn)GUEST.secs+=dt;updatePlayer(dt,t);updateAbilities(dt,t);updateMonster(dt,t);
+  if(state==='play'){if(!paused){elapsed=MP?mpElapsed():elapsed+dt;save.stats.playTime+=dt;if(!cloudUser&&!acctIn)GUEST.secs+=dt;updatePlayer(dt,t);updateAbilities(dt,t);updateHunters(dt,t);
     if(!MP&&DF().scare>0&&elapsed>nextScareAt&&graceT<=0&&M.state!=='chase'&&!doorOpen&&!P.hiding&&M.floor===P.floor
-       &&AB.foreT<=0&&AB.invisT<=0&&M.goneT<=0&&M.stunT<=0){
+       &&AB.foreT<=0&&AB.invisT<=0&&M.goneT<=0&&M.stunT<=0&&(M.home==null||(M.home===P.floor&&rampOf(P)==null))){
       triggerJumpscare();nextScareAt=elapsed+(45+Math.random()*45)*(1-0.3*heat())*DF().every;}}}
-  else if(state==='caught'){if(MP)elapsed=mpElapsed();runAsFocus(()=>updateCaught(dt));if(!paused)updateMonster(dt,t);}
-  else if(MP&&(state==='dead'||state==='win')&&mpRunning){elapsed=mpElapsed();updateMonster(dt,t);}
+  else if(state==='caught'){if(MP)elapsed=mpElapsed();runAsFocus(()=>updateCaught(dt));if(!paused)updateHunters(dt,t);}
+  else if(MP&&(state==='dead'||state==='win')&&mpRunning){elapsed=mpElapsed();updateHunters(dt,t);}
   else if(state==='title'){mon.g.position.set(M.x,M.y,M.z);mon.g.rotation.y=t*0.2;}
   else if(state==='watch'){ipSpec=true;watchFrame(dt,t);}
   if(MP)specTick(now);
@@ -7568,7 +7737,11 @@ function runAsFocus(fn){
 function animateAllMonsters(dt,t){
   if(!OWNREF||!PUP.length){mon.mute=false;animateMonster(dt,t);return;}
   const fM=M,fm=mon,list=[OWNREF].concat(PUP);
-  for(const m of list){M=m.M;mon=m.mon;mon.mute=(m.M!==fM);animateMonster(dt,t);}
+  for(const m of list){M=m.M;mon=m.mon;mon.mute=(m.M!==fM);
+    /* a hunter on a floor you are not on is not drawn at all (on the title screen only the first one is) */
+    if(PER_FLOOR){const near=state==='title'?m===OWNREF:Math.abs(M.y-P.y)<FH*0.95;
+      mon.g.visible=near&&M.goneT<=0;if(!near)continue;}
+    animateMonster(dt,t);}
   M=fM;mon=fm;}
 
 /* ---- the other souls ---- */
@@ -7687,11 +7860,26 @@ function mpUpdateRemote(r,dt,t){
 /* ---- the other players' hunters ---- */
 function mpApplyMon(uid,v){
   if(!MP||uid===MP.uid)return;
-  const i=PUP.findIndex(p=>p.uid===uid);
+  if(PER_FLOOR){
+    /* one report carries every hunter that player runs: the first, and the rest in xs */
+    const rows=v?[v].concat(Array.isArray(v.xs)?v.xs:[]):[],keep=new Set();
+    for(const row of rows){if(!row||row.hid==null)continue;const h=row.hid|0;if(h<0||h>=NF)continue;
+      if(M.home===h||PUP.some(p=>p.local&&p.M.home===h))continue;   /* this page runs that one now */
+      const key=uid+'#'+h;keep.add(key);mpApplyMonRow(uid,key,Object.assign({ts:v.ts},row));
+      const pp=PUP.find(p=>p.key===key);if(pp)pp.M.home=h;
+      if(row.cs!=null&&row.cs>=0&&stairs[row.cs]){const o=STAIRHOLD.get(row.cs),now=performance.now(),rc=row.cc?1:0;
+        /* two pages that both think they hold it: a chase beats standing near, then the lower floor wins */
+        if(!o||now-o.t>=HOLD_MS||o.h===h||(rc&&!o.c)||(rc===(o.c?1:0)&&h<o.h))STAIRHOLD.set(row.cs,{h,t:now,c:rc});}}
+    for(let i=PUP.length-1;i>=0;i--){const p=PUP[i];
+      if(!p.local&&p.uid===uid&&!keep.has(p.key)){if(catcher===p)catcher=null;scene.remove(p.mon.g);PUP.splice(i,1);}}
+    return;}
+  mpApplyMonRow(uid,uid,v);}
+function mpApplyMonRow(uid,key,v){
+  const i=PUP.findIndex(p=>p.key===key);
   if(v&&+v.ts&&i>=0){const p0=PUP[i];if(p0.lastTs&&+v.ts<=p0.lastTs)return;p0.lastTs=+v.ts;}
   if(!v){if(i>=0){const p=PUP[i];if(catcher===p)catcher=null;scene.remove(p.mon.g);PUP.splice(i,1);}return;}
   let p=PUP[i];
-  if(!p){p={uid,M:Object.assign(entAt(0,0,0),{state:'patrol',stunT:0,goneT:0,slowT:0,yaw:0,noticeT:-1,tg:''}),mon:buildMonster(),tx:0,ty:0,tz:0,yt:0,seen:false,ip:ipNew()};
+  if(!p){p={uid,key,M:Object.assign(entAt(0,0,0),{state:'patrol',stunT:0,goneT:0,slowT:0,yaw:0,noticeT:-1,tg:''}),mon:buildMonster(),tx:0,ty:0,tz:0,yt:0,seen:false,ip:ipNew()};
     p.mon.mute=true;PUP.push(p);}
   p.tx=+v.x||0;p.ty=+v.y||0;p.tz=+v.z||0;p.yt=+v.r||0;p.M.floor=v.f|0;
   p.M.state=['patrol','investigate','search','chase'][v.s|0]||'patrol';
@@ -7706,13 +7894,32 @@ function mpUpdatePuppet(p,dt){
     let dy=p.yt-m.yaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;m.yaw+=dy*Math.min(1,dt*8);}
   m.nodeKey=nk(m.floor,Math.floor(m.x/CS),Math.floor(m.z/CS));
   p.mon.g.visible=m.goneT<=0;}
+/* ONE HUNTER PER FLOOR in co-op: when a player leaves the house, the floors they ran are taken over by
+   whoever is next in the room's order, from wherever that hunter last was; when they come back, the
+   floors go back to them (each side sees the other's report and stops running the floor itself). */
+function mpOwnHunters(){
+  const want=new Set(myHomes(mpElapsed()<10));
+  /* take over a floor nobody is running for us */
+  want.forEach(h=>{
+    if(M.home===h||PUP.some(p=>p.local&&p.M.home===h))return;
+    const m=newHunter(h),pi=PUP.findIndex(p=>!p.local&&p.M.home===h);
+    if(pi>=0){const o=PUP[pi].M,k=nk(o.floor,Math.floor(o.x/CS),Math.floor(o.z/CS));
+      if(nodes.has(k)){m.x=o.x;m.y=o.y;m.z=o.z;m.floor=o.floor;m.nodeKey=k;m.yaw=o.yaw||0;}
+      if(catcher===PUP[pi])catcher=null;scene.remove(PUP[pi].mon.g);PUP.splice(pi,1);}
+    addLocalHunter(m);});
+  /* hand back the ones that belong to someone else again (never the last one this page runs) */
+  const give=h=>!want.has(h)&&want.size>0;
+  if(give(M.home)){const e=localHunters().find(e=>want.has(e.M.home));
+    if(e){const m=M,mo=mon;M=e.M;mon=e.mon;e.M=m;e.mon=mo;mon.mute=false;e.mon.mute=true;}}
+  for(let i=PUP.length-1;i>=0;i--){const p=PUP[i];
+    if(p.local&&give(p.M.home)&&state!=='caught'){scene.remove(p.mon.g);PUP.splice(i,1);}}}
 /* a hunter that belongs to someone else has reached you */
 function caughtBy(p){
   const sM=M,sm=mon,warded=AB.ward>0;
   M=p.M;mon=p.mon;
   try{startCaught();}finally{M=sM;mon=sm;}
   if(state==='caught')catcher=p;
-  else if(warded)mpSend({k:'stun',to:p.uid,t:AB.wardStun||4});}
+  else if(warded)mpSend({k:'stun',to:p.uid,h:p.M.home,t:AB.wardStun||4});}
 
 /* ---- embers: whoever takes one, it is taken for everyone ---- */
 function mpApplyEmber(i,uid){
@@ -7744,9 +7951,14 @@ function mpOnEvent(ev){
   if(ev.k==='reset'){if(ev.go>mpGO+3000)mpResetNight(ev.go);return;}
   if(ev.k==='em'){if(ev.n===mpGO)mpApplyEmber(ev.i|0,ev.from);return;}
   if(ev.k==='stun'){
-    if(ev.to===MP.uid&&M.goneT<=0){M.stunT=Math.max(M.stunT,ev.t||3);M.state='search';M.searchT=3;M.path=null;}
+    if(ev.to===MP.uid)eachLocal(()=>{if(M.goneT<=0&&(ev.h==null||M.home==null||M.home===ev.h)){M.stunT=Math.max(M.stunT,ev.t||3);M.state='search';M.searchT=3;M.path=null;}});
     return;}
-  if(ev.k!=='pw'||M.goneT>0)return;
+  if(ev.k!=='pw')return;
+  /* every hunter this page runs that is near, or hunting the one who used it */
+  let hit=false;eachLocal(()=>{if(mpPwApply(ev))hit=true;});
+  if(hit)subtitle(mpName(ev.from)+"'s power turns a hunter aside.",3);}
+function mpPwApply(ev){
+  if(M.goneT>0)return false;
   const near=M.floor===ev.f&&Math.hypot(M.x-ev.x,M.z-ev.z)<16;
   const mine=M.state==='chase'&&M.tgt&&M.tgt.uid===ev.from;
   if(!near&&!mine)return;
@@ -7757,8 +7969,8 @@ function mpOnEvent(ev){
     case'lure':{const cell=farCellFrom(ev.x,ev.z,ev.f);
       if(cell){M.state='investigate';M.invT=0;M.losLostT=0;M.path=null;setTargetCell(cell[0],cell[1],cell[2]);}break;}
     case'foresight':M.slowT=ev.t;M.slowMul=0.55;break;
-    default:return;}
-  subtitle(mpName(ev.from)+"'s power turns a hunter aside.",3);}
+    default:return false;}
+  return true;}
 
 /* ---- reporting this player ---- */
 function mpStateNow(){
@@ -7768,9 +7980,14 @@ function mpStateNow(){
   const ts=Math.round(performance.now());   /* when this was sent, so the others can play it back evenly */
   const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:pubLegend(),ts};
   if(ph===3)so.et=TEAM.myOut;   /* when I got out: the team's time is the latest of these */
-  const st={patrol:0,investigate:1,search:2,chase:3}[M.state]||0;
-  const tg=M.state==='chase'&&M.tgt?(M.tgt===P?MP.uid:(M.tgt.uid||'')):'';
-  return [so,{x:r2(M.x),y:r2(M.y),z:r2(M.z),f:M.floor,r:r2(M.yaw),s:st,g:M.goneT>0?1:0,st:M.stunT>0?1:0,tg,ts}];}
+  const row=m=>{const st={patrol:0,investigate:1,search:2,chase:3}[m.state]||0;
+    const tg=m.state==='chase'&&m.tgt?(m.tgt===P?MP.uid:(m.tgt.uid||'')):'';
+    const o={x:r2(m.x),y:r2(m.y),z:r2(m.z),f:m.floor,r:r2(m.yaw),s:st,g:m.goneT>0?1:0,st:m.stunT>0?1:0,tg};
+    if(m.home!=null){o.hid=m.home;o.cs=m.holds!=null?m.holds:-1;if(m.holdC)o.cc=1;}
+    return o;};
+  const mo=Object.assign(row(M),{ts});
+  if(PER_FLOOR)mo.xs=localHunters().map(e=>row(e.M));
+  return [so,mo];}
 /* The database copy. While there is a direct line open to every teammate in the room it is only a
    backup, sent 3 times a second; otherwise it is how they see you, so it goes 15 times a second.
    Nothing is written while nothing has changed, apart from a heartbeat each second. */
@@ -7817,7 +8034,7 @@ function mpBanner(){
   const readyN=present.filter(u=>pl[u].ready).length;
   const names=present.map(u=>`${pl[u].ready?'◆':'◇'} ${escHTML(pl[u].name)}`).join(' &nbsp;&nbsp; ');
   const leader=present[0]===MP.uid;
-  let h=`<b>ROOM ${MP.code}</b><br>${DF().n} · ${MP.n} ${MP.n===1?'soul':'souls'} · ${NF} floors · ${MP.n} ${MP.n===1?'hunter':'hunters'} · ${TOTAL_EMBERS} embers<br>${names}`;
+  let h=`<b>ROOM ${MP.code}</b><br>${DF().n} · ${MP.n} ${MP.n===1?'soul':'souls'} · ${NF} floors · ${PER_FLOOR?NF:MP.n} ${(PER_FLOOR?NF:MP.n)===1?'hunter':'hunters'} · ${TOTAL_EMBERS} embers<br>${names}`;
   if(mpReady&&!mpGO&&leader&&readyN<present.length&&Date.now()-mpReadyAt>25000)
     h+=`<br><button id="mpForce" class="ovbtn" style="margin-top:12px">BEGIN WITHOUT THE OTHERS</button>`;
   el.innerHTML=h;el.style.display='block';
@@ -7882,7 +8099,8 @@ function mpResetNight(go){
   embers.forEach(e=>{e.taken=false;e.grp.visible=true;});
   resetProgress();randomizeShards();
   deaths=0;reviveAt=0;catcher=null;
-  M=Object.assign(entAt(MY_START[0],MY_START[1],MY_START[2]),
+  if(PER_FLOOR)resetHunters();
+  else M=Object.assign(entAt(MY_START[0],MY_START[1],MY_START[2]),
     {state:'patrol',wpIdx:0,path:null,pathI:0,repathT:0,lastSeen:null,losLostT:0,searchT:0,invT:0,tx:null,tz:null,tf:null,stepPhase:0,yaw:0,noticeT:-1});
   try{if(state==='dead'||state==='caught'||state==='play')respawn();}catch(e){console.warn(e);}
   graceT=Math.max(graceT,5+Math.max(0,(go-MP.net.srvNow())/1000));
@@ -7901,11 +8119,12 @@ function mpFrame(dt,t){
     voiceTick(performance.now());   /* talk to the team while everyone clicks in */
     return;}
   REMOTE.forEach(r=>mpUpdateRemote(r,dt,t));
-  PUP.forEach(p=>mpUpdatePuppet(p,dt));
-  /* someone else's hunter has reached you */
+  PUP.forEach(p=>{if(!p.local)mpUpdatePuppet(p,dt);});
+  if(PER_FLOOR&&(mpFrame.own=(mpFrame.own||0)-dt)<=0){mpFrame.own=1;mpOwnHunters();}
+  /* someone else's hunter has reached you (this page's own catch you in updateMonster) */
   if(state==='play'&&graceT<=0&&!P.hiding){
-    for(const p of PUP){const m=p.M;
-      if(m.goneT>0||m.stunT>0||m.floor!==P.floor)continue;
+    for(const p of PUP){const m=p.M;if(p.local)continue;
+      if(m.goneT>0||m.stunT>0||m.floor!==P.floor||(m.home!=null&&!onTurf(P,m.home)))continue;
       if(Math.hypot(P.x-m.x,P.z-m.z)<1.15){caughtBy(p);break;}}}
   mpWatchAllDead(dt);
   mpTeamCheck();
@@ -7924,7 +8143,7 @@ function mpInit(){
   $('winText').textContent="You slip through the great door as the mansion howls behind you. Somewhere inside, your friends are still searching. Dawn is coming.";
   $('winPulse').textContent='TAP OR ENTER TO RETURN TO THE LOBBY';
   const p=titleOv.querySelector(':scope > p');
-  if(p)p.textContent=`You are not alone in the dark. ${MP.n} souls share this house, and it has grown to ${NF} floors to hold them — with a hunter of its own for each. ${TOTAL_EMBERS} embers are hidden through it, two on every floor. Every ember anyone takes is taken for all of you; when the last is gone the seal on the front door breaks, and you may each leave. If a hunter takes you, you rise again at the Heart after 20 seconds — the team keeps the embers. But if every soul is taken at once, the night starts over from nothing. Other hunters can find you too.`;
+  if(p)p.textContent=`You are not alone in the dark. ${MP.n} souls share this house, and it has grown to ${NF} floors to hold them — ${PER_FLOOR?'with a hunter on every floor, and none of them leaves its own':'with a hunter of its own for each'}. ${TOTAL_EMBERS} embers are hidden through it, two on every floor. Every ember anyone takes is taken for all of you; when the last is gone the seal on the front door breaks, and you may each leave. If a hunter takes you, you rise again at the Heart after 20 seconds — the team keeps the embers. But if every soul is taken at once, the night starts over from nothing. Other hunters can find you too.`;
   const n=MP.net,c=MP.code;
   n.watchRoom(c,mpOnRoom);
   n.watchStates(c,mpApplyState);
@@ -8632,7 +8851,7 @@ function dcSetup(p,ch){
 }
 /* half the round trip: how far behind the newest update really is */
 function dcLead(p){const r=REMOTE.get(p.uid),lead=Math.min(150,(p.rtt||0)/2);
-  if(r&&r.ip)r.ip.lead=lead;const pp=PUP.find(x=>x.uid===p.uid);if(pp&&pp.ip)pp.ip.lead=lead;}
+  if(r&&r.ip)r.ip.lead=lead;PUP.forEach(pp=>{if(!pp.local&&pp.uid===p.uid&&pp.ip)pp.ip.lead=lead;});}
 function voiceClose(uid){
   const p=VOICE.peers.get(uid);if(!p)return;
   VOICE.peers.delete(uid);
@@ -8745,8 +8964,8 @@ if(WATCH)watchInit();
 if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return state;},get got(){return got;},get doorOpen(){return doorOpen;},
   get MP(){return MP;},embers,stairs,nodes,adj,findPath,nk,NF,CS,FH,PATROL,maps,entAt,TOTAL_EMBERS,startGame,warpTo,openDoor,camera,scene,get REMOTE(){return typeof REMOTE!=='undefined'?REMOTE:null;},
   get PUP(){return typeof PUP!=='undefined'?PUP:null;},
-  get graceT(){return graceT;},triggerJumpscare,doDeath,settings,keys,setDiff(d){runDiff=d;}};
-if(DEBUG)Object.assign(window.__hm,{HOUSE,ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare,DAILY,dailyDefs,btyToday,dailyAdd,openBty,doWin,doDeath,getSave:()=>save,setGot:v=>{got=v;}});
+  get graceT(){return graceT;},setGrace(v){graceT=v;},updateHunters,respawn,triggerJumpscare,doDeath,settings,keys,setDiff(d){runDiff=d;}};
+if(DEBUG)Object.assign(window.__hm,{PER_FLOOR,STAIRHOLD,emberPools,REACH,FURN_CELLS,shards,localHunters,hideSpots0,get catchM(){return catchM;},HOUSE,ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare,DAILY,dailyDefs,btyToday,dailyAdd,openBty,doWin,doDeath,getSave:()=>save,setGot:v=>{got=v;}});
 window.__HM_BOOTED=true;
 /* arrived from freshNight: the short NIGHT FALLS screen instead of the whole title screen */
 if(!MP&&!WATCH&&QS.get('next')==='1'){showOv(nextOv);

@@ -16,6 +16,19 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-02-hunter-every-floor',
+    date: '2026-11-02',
+    tag: 'NEW',
+    title: 'A hunter on every floor',
+    body: 'On Normal, Hard and Nightmare every floor of Hollowmere now has a hunter of its own, and none of them will ever leave its floor. ' +
+      'If one sees you take the stairs it can follow you all the way up or down them, but it stops at the top or the bottom. ' +
+      'Only one hunter ever holds a staircase: while one is on your heels, the hunter at the other end keeps back from the landing, so you are never caught on the stairs between two of them.\n\n' +
+      'The difficulties have moved: EASY is now the old house, the same every night, with the one slow hunter that roams every floor. ' +
+      'NORMAL plays like the old Easy, HARD like the old Normal, and NIGHTMARE is still Nightmare, all three in a new house every night with a hunter on every floor. ' +
+      'In co-op, Easy keeps one hunter per player; the other difficulties put one on every floor, shared out between you.\n\n' +
+      'Embers and memories now always lie somewhere you can walk to, out in the open: never sealed off, and never inside a crate, a bed, the hearth or a hiding place.'
+  },
+  {
     id: '2026-11-02-less-camera-shake',
     date: '2026-11-02',
     tag: 'CHANGE',
