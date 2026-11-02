@@ -4224,7 +4224,7 @@ function syncSetUI(){
   invertBtn.textContent=settings.invertY?'INVERTED \u2014 UP LOOKS DOWN':'NORMAL \u2014 UP LOOKS UP';
   flashBtn.textContent=settings.reduceFlash?'REDUCED \u2014 NO STROBING, SOFT FLASHES':'NORMAL \u2014 FULL INTENSITY';
   $('scareBtn').textContent=settings.scares?'ON \u2014 THE FACE CAN FIND YOU':'OFF \u2014 NO FACE, NO SCREAM';
-  $('camBtn').textContent=settings.calmCam?'REDUCED \u2014 NO BOB, SWAY OR SHAKE':'FULL \u2014 BOB, SWAY AND SHAKE';
+  $('camBtn').textContent=settings.calmCam?'REDUCED \u2014 NO BOB, SWAY OR SHAKE':'FULL \u2014 FAINT BOB, SWAY AND SHAKE';
   {const mb=document.getElementById('musicBtn');
    if(mb)mb.textContent=(save.music!==false)?'ON \u2014 THE HOUSE HUMS':'OFF \u2014 SILENCE IN THE MENUS';}
   $('setClose').textContent=(state==='play')?'RESUME':'CLOSE';
@@ -6576,6 +6576,9 @@ function updateFX(dt,t){
   POST.u.caught=state==='caught'?Math.min(1,caughtT*0.7):(state==='dead'?0.4:0);POST.u.time=t;}
 
 /* ---------- the camera: your eyes (or over your shoulder, if you prefer) ---------- */
+/* first-person camera motion strength (head bob, sway, roll, shake) with the camera setting on FULL.
+   Kept faint so walking and scares still have feel without making anyone queasy. */
+const FP_MOTION=0.3;
 let bobPh=0,bobAmt=0,eyeH=1.62,camRoll=0,lastStepN=0,fpPitchS=0;
 const _cp=new THREE.Vector3(),_ld=new THREE.Vector3(),_hd=new THREE.Vector3();
 function updateCamera(dt,t){
@@ -6590,8 +6593,8 @@ function updateCamera(dt,t){
     if(FP()){const d=Math.max(0.42,1.1-caughtT*0.55);_cp.set(_hd.x+fx*d,_hd.y-0.02,_hd.z+fz*d);}
     else _cp.copy(_hd).add(new THREE.Vector3(Math.sin(fy+2.6),0.25,Math.cos(fy+2.6)).multiplyScalar(1.6));
     camera.position.lerp(_cp,Math.min(1,dt*(FP()?9:6)));
-    const calm=settings.calmCam,sh=FP()&&!calm?0.02+caughtT*0.01:0;camera.position.x+=(Math.random()-.5)*sh;camera.position.y+=(Math.random()-.5)*sh;
-    camera.lookAt(_hd.x,_hd.y-0.03,_hd.z);if(!calm)camera.rotation.z+=Math.sin(t*3)*0.05;
+    const calm=settings.calmCam,sh=FP()&&!calm?(0.02+caughtT*0.01)*FP_MOTION:0;camera.position.x+=(Math.random()-.5)*sh;camera.position.y+=(Math.random()-.5)*sh;
+    camera.lookAt(_hd.x,_hd.y-0.03,_hd.z);if(!calm)camera.rotation.z+=Math.sin(t*3)*0.05*(FP()?FP_MOTION:1);
     camera.fov+=((FP()?54:90)-camera.fov)*Math.min(1,dt*4);camera.updateProjectionMatrix();
     FLASH.level+=((0.6+Math.random()*0.4)-FLASH.level)*Math.min(1,dt*10);updateFlashlight(dt,t);return;}
   /* a step every ~0.75 m, two per bob cycle — heard in either view */
@@ -6606,25 +6609,26 @@ function updateCamera(dt,t){
     if(updateCamera._lastPy===undefined)updateCamera._lastPy=P.y;
     if(updateCamera._lastPy-P.y>0.05&&state==='play'&&!P.hiding){updateCamera._landT=0.35;SFX.step(0.35*(P.dashing?1:0.6),0);}
     updateCamera._lastPy=P.y;
-    /* CAMERA MOTION reduced: no head bob, sway, roll, shake or sprint zoom (steps still sound) */
-    const calm=settings.calmCam;
-    if(updateCamera._landT>0){updateCamera._landT-=dt;if(!calm)bobAmt+=updateCamera._landT*0.18;}
-    const ba=P.moving&&!calm?(P.dashing?0.075:P.veiling?0.026:0.055):0;bobAmt+=(ba-bobAmt)*Math.min(1,dt*6);
+    /* CAMERA MOTION reduced: no head bob, sway, roll, shake or sprint zoom (steps still sound).
+       FULL keeps only a faint amount: every bob, sway, roll and shake is scaled by FP_MOTION. */
+    const calm=settings.calmCam,K=FP_MOTION;
+    if(updateCamera._landT>0){updateCamera._landT-=dt;if(!calm)bobAmt+=updateCamera._landT*0.18*K;}
+    const ba=P.moving&&!calm?(P.dashing?0.075:P.veiling?0.026:0.055)*K:0;bobAmt+=(ba-bobAmt)*Math.min(1,dt*6);
     const fx=Math.sin(camYaw),fz=Math.cos(camYaw),rx=-Math.cos(camYaw),rz=Math.sin(camYaw);
-    const lat=Math.sin(bobPh)*bobAmt*0.6,up=-Math.abs(Math.sin(bobPh))*bobAmt+(calm?0:Math.sin(t*1.7)*0.006);
+    const lat=Math.sin(bobPh)*bobAmt*0.6,up=-Math.abs(Math.sin(bobPh))*bobAmt+(calm?0:Math.sin(t*1.7)*0.006*K);
     _cp.set(P.x+rx*lat,P.y+eyeH+up,P.z+rz*lat);
     if(P.hiding)_cp.addScaledVector(new THREE.Vector3(fx,0,fz),-0.15);
     let jx=0,jy=0;
-    if(state==='play'&&dangerLevel>0.02&&!calm){const sh=dangerLevel*(M.state==='chase'?0.012:0.004);jx=(Math.random()-.5)*sh;jy=(Math.random()-.5)*sh;}
-    if(scareShakeT>0){scareShakeT-=dt;const ss=calm?0:Math.min(1,scareShakeT/0.5)*0.06;jx+=(Math.random()-.5)*ss;jy+=(Math.random()-.5)*ss;}
+    if(state==='play'&&dangerLevel>0.02&&!calm){const sh=dangerLevel*(M.state==='chase'?0.012:0.004)*K;jx=(Math.random()-.5)*sh;jy=(Math.random()-.5)*sh;}
+    if(scareShakeT>0){scareShakeT-=dt;const ss=calm?0:Math.min(1,scareShakeT/0.5)*0.06*K;jx+=(Math.random()-.5)*ss;jy+=(Math.random()-.5)*ss;}
     camera.position.copy(_cp);camera.position.x+=jx;camera.position.y+=jy;
     const strafe=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+(stick.id!==null?stick.dx:0);
-    camRoll+=((P.moving&&!calm?-strafe*0.028:0)+Math.sin(bobPh)*bobAmt*0.25+Math.sin(bobPh)*bobAmt*0.5-camRoll)*Math.min(1,dt*5);
+    camRoll+=((P.moving&&!calm?-strafe*0.028*K:0)+Math.sin(bobPh)*bobAmt*0.25+Math.sin(bobPh)*bobAmt*0.5-camRoll)*Math.min(1,dt*5);
     fpPitchS+=(fpPitch-fpPitchS)*Math.min(1,dt*25);
     const bobY=Math.cos(bobPh*2)*bobAmt*0.9;
     const yawLead=-Math.sin(bobPh)*bobAmt*0.35;
     camera.rotation.set(fpPitchS+bobY+jy*2,camYaw+Math.PI+jx*2+yawLead,camRoll);
-    const tf=P.dashing&&P.moving&&!calm?82:70;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();
+    const tf=P.dashing&&P.moving&&!calm?74:70;camera.fov+=(tf-camera.fov)*Math.min(1,dt*5);camera.updateProjectionMatrix();
   }else{
     const tgt=new THREE.Vector3(P.x,P.y+1.3,P.z);
     const fwd=new THREE.Vector3(Math.sin(camYaw),0,Math.cos(camYaw));
