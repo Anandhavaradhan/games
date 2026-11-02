@@ -16,6 +16,15 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-02-less-camera-shake',
+    date: '2026-11-02',
+    tag: 'CHANGE',
+    title: 'Much less camera shake',
+    body: 'In first person the view now bobs, sways and shakes far less: walking, sprinting, landing, being hunted and jump scares all move the camera only faintly. ' +
+      'Sprinting also widens the view much less.\n\n' +
+      'If you want no camera motion at all, set CAMERA MOTION to REDUCED in settings.'
+  },
+  {
     id: '2026-10-25-new-house-every-night',
     date: '2026-10-25',
     tag: 'NEW',
