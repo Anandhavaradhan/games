@@ -1,0 +1,290 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn()    { return request.auth != null; }
+    // A real account (email or Google). Co-op guests are signed in anonymously and do not count.
+    function realUser()    { return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+    function isSelf(uid)   { return signedIn() && request.auth.uid == uid; }
+    function isAdmin()     { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    function validPlayer() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name','email','provider','ether','unlocked','main','escapes','pending',
+                               'music','lastDay','v','stats','live','lastSeen','createdAt'])
+        && d.name is string && d.name.size() <= 60
+        && d.ether is int && d.ether >= 0 && d.ether <= 10000000
+        && d.unlocked is list && d.unlocked.size() <= 64
+        && d.main is string && d.main.size() <= 40
+        && d.escapes is int && d.escapes >= 0
+        && d.pending is list && d.pending.size() <= 20
+        && d.stats is map && d.live is map
+        && d.lastSeen == request.time;
+    }
+
+    function validRun() {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['result','diff','nightTime','legend','embers','memories','ether',
+                               'deathsTonight','seen','floor','at'])
+        && r.result in ['escape','death']
+        && r.nightTime is number && r.nightTime >= 0
+        && r.at == request.time;
+    }
+
+    // A player reads and writes only their own record. An admin can read every
+    // record and may edit or delete any of them from admin.html — granting
+    // legends, correcting ether, removing a run, deleting an account outright.
+    // Admin writes skip validPlayer() deliberately: the shape check exists to
+    // stop players writing junk into their own record, and the keeper is trusted.
+    match /players/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create, update: if (isSelf(uid) && validPlayer()) || isAdmin();
+      allow delete: if isAdmin();
+
+      match /runs/{runId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if (isSelf(uid) && validRun()) || isAdmin();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    function banned(uid) { return exists(/databases/$(database)/documents/boardBans/$(uid)); }
+
+    // USERNAMES — usernames/{key}: { uid, name, at }. Every account has exactly one, and no two accounts
+    // can share one. The key is the name lower-cased with everything but letters and digits removed,
+    // so "KP", "kp" and "K.P" are the same name. A document can only be CREATED if it does not
+    // exist yet, which is what makes a name unique. Anyone may check one name (get), only an admin
+    // may list them all.
+    function unameKey(n)   { return n.lower().replace('[^a-z0-9]', ''); }
+    function validUname(n) { return n is string && n.matches('[A-Za-z0-9 _.-]{2,24}') && unameKey(n).size() >= 2; }
+    function ownsName(n) {
+      return validUname(n)
+        && exists(/databases/$(database)/documents/usernames/$(unameKey(n)))
+        && get(/databases/$(database)/documents/usernames/$(unameKey(n))).data.uid == request.auth.uid
+        && get(/databases/$(database)/documents/usernames/$(unameKey(n))).data.name == n;
+    }
+    function validClaim(key) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['uid','name','at'])
+        && d.keys().hasAll(['uid','name','at'])
+        && d.uid == request.auth.uid
+        && validUname(d.name) && unameKey(d.name) == key
+        && d.at == request.time;
+    }
+    match /usernames/{key} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if (realUser() && validClaim(key) && !banned(request.auth.uid)) || isAdmin();
+      // changing the spelling of your own name (kp → KP) keeps the same key
+      allow update: if (realUser() && resource.data.uid == request.auth.uid && validClaim(key)) || isAdmin();
+      // letting go of your old name when you pick a new one
+      allow delete: if (signedIn() && resource.data.uid == request.auth.uid) || isAdmin();
+    }
+
+    // OLD LEADERBOARD — one entry per player, fastest escape only.
+    // No longer shown by the game (escapes/ replaced it); admin.html copies these
+    // entries into escapes/ once. Kept so nothing old breaks.
+    function validEntry() {
+      let e = request.resource.data;
+      return e.keys().hasOnly(['name','bestTime','legend','deaths','embers','at'])
+        && e.name is string && e.name.size() >= 1 && e.name.size() <= 40
+        && e.bestTime is number && e.bestTime >= 20 && e.bestTime <= 86400
+        && e.legend is string && e.legend.size() <= 40
+        && e.deaths is int && e.deaths >= 0 && e.deaths <= 100000
+        && e.embers is int && e.embers >= 0 && e.embers <= 8
+        && e.at == request.time;
+    }
+    match /leaderboard/{uid} {
+      allow read: if true;
+      allow create: if (isSelf(uid) && validEntry() && !banned(uid)) || isAdmin();
+      allow update: if (isSelf(uid) && validEntry() && !banned(uid)
+                        && request.resource.data.bestTime <= resource.data.bestTime)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ESCAPES — the leaderboard: one public document for EVERY escape.
+    // Anyone can read. A signed-in player (co-op guests are signed in anonymously)
+    // can add an escape under their own uid.
+    //  · Solo escape (random id): the name MUST be the player's own claimed username.
+    //  · Co-op team escape (id starts "mp_"): "user1+user2" — registered players only, guests are
+    //    never named — posted by the first signed-in teammate out (a fixed id, so later writes are refused).
+    // The only edit a player may make is renaming their own solo escapes after changing username,
+    // or putting their new username into a co-op entry that lists them in members (newer co-op entries).
+    // Each escape records its difficulty (easy / normal / hard / nightmare): one board per difficulty.
+    // Entries from before difficulty levels have none and count as Normal.
+    function validEscape() {
+      let e = request.resource.data;
+      return e.keys().hasOnly(['uid','name','time','legend','deaths','embers','team','diff','at','members'])
+        && e.keys().hasAll(['uid','name','time','legend','deaths','embers','team','diff','at'])
+        && e.diff in ['easy','normal','hard','nightmare']
+        && e.uid is string
+        && e.name is string && e.name.size() >= 1 && e.name.size() <= 40
+        && e.time is number && e.time >= 20 && e.time <= 86400
+        && e.legend is string && e.legend.size() <= 40
+        && e.deaths is int && e.deaths >= 0 && e.deaths <= 100000
+        && e.embers is int && e.embers >= 0 && e.embers <= 40
+        && e.team is bool
+        && (!('members' in e) || (e.team && e.members is list && e.members.size() >= 1 && e.members.size() <= 8))
+        && e.at == request.time;
+    }
+    match /escapes/{id} {
+      allow read: if true;
+      allow create: if (signedIn() && validEscape()
+                        && request.resource.data.uid == request.auth.uid
+                        && !banned(request.auth.uid)
+                        && ((request.resource.data.team && id.matches('mp_.*') && realUser()
+                             && (!('members' in request.resource.data) || request.auth.uid in request.resource.data.members))
+                            || (!request.resource.data.team && !id.matches('mp_.*')
+                                && realUser() && ownsName(request.resource.data.name))))
+                    || isAdmin();
+      allow update: if (realUser() && resource.data.uid == request.auth.uid && !resource.data.team
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+                        && ownsName(request.resource.data.name))
+                    // a co-op entry: anyone listed in it may put their new username into its name
+                    || (realUser() && resource.data.team && ('members' in resource.data)
+                        && request.auth.uid in resource.data.members
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+                        && request.resource.data.name is string
+                        && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 40)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // MOST TIME PLAYED — one public entry per player: { name, seconds, at }.
+    // The game only counts ACTIVE seconds. On top of that, these rules make the
+    // total impossible to inflate: an update may never add more seconds than real
+    // time has passed since the previous write (plus 10 s for network delay), and
+    // the total can never go down. A brand-new entry starts at 2 minutes or less.
+    function validPlaytime() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name','seconds','at'])
+        && d.keys().hasAll(['name','seconds','at'])
+        && d.name is string && ownsName(d.name)
+        && d.seconds is int && d.seconds >= 0 && d.seconds <= 100000000
+        && d.at == request.time;
+    }
+    match /playtime/{uid} {
+      allow read: if true;
+      allow create: if (isSelf(uid) && validPlaytime() && !banned(uid)
+                        && request.resource.data.seconds <= 120)
+                    || isAdmin();
+      allow update: if (isSelf(uid) && validPlaytime() && !banned(uid)
+                        && request.resource.data.seconds >= resource.data.seconds
+                        && request.resource.data.seconds - resource.data.seconds
+                           <= (request.time.toMillis() - resource.data.at.toMillis()) / 1000 + 10)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // FRIENDS — between signed-in players with a username.
+    //   friendReqs/{to}_{from} { from, fromName, to, toName, at }  a request waiting for an answer
+    //   friends/{uid}/list/{fid} { name, since }                   each side keeps its own list
+    // A list entry can only be made while a matching request exists (accepting writes both lists
+    // and removes the request in one batch). Either friend can end it. Lists are private.
+    match /friendReqs/{id} {
+      allow read: if signedIn() && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+      allow create: if realUser()
+                    && request.resource.data.keys().hasOnly(['from','fromName','to','toName','at'])
+                    && request.resource.data.keys().hasAll(['from','fromName','to','toName','at'])
+                    && request.resource.data.from == request.auth.uid
+                    && request.resource.data.to is string && request.resource.data.to != request.auth.uid
+                    && id == request.resource.data.to + '_' + request.auth.uid
+                    && ownsName(request.resource.data.fromName)
+                    && request.resource.data.toName is string && request.resource.data.toName.size() <= 40
+                    && request.resource.data.at == request.time;
+      allow delete: if signedIn() && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+    }
+    match /friends/{uid}/list/{fid} {
+      allow read: if isSelf(uid);
+      // I accept fid's request (friendReqs/{me}_{fid}) — I may write my own entry and theirs
+      allow create: if realUser()
+                    && request.resource.data.keys().hasOnly(['name','since'])
+                    && request.resource.data.name is string && request.resource.data.name.size() <= 40
+                    && request.resource.data.since == request.time
+                    && ((request.auth.uid == uid && exists(/databases/$(database)/documents/friendReqs/$(uid + '_' + fid)))
+                        || (request.auth.uid == fid && exists(/databases/$(database)/documents/friendReqs/$(fid + '_' + uid))));
+      // after a username change a friend updates their own name in my list
+      allow update: if signedIn() && request.auth.uid == fid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+                    && ownsName(request.resource.data.name);
+      allow delete: if signedIn() && (request.auth.uid == uid || request.auth.uid == fid);
+    }
+
+    // GUEST ACCOUNTS — guests are temporary: they never get a record of their own and never appear
+    // on a leaderboard. Everything they play is added to ONE running total, readable only by an admin:
+    // guestStats/total { seconds, active, escapes, at }. Anyone (even signed out) may add to it, but
+    // only a little at a time: up to 120 seconds and 1 escape per write, and it can never go down.
+    function validGuestStats() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['seconds','active','escapes','at'])
+        && d.keys().hasAll(['seconds','active','escapes','at'])
+        && d.seconds is int && d.active is int && d.escapes is int
+        && d.at == request.time;
+    }
+    match /guestStats/{doc} {
+      allow read: if isAdmin();
+      allow create: if (doc == 'total' && validGuestStats()
+                        && request.resource.data.seconds >= 0 && request.resource.data.seconds <= 120
+                        && request.resource.data.active >= 0 && request.resource.data.active <= 120
+                        && request.resource.data.escapes >= 0 && request.resource.data.escapes <= 1)
+                    || isAdmin();
+      allow update: if (doc == 'total' && validGuestStats()
+                        && request.resource.data.seconds >= resource.data.seconds
+                        && request.resource.data.seconds - resource.data.seconds <= 120
+                        && request.resource.data.active >= resource.data.active
+                        && request.resource.data.active - resource.data.active <= 120
+                        && request.resource.data.escapes >= resource.data.escapes
+                        && request.resource.data.escapes - resource.data.escapes <= 1)
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // GIFTS — gifts/{id} { from, fromName, to, toName, kind, n, legend, at }
+    // A signed-in player (not a guest) may gift ether, ash or a legend to another player's account. The gift
+    // must be PAID FOR in the same write that creates it: for ether or ash (kept in stats.ash), the giver's
+    // record goes down by exactly n and does not go below 0; for a legend, it was in the giver's vault before and is gone after. So a gift can never
+    // create ether or a legend out of nothing, and only the giver's own record can pay. The recipient
+    // collects it by deleting it (in the same write that adds it to their own record); a gift can be
+    // deleted only once, so it can be collected only once. Nobody else can read or touch it.
+    function validGift() {
+      let g = request.resource.data;
+      let me = /databases/$(database)/documents/players/$(request.auth.uid);
+      return g.keys().hasOnly(['from','fromName','to','toName','kind','n','legend','at'])
+        && g.keys().hasAll(['from','fromName','to','toName','kind','n','legend','at'])
+        && g.from == request.auth.uid
+        && g.to is string && g.to != request.auth.uid
+        && exists(/databases/$(database)/documents/players/$(g.to))
+        && ownsName(g.fromName)
+        && g.toName is string && g.toName.size() <= 40
+        && g.n is int && g.legend is string
+        && g.at == request.time
+        && ((g.kind == 'ether' && g.legend == '' && g.n >= 1 && g.n <= 1000000
+             && getAfter(me).data.ether == get(me).data.ether - g.n)
+            || (g.kind == 'ash' && g.legend == '' && g.n >= 1 && g.n <= 1000000
+                && getAfter(me).data.stats.ash == get(me).data.stats.ash - g.n
+                && getAfter(me).data.stats.ash >= 0)
+            || (g.kind == 'legend' && g.n == 0 && g.legend.size() >= 1 && g.legend.size() <= 40
+                && g.legend in get(me).data.unlocked
+                && !(g.legend in getAfter(me).data.unlocked)));
+    }
+    match /gifts/{id} {
+      allow read: if (signedIn() && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid)) || isAdmin();
+      allow create: if (realUser() && validGift()) || isAdmin();
+      allow update: if isAdmin();
+      allow delete: if (realUser() && resource.data.to == request.auth.uid) || isAdmin();
+    }
+
+    // Players an admin has blocked from the leaderboards (set from admin.html).
+    match /boardBans/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Admins are added by hand in the Firebase console; nobody can write this from the site.
+    match /admins/{uid} {
+      allow read: if isSelf(uid);
+      allow write: if false;
+    }
+  }
+}
