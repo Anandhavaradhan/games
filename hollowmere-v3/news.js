@@ -16,6 +16,15 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-03-realistic-hunter',
+    date: '2026-11-03',
+    tag: 'CHANGE',
+    title: 'A more real hunter, easier to see',
+    body: 'The thing that hunts you now looks more like a real body: muscle and tendon in its arms and legs, kneecaps and elbows, and pale dead skin with veins, bruising, creases and a wet sheen. Its hair is wet too.\n\n' +
+      'It is also easier to see in the dark: its skin and its dress are paler, and their edges catch a cold light, so you can make out its shape before your light finds it.\n\n' +
+      'Brass, glass, varnished wood and water around the house now show real reflections.'
+  },
+  {
     id: '2026-11-03-house-dressed',
     date: '2026-11-03',
     tag: 'CHANGE',
