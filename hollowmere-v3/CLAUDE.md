@@ -1,4 +1,4 @@
-# Hollowmere V3 (holomere-v3)
+# Hollowmere V3 (hollowmere-v3)
 
 A standalone copy of Hollowmere with every update through PR #32 (new house every night, a hunter per floor, reachable embers and memories, the new difficulty ladder, faint first-person camera shake). `hollowmere-v2/` was rolled back to its state before PR #30.
 
@@ -20,4 +20,4 @@ Follow the format and id rules at the top of `news.js`; never change or reuse an
 V2 and V3 share one Firebase project. Accounts, usernames, players/, friends and time played are shared.
 - Fastest escapes: V3 posts to and reads `escapes_v3/` (`BOARD` in cloud.js and admin.html). Username renames touch both boards.
 - Co-op: multiplayer.js maps `rooms`, `live`, `presence`, `watch` and `invites` to `*_v3` paths, so V2 and V3 players never meet in a room.
-- Both rules files (firestore.rules, database.rules.json) are kept identical in hollowmere-v2/ and holomere-v3/ and hold the rules for both games. Publish either copy.
+- Both rules files (firestore.rules, database.rules.json) are kept identical in hollowmere-v2/ and hollowmere-v3/ and hold the rules for both games. Publish either copy.
