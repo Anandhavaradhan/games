@@ -21,3 +21,10 @@ V2 and V3 share one Firebase project. Accounts, usernames, players/, friends and
 - Fastest escapes: V3 posts to and reads `escapes_v3/` (`BOARD` in cloud.js and admin.html). Username renames touch both boards.
 - Co-op: multiplayer.js maps `rooms`, `live`, `presence`, `watch` and `invites` to `*_v3` paths, so V2 and V3 players never meet in a room.
 - Both rules files (firestore.rules, database.rules.json) are kept identical in hollowmere-v2/ and hollowmere-v3/ and hold the rules for both games. Publish either copy.
+
+## Dressing (looks only)
+The DRESSING block in index.html (search `DRESSING: the house's second pass`) adds trim, beams, rafters, sconces, rugs, doors ajar,
+clutter, webs, window shafts, cellar puddles and mist after the house is built. None of it joins the walking graph or blocks a cell.
+- Wall-fixed instances go in `TRIMIDX` (wall key -> instance list) and wall groups go through `addDecor`, so `breachWall` hides them.
+- It is seeded from `HOUSE.seed`, so co-op players see the same dressing. `DRESS.fx` (shafts, mist) is hidden on LOW quality.
+- Wall props use `decorFaceOK` / `decorPlace` (the same rules as the paintings: clear of hiding places, stairs and windows).

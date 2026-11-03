@@ -2199,27 +2199,40 @@ function genFlags(size,seed){
 /* ---- rubble stone wall (cellar), laid out over one wall cell, floor to ceiling ---- */
 function genStoneWall(w,h,seed){
   w=Math.round(w);h=Math.round(h);
-  const R=mulberry32(seed),courses=20,cc=cutsFor(R,courses,0.16,0.22);
+  /* courses of uneven height (heavier footing stones low down), stones of uneven length, each stone its own
+     tint and its own bulge, chipped where it meets the mortar */
+  const R=mulberry32(seed),rows=[0];
+  for(let i=0;i<17;i++)rows.push(rows[i]+(0.65+R()*0.8)*(i<3?1.35:1));
+  const tot=rows[rows.length-1];for(let i=0;i<rows.length;i++)rows[i]/=tot;
+  const courses=rows.length-1,cc=cutsFor(R,courses,0.12,0.3);
   return bake(w,h,(x,y,o)=>{
     const u=x/w,vv=1-y/h,ym=vv*FH,fx=u*256,fy=vv*640;
-    const pu=u+(sf(FB,fx*3,fy*1.2)-0.5)*0.012,pv=vv+(sf(FA,fx*3+50,fy*1.2)-0.5)*0.005;
-    const rf=Math.max(0,Math.min(courses-0.001,pv*courses)),ri=rf|0,ly=rf-ri;
-    const [bi,du]=cutInfo(cc[ri],((pu%1)+1)%1),edge=Math.min(du*w,Math.min(ly,1-ly)*h/courses);
-    const sd=h2(ri*19+3,bi*23+seed),n1=sf(FA,fx*2+sd*80,fy*0.8+sd*40),n2=sf(FB,fx*10,fy*4);
-    const mortar=edge<2.2?1:edge<5?(5-edge)/2.8:0;
-    let l=(0.28+sd*0.15)*(0.76+n1*0.48)*(0.9+n2*0.2);
-    let r=l*1.03,g=l,b=l*0.9;
-    const mc=0.2+n2*0.07;r+=(mc-r)*mortar;g+=(mc-g)*mortar;b+=(mc*0.9-b)*mortar;
+    const pu=u+(sf(FB,fx*3,fy*1.2)-0.5)*0.02,pv=vv+(sf(FA,fx*3+50,fy*1.2)-0.5)*0.008;
+    const cv=Math.max(0,Math.min(0.99999,pv));let ri=0;while(ri<courses-1&&rows[ri+1]<=cv)ri++;
+    const ch=rows[ri+1]-rows[ri],ly=(cv-rows[ri])/ch;
+    const [bi,du]=cutInfo(cc[ri],((pu%1)+1)%1);
+    const chip=(sf(FB,fx*9+ri*31,fy*3)-0.5)*3.2;
+    const edge=Math.max(0,Math.min(du*w,Math.min(ly,1-ly)*ch*h)+chip);
+    const sd=h2(ri*19+3,bi*23+seed),sd2=h2(bi*7+11,ri*5+seed),n1=sf(FA,fx*2+sd*80,fy*0.8+sd*40),n2=sf(FB,fx*10,fy*4);
+    const mortar=edge<2.4?1:edge<5.5?(5.5-edge)/3.1:0;
+    let l=(0.25+sd*0.17)*(0.74+n1*0.5)*(0.9+n2*0.2);
+    let r=l*(1.0+(sd2-0.5)*0.16),g=l*(0.99-(sd2-0.5)*0.04),b=l*(0.88+(0.5-sd2)*0.12);
+    const mc=0.17+n2*0.07;r+=(mc-r)*mortar;g+=(mc-g)*mortar;b+=(mc*0.9-b)*mortar;
+    if(mortar>0.99){const deep=Math.max(0,1-edge/1.4);r*=1-deep*0.55;g*=1-deep*0.55;b*=1-deep*0.55;}
     const tide=0.9+sf(FC,fx*2,7)*1.0,dampK=ym<tide?Math.min(1,(tide-ym)/0.45):0;
     r*=1-dampK*0.42;g*=1-dampK*0.33;b*=1-dampK*0.4;
+    /* green-black growth in the damp, salt at the tide line */
+    const moss=dampK*Math.max(0,sf(FA,fx*4+9,fy*2)-0.52)*3.2*(mortar>0.5?1:0.55);
+    r+=(0.06-r)*Math.min(0.8,moss);g+=(0.09-g)*Math.min(0.8,moss);b+=(0.05-b)*Math.min(0.8,moss);
     const eff=Math.max(0,1-Math.abs(ym-tide)/0.14)*Math.max(0,sf(FB,fx*6,fy*0.8)-0.42)*2.6;
     r+=(0.6-r)*eff*0.5;g+=(0.58-g)*eff*0.5;b+=(0.53-b)*eff*0.5;
     const streak=Math.max(0,sf(FA,fx*14,fy*0.12)-0.56)*2.2,gr=Math.min(0.7,Math.max(0,(ym-3.6)/1.9)*0.55+streak*0.35);
     r*=1-gr;g*=1-gr;b*=1-gr*0.92;
     o.r=r;o.g=g;o.b=b;
-    o.h=0.22+0.55*Math.sqrt(Math.min(1,edge/6))+(n1-0.5)*0.28+n2*0.06;
-    o.ro=Math.max(0.3,0.9-dampK*0.5);
-  },5,'#3b3934');}
+    const bulge=Math.sin(Math.min(1,du*w/24)*Math.PI/2)*Math.sin(Math.min(1,Math.min(ly,1-ly)*2)*Math.PI/2);
+    o.h=0.18+0.42*Math.sqrt(Math.min(1,edge/6))+bulge*0.16+(n1-0.5)*0.3+n2*0.06-(mortar>0.99?0.08:0);
+    o.ro=Math.max(0.3,0.9-dampK*0.5+moss*0.1);
+  },6,'#3b3934');}
 
 /* ---- panelled wall: baseboard, wainscot, chair rail, paper, cornice ---- */
 function woodTone(c,fx,fy,sd){const g=sf(FA,fx*0.6+sd*50,fy*6)*7+sd,ring=g-Math.floor(g);
@@ -2498,7 +2511,7 @@ const TX={};
 const std=o=>new THREE.MeshStandardMaterial(o);
 const setOf=(s,extra)=>Object.assign({map:s.map,normalMap:s.normalMap,roughnessMap:s.roughnessMap,roughness:1,metalness:0},extra||{});
 const wallMats=[
-  worldMap(std(setOf(TX.stoneWall,{normalScale:new THREE.Vector2(1.6,1.6)})),CS,CS,true,1),
+  worldMap(std(setOf(TX.stoneWall,{normalScale:new THREE.Vector2(2.0,2.0)})),CS,CS,true,1),
   worldMap(std(setOf(TX.wallG,{normalScale:new THREE.Vector2(1.2,1.2)})),CS,CS,true,1),
   worldMap(std(setOf(TX.wallU,{normalScale:new THREE.Vector2(1.2,1.2)})),CS,CS,true,1),
   worldMap(std(setOf(TX.attWall,{normalScale:new THREE.Vector2(1.3,1.3)})),CS,CS,true,1)];
@@ -2826,7 +2839,10 @@ function wallFaces(f){const out=[];
   for(let z=0;z<D;z++)for(let x=0;x<W;x++){if(!isSolid(f,x,z))continue;
     [[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{if(isOpen(f,x+d[0],z+d[1]))out.push({f,x,z,d,key:nk(f,x,z)});});}
   return out;}
-{const R=mulberry32(4242),used=new Set(winSpots.map(w=>w.key+'|'+w.d));
+/* faces already dressed (windows, paintings, chairs...), shared with the DRESSING pass further down */
+const DECOR_USED=new Set(winSpots.map(w=>w.key+'|'+w.d));
+let decorFaceOK=null,decorPlace=null;
+{const R=mulberry32(4242),used=DECOR_USED;
  const faceOK=w=>!used.has(w.key+'|'+w.d)&&!hideSpots0.some(h=>h.f===w.f&&Math.hypot(h.x-(w.x+.5+w.d[0])*CS,h.z-(w.z+.5+w.d[1])*CS)<2.4)
    &&!stairs.some(s=>(s.floor===w.f||s.floor+1===w.f)&&Math.abs(s.x-(w.x+w.d[0]))<=1&&(w.z+w.d[1])>=s.zMin-1&&(w.z+w.d[1])<=s.zMax+1)
    &&!(w.f===1&&w.x+w.d[0]===11&&w.z+w.d[1]>=14);
@@ -2834,6 +2850,7 @@ function wallFaces(f){const out=[];
    g.position.set((w.x+.5)*CS+w.d[0]*CS/2,w.f*FH,(w.z+.5)*CS+w.d[1]*CS/2);
    g.rotation.y=Math.atan2(w.d[0],w.d[1]);build(g);scene.add(g);bakeGroup(g);addDecor(w.key,g);};
  const frameMat=std({color:0x4a3418,roughness:0.4,metalness:0.6});
+ decorFaceOK=faceOK;decorPlace=place;
  for(let f=1;f<NF-1;f++){const faces=wallFaces(f).filter(faceOK);
    for(let n=0;n<7&&faces.length;n++){const w=faces.splice((R()*faces.length)|0,1)[0];if(!faceOK(w))continue;
      const v=(R()*3)|0,big=R()<0.4;
@@ -2931,6 +2948,216 @@ function setDoorSealed(sealed){DOOR.seal.visible=sealed;DOOR.chains.visible=seal
   if(sealed){DOOR.open=0;DOOR.leaves.forEach(l=>l.hinge.rotation.y=0);}}
 window.__panels=[];
 
+/* ================= DRESSING: the house's second pass =================
+   Real skirting, dado rails and cornices on the panelled walls; joists, props, shelves, chains, puddles and a
+   low mist in the cellar; rafters in the attic; sconces, corridor runners, doors left ajar, clutter along the
+   walls and webs in the corners; moonlight falling through the windows in shafts.
+   Looks only: nothing here joins the walking graph or blocks a cell, so tonight's house, the hunters, co-op and
+   the leaderboard are untouched. Wall-fixed instances are listed in TRIMIDX under their wall's key and groups go
+   through addDecor, so a breached wall takes them with it. Seeded from tonight's house, so a co-op room sees the
+   same rooms dressed the same way. */
+const TRIMIDX=new Map();
+const DRESS={shafts:null,shaftMat:null,mist:[],fx:[],n:{doors:0,runners:0,sconces:0}};
+{const R=mulberry32(((HOUSE.seed|0)^0x5bd1e995)>>>0),ri=(a,b)=>a+Math.floor(R()*(b-a+1));
+ const tAdd=(key,m,i)=>{if(!TRIMIDX.has(key))TRIMIDX.set(key,[]);TRIMIDX.get(key).push([m,i]);};
+ const faceKey=w=>w.key+'|'+w.d;
+ /* a strip along a wall face, dep out from it, centred at height y (absolute) */
+ const strip=(L,K,w,y,h,dep,ext)=>{const cx=(w.x+.5)*CS+w.d[0]*(CS/2+dep/2),cz=(w.z+.5)*CS+w.d[1]*(CS/2+dep/2),len=CS+2*(ext||0);
+   L.push(w.d[0]!==0?[cx,y,cz,dep,h,len]:[cx,y,cz,len,h,dep]);K.push(w.key);};
+ const trimMesh=(mat,L,K,cast)=>{if(!L.length)return null;const m=instList(boxGeo,mat,L);m.receiveShadow=true;m.castShadow=!!cast;
+   K.forEach((k,i)=>tAdd(k,m,i));return m;};
+ const notDoorSide=w=>!DOORSET.has(nk(w.f,w.x+w.d[0],w.z+w.d[1]));
+ const trimWood=edgeMat;
+ const crownMat=worldMap(std(setOf(TX.plaster,{color:0x9c9486})),1.1,1.1,false,0);
+ const beamMat=worldMap(std(setOf(TX.furnLight,{color:0x9a8a78,normalScale:new THREE.Vector2(1.4,1.4)})),0.9,0.9,false,0);
+ const CEIL=FH-0.3;                     /* the underside of the floor above, from this floor's boards */
+
+ /* ---- panelled floors: skirting, dado rail, a two-step cornice; the attic gets a plain skirting board ---- */
+ {const sk=[],skK=[],cr=[],crK=[];   /* one draw for all the wood, one for all the plaster */
+  for(let f=1;f<NF;f++){const faces=wallFaces(f).filter(notDoorSide),y=f*FH,att=f===NF-1,ra=sk,raK=skK;
+   faces.forEach(w=>{
+     strip(sk,skK,w,y+(att?0.09:0.12),att?0.18:0.24,att?0.03:0.045,0.045);
+     if(att)return;
+     strip(ra,raK,w,y+1.04,0.075,0.035,0.035);
+     strip(cr,crK,w,y+CEIL-0.09,0.18,0.15,0.15);strip(cr,crK,w,y+CEIL-0.23,0.1,0.075,0.075);});}
+  trimMesh(trimWood,sk,skK,false);trimMesh(crownMat,cr,crK,false);}
+
+ /* ---- the cellar: joists and girders overhead, posts and bolsters against the stone ---- */
+ {const jo=[],gi=[];
+  for(let z=1;z<D-1;z++)for(let x=1;x<W-1;x++){
+    const n=nodes.get(nk(0,x,z));if(!n||n.ramp!=null||holeSet.has('1,'+x+','+z)||DOORSET.has(nk(0,x,z)))continue;
+    const cx=(x+.5)*CS,cz=(z+.5)*CS;
+    for(const o of[-0.55,0.55])jo.push([cx+o,CEIL-0.13,cz,0.16,0.26,CS+0.01]);
+    if(z%4===2)gi.push([cx,CEIL-0.3,cz,CS+0.01,0.3,0.32]);}
+  shadowOn(instList(boxGeo,beamMat,jo));shadowOn(instList(boxGeo,beamMat,gi));
+  const po=[],poK=[];
+  wallFaces(0).filter(notDoorSide).forEach(w=>{if(R()>0.3||!decorFaceOK(w))return;
+    const[fx,fz]=[(w.x+.5)*CS+w.d[0]*(CS/2+0.11),(w.z+.5)*CS+w.d[1]*(CS/2+0.11)];
+    po.push([fx,CEIL/2,fz,0.2,CEIL,0.2]);poK.push(w.key);
+    const along=w.d[0]!==0;po.push([fx,CEIL-0.36,fz,along?0.22:1.1,0.16,along?1.1:0.22]);poK.push(w.key);});
+  const pm=trimMesh(beamMat,po,poK,true);
+  /* hanging chains and hooks from the joists, clear of the Heart */
+  const chainGeo=new THREE.TorusGeometry(0.045,0.01,4,6),hookGeo=new THREE.TorusGeometry(0.07,0.013,4,8,Math.PI*1.3),links=[],hooks=[];
+  openCells[0].forEach(([x,z])=>{if(R()>0.06)return;const cx=(x+.2+R()*0.6)*CS,cz=(z+.2+R()*0.6)*CS;
+    if(Math.hypot(cx-HEART[0],cz-HEART[1])<3.4||DOORSET.has(nk(0,x,z)))return;
+    const n=ri(7,12),ry=R()*3;
+    for(let i=0;i<n;i++)links.push([cx,CEIL-0.28-i*0.07,cz,1,1,1,0,ry+(i%2)*Math.PI/2,Math.PI/2]);
+    hooks.push([cx,CEIL-0.28-n*0.07-0.07,cz,1,1,1,0,ry,Math.PI*0.85]);});
+  if(links.length){instList(chainGeo,ironMat,links);instList(hookGeo,ironMat,hooks);}
+  /* shelves of old jars against the stone */
+  const jarGeo=new THREE.CylinderGeometry(1,1,1,10),jarMats=[std({color:0x2a3a22,roughness:0.15,metalness:0.1}),std({color:0x3a2412,roughness:0.2}),std({color:0x1c2228,roughness:0.12,metalness:0.2})];
+  const faces=wallFaces(0).filter(w=>notDoorSide(w)&&decorFaceOK(w));let made=0;
+  while(faces.length&&made<5){const w=faces.splice((R()*faces.length)|0,1)[0];if(!decorFaceOK(w))continue;made++;
+    decorPlace(w,g=>{for(const sx of[-0.62,0.62])box(0.06,2.0,0.36,darkWood,sx,1.0,0.2,0,g);
+      for(let s=0;s<4;s++){const sy=0.25+s*0.55;box(1.3,0.04,0.36,darkWood,0,sy,0.2,0,g);
+        let bx=-0.55;while(bx<0.5){const r=0.04+R()*0.05,hh=0.1+R()*0.18;if(R()<0.8){const m=mesh(jarGeo,jarMats[(R()*3)|0],bx+r,sy+0.02+hh/2,0.18+(R()-.5)*0.1,g);m.scale.set(r,hh,r);}bx+=r*2+0.03;}}
+      if(R()<0.5)candle(0.3,0.82,0.22,g,0.08);});}
+  /* puddles of melted candles at the foot of the walls, a few still burning */
+  {const fc=wallFaces(0).filter(w=>notDoorSide(w)&&decorFaceOK(w));let lit=0;
+   while(fc.length&&lit<6){const w=fc.splice((R()*fc.length)|0,1)[0];if(!decorFaceOK(w))continue;lit++;
+     decorPlace(w,g=>{const n=ri(3,7);for(let i=0;i<n;i++)candle((R()-.5)*0.9,0,0.12+R()*0.35,g,0.06+R()*0.26);
+       const pool=mesh(new THREE.CircleGeometry(0.45,16),waxMat,0,0.003,0.3,g);pool.rotation.x=-Math.PI/2;pool.scale.set(1,0.6+R()*0.4,1);
+       const wx=g.position.x+Math.sin(g.rotation.y)*0.4,wz=g.position.z+Math.cos(g.rotation.y)*0.4;
+       lightSpot(wx,0.45,wz,0,0xff9a48,1.8,0.4);});}}
+  /* puddles: black water that throws your light back */
+  const pudTex=canvasToTex(cv(128,128,(g,w,h)=>{const Q=mulberry32(919);g.filter='blur(4px)';g.fillStyle='#fff';
+    for(let i=0;i<7;i++){g.beginPath();g.ellipse(64+(Q()-.5)*44,64+(Q()-.5)*44,10+Q()*24,8+Q()*16,Q()*3,0,7);g.fill();}}),false);
+  const pudMat=std({color:0x16181b,roughness:0.04,metalness:0.1,opacity:0.7,alphaMap:pudTex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+  const pl=[];openCells[0].forEach(([x,z])=>{if(R()>0.14)return;const cx=(x+R())*CS,cz=(z+R())*CS;
+    if(Math.hypot(cx-HEART[0],cz-HEART[1])<2.6)return;const s=0.9+R()*1.6;pl.push([cx,0.004,cz,s,s*(0.6+R()*0.6),1,-Math.PI/2,0,R()*6]);});
+  instList(new THREE.PlaneGeometry(1,1),pudMat,pl).receiveShadow=true;}
+
+ /* ---- the attic: rafters running up from the outside walls, so the roof feels pitched ---- */
+ {const f=NF-1,y=f*FH,rl=[],rK=[];
+  wallFaces(f).filter(w=>notDoorSide(w)&&(w.x===0||w.z===0||w.x===W-1||w.z===D-1)).forEach(w=>{
+    const along=w.d[0]!==0?[0,1]:[1,0],run=1.7,rise=CEIL-1.7,len=Math.hypot(run,rise),tilt=Math.atan2(run,rise);
+    for(const o of[-0.55,0.55]){const fx=(w.x+.5)*CS+w.d[0]*(CS/2+run/2)+along[0]*o,fz=(w.z+.5)*CS+w.d[1]*(CS/2+run/2)+along[1]*o;
+      /* lean the beam away from the wall: about x for a north/south wall, about z for an east/west one */
+      if(w.d[1]!==0)rl.push([fx,y+1.7+rise/2,fz,0.14,len,0.18,w.d[1]*tilt,0,0]);
+      else rl.push([fx,y+1.7+rise/2,fz,0.18,len,0.14,0,0,-w.d[0]*tilt]);rK.push(w.key);}});
+  trimMesh(beamMat,rl,rK,true);}
+
+ /* ---- sconces: a brass plate, a cup and a candle; a few have long gone out ---- */
+ const cupGeo=new THREE.CylinderGeometry(0.06,0.035,0.05,12);
+ for(let f=1;f<NF-1;f++){const faces=wallFaces(f).filter(w=>notDoorSide(w)&&decorFaceOK(w));
+   for(let n=0;n<8&&faces.length;n++){const w=faces.splice((R()*faces.length)|0,1)[0];if(!decorFaceOK(w))continue;
+     const lit=R()<0.8;DRESS.n.sconces++;
+     decorPlace(w,g=>{const[ox]=[(R()-.5)*0.6];
+       box(0.13,0.26,0.025,brassMat,ox,2.05,0.013,0,g);box(0.03,0.03,0.2,brassMat,ox,1.98,0.11,0,g);
+       mesh(cupGeo,brassMat,ox,2.0,0.22,g);
+       if(lit){candle(ox,2.025,0.22,g,0.1+R()*0.08);
+         const wx=g.position.x+Math.sin(g.rotation.y)*0.3+Math.cos(g.rotation.y)*ox,wz=g.position.z+Math.cos(g.rotation.y)*0.3-Math.sin(g.rotation.y)*ox;
+         lightSpot(wx,g.position.y+2.25,wz,f,0xffa050,1.5,0.35);}
+       else box(0.035,0.04,0.035,waxMat,ox,2.04,0.22,0,g);});}}
+
+ /* ---- doors left ajar in the doorways ---- */
+ {const leafMat=std(setOf(TX.door,{normalScale:new THREE.Vector2(1.2,1.2),color:0xb8a898}));
+  doorways.forEach(d=>{if(d.f<1||d.f>=NF-1)return;
+    /* a one-cell-wide corridor is a row of 'doorways': only a real doorway, alone in its wall, gets a door */
+    if(d.ax==='x'?(DOORSET.has(nk(d.f,d.x,d.z-1))||DOORSET.has(nk(d.f,d.x,d.z+1))):(DOORSET.has(nk(d.f,d.x-1,d.z))||DOORSET.has(nk(d.f,d.x+1,d.z))))return;
+    if(R()>0.5)return;
+    const h=R()<0.5?1:-1,s=R()<0.5?1:-1,th=Math.PI*(0.6+R()*0.32),L=CS-2*JAMB-0.04,H=LINTEL-0.03;
+    const cx=(d.x+.5)*CS,cz=(d.z+.5)*CS,y=d.f*FH;let hx,hz,ry,wallKey,wd;
+    if(d.ax==='x'){hx=h>0?d.x*CS+JAMB:(d.x+1)*CS-JAMB;hz=cz+s*CS/2;ry=-h*s*th;wallKey=nk(d.f,d.x-h,d.z);wd=[0,s];}
+    else{hz=h>0?d.z*CS+JAMB:(d.z+1)*CS-JAMB;hx=cx+s*CS/2;ry=h*s*th;wallKey=nk(d.f,d.x,d.z-h);wd=[s,0];}
+    if(DECOR_USED.has(wallKey+'|'+wd))return;
+    const g=new THREE.Group();g.position.set(hx,y,hz);g.rotation.y=ry;scene.add(g);
+    if(d.ax==='x')box(L,H,0.05,leafMat,h*L/2,H/2,0,0,g);else box(0.05,H,L,leafMat,0,H/2,h*L/2,0,g);
+    const kx=d.ax==='x'?h*(L-0.1):0,kz=d.ax==='x'?0:h*(L-0.1);
+    mesh(new THREE.SphereGeometry(0.03,10,8),brassMat,kx+(d.ax==='x'?0:0.04),1.0,kz+(d.ax==='x'?0.04:0),g);
+    mesh(new THREE.SphereGeometry(0.03,10,8),brassMat,kx-(d.ax==='x'?0:0.04),1.0,kz-(d.ax==='x'?0.04:0),g);
+    addDecor(wallKey,g);DRESS.n.doors++;});}
+
+ /* ---- runners down the corridors ---- */
+ {const runTex=canvasToTex(cv(128,256,(g,w,h)=>{g.fillStyle='#3a0e0e';g.fillRect(0,0,w,h);
+    g.fillStyle='#1a0808';g.fillRect(0,0,10,h);g.fillRect(w-10,0,10,h);
+    g.fillStyle='#8a6a3a';g.fillRect(14,0,5,h);g.fillRect(w-19,0,5,h);
+    g.strokeStyle='#6a4a28';g.lineWidth=3;for(let y=0;y<h;y+=64){g.beginPath();g.moveTo(w/2,y+8);g.lineTo(w-30,y+32);g.lineTo(w/2,y+56);g.lineTo(30,y+32);g.closePath();g.stroke();
+      g.fillStyle='#1c1430';g.beginPath();g.arc(w/2,y+32,9,0,7);g.fill();}
+    const im=g.getImageData(0,0,w,h),dd=im.data;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const j=(y*w+x)*4,k=(0.7+sf(FB,x*3,y*3)*0.35)*(1-Math.max(0,sf(FC,x*0.8,y*0.4)-0.5)*0.9);
+      dd[j]*=k;dd[j+1]*=k;dd[j+2]*=k;}g.putImageData(im,0,0);}),true);
+  const runMat=std({map:runTex,roughness:1});
+  for(let f=1;f<NF-1;f++){
+    const corr=(x,z,ax)=>{if(!isOpen(f,x,z))return false;
+      return ax==='x'?(isSolid(f,x,z-1)&&isSolid(f,x,z+1)):(isSolid(f,x-1,z)&&isSolid(f,x+1,z));};
+    const lay=(x0,z0,n,ax)=>{if(n<2)return;const len=n*CS-0.5,geo=new THREE.PlaneGeometry(0.95,len);const uv=geo.attributes.uv;
+      for(let i=0;i<uv.count;i++)uv.setY(i,uv.getY(i)*len/1.9);
+      const m=new THREE.Mesh(geo,runMat);m.rotation.x=-Math.PI/2;if(ax==='x')m.rotation.z=Math.PI/2;
+      m.position.set(ax==='x'?(x0+n/2)*CS:(x0+.5)*CS,f*FH+0.011,ax==='x'?(z0+.5)*CS:(z0+n/2)*CS);m.receiveShadow=true;m.userData.bake=true;scene.add(m);DRESS.n.runners++;};
+    for(let z=1;z<D-1;z++){let s=-1;for(let x=1;x<=W-1;x++){const c=x<W-1&&corr(x,z,'x');if(c&&s<0)s=x;if(!c&&s>=0){lay(s,z,x-s,'x');s=-1;}}}
+    for(let x=1;x<W-1;x++){let s=-1;for(let z=1;z<=D-1;z++){const c=z<D-1&&corr(x,z,'z');if(c&&s<0)s=z;if(!c&&s>=0){lay(x,s,z-s,'z');s=-1;}}}}}
+
+ /* ---- old rugs in tonight's rooms, wherever a room has the floor for one ---- */
+ for(let f=1;f<NF-1;f++){const picked=[[11,8]];if(f===1)picked.push([11,14]);
+   const cand=[];for(let z=2;z<D-2;z++)for(let x=2;x<W-2;x++){let ok=true;
+     for(let dz=-1;dz<=1&&ok;dz++)for(let dx=-1;dx<=1&&ok;dx++){const k=nk(f,x+dx,z+dz);if(!isOpen(f,x+dx,z+dz)||DOORSET.has(k))ok=false;}
+     if(ok&&!hideSpots0.some(h=>h.f===f&&Math.hypot(h.x-(x+.5)*CS,h.z-(z+.5)*CS)<3))cand.push([x,z]);}
+   for(let n=0;n<3&&cand.length;){const c=cand.splice((R()*cand.length)|0,1)[0];
+     if(picked.some(p=>Math.abs(p[0]-c[0])<5&&Math.abs(p[1]-c[1])<4))continue;picked.push(c);n++;
+     const m=new THREE.Mesh(new THREE.PlaneGeometry(4.6,3.2),R()<0.5?rugMat:rugMat2);m.rotation.x=-Math.PI/2;m.rotation.z=R()<0.5?0:Math.PI/2;
+     m.position.set((c[0]+.5)*CS,f*FH+0.009,(c[1]+.5)*CS);m.receiveShadow=true;m.userData.bake=true;scene.add(m);DRESS.n.rugs=(DRESS.n.rugs||0)+1;}}
+
+ /* ---- clutter along the walls: planks leant on the paper, stacks of books, a frame that fell ---- */
+ {const bookMat=std({color:0x3a2418,roughness:0.85}),bookMat2=std({color:0x1e2a22,roughness:0.85}),pageMat=std({color:0x9a907a,roughness:0.9}),fallenFrame=std({color:0x4a3418,roughness:0.4,metalness:0.6});
+  for(let f=1;f<NF;f++){const faces=wallFaces(f).filter(w=>notDoorSide(w)&&decorFaceOK(w));
+    for(let n=0;n<(f===NF-1?7:5)&&faces.length;n++){const w=faces.splice((R()*faces.length)|0,1)[0];if(!decorFaceOK(w))continue;
+      const kind=f===NF-1?(R()<0.6?0:1):(R()*3)|0;
+      decorPlace(w,g=>{
+        if(kind===0){/* planks leant against the wall */
+          for(let i=0,k=ri(2,4);i<k;i++){const ln=1.4+R()*0.9,lean=0.14+R()*0.14,ox=(R()-.5)*1.1;
+            const m=box(0.16+R()*0.08,ln,0.025,lightWood,ox,Math.cos(lean)*ln/2,0.03+Math.sin(lean)*ln/2+i*0.03,0,g);m.rotation.x=-lean;m.rotation.z=(R()-.5)*0.12;}}
+        else if(kind===1){/* books, stacked and spilled */
+          for(let st=0,ns=ri(1,2);st<ns;st++){let yy=0;const ox=(R()-.5)*0.9;
+            for(let i=0,k=ri(3,7);i<k;i++){const bh=0.035+R()*0.03,bw=0.17+R()*0.08,bd=0.24+R()*0.06;
+              box(bw,bh,bd,R()<0.5?bookMat:bookMat2,ox+(R()-.5)*0.04,yy+bh/2,0.24+(R()-.5)*0.04,(R()-.5)*0.5,g);yy+=bh;}}
+          box(0.32,0.012,0.22,pageMat,(R()-.5)*0.8,0.006,0.55,R()*3,g);}
+        else{/* a frame that came off its nail and lies face down */
+          box(0.8,0.04,1.0,fallenFrame,(R()-.5)*0.5,0.02,0.6,(R()-.5)*0.6,g);box(0.02,0.02,0.05,ironMat,0,2.3,0.025,0,g);}});}}}
+
+ /* ---- webs in the ceiling corners ---- */
+ {const webMat=new THREE.MeshBasicMaterial({map:texCobweb,transparent:true,depthWrite:false,color:0x9aa0ac,opacity:.5,side:THREE.DoubleSide});
+  const wl=[];
+  for(let f=0;f<NF;f++){const yc=f*FH+(f===0?CEIL-0.32:CEIL-0.06);
+    openCells[f].forEach(([x,z])=>{if(DOORSET.has(nk(f,x,z)))return;
+      for(const cxs of[-1,1])for(const czs of[-1,1]){
+        if(!isSolid(f,x+cxs,z)||!isSolid(f,x,z+czs)||R()>0.32)continue;
+        const s=0.7+R()*0.7,px=(x+.5+cxs*.5)*CS-cxs*s/2,pz=(z+.5+czs*.5)*CS-czs*s/2;
+        const rz=cxs<0?(czs<0?0:Math.PI/2):(czs>0?Math.PI:-Math.PI/2);
+        wl.push([px,yc,pz,s,s,1,-Math.PI/2+(R()-.5)*0.3,0,rz]);}});}
+  instList(new THREE.PlaneGeometry(1,1),webMat,wl).renderOrder=1;}
+
+ /* ---- moonlight falling through the windows ---- */
+ {const shTex=canvasToTex(cv(64,128,(g,w,h)=>{const Q=mulberry32(4711);
+    for(let x=0;x<w;x++){const e=Math.pow(Math.min(1,Math.min(x,w-1-x)/22),1.5),st=0.55+Q()*0.45;
+      const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(0.12,'rgba(255,255,255,'+(0.8*e*st)+')');gr.addColorStop(0.7,'rgba(255,255,255,'+(0.35*e*st)+')');gr.addColorStop(1,'rgba(255,255,255,0)');
+      g.fillStyle=gr;g.fillRect(x,0,1,h);}}),true);
+  const pos=[],uv=[],idx=[];let v=0;
+  winSpots.forEach(w=>{if(w.attic)return;const along=w.d[0]!==0?[0,1]:[1,0],ww=1.0,y0=w.f*FH,top=y0+3.3,bot=y0+0.02,out=2.6;
+    const fx=(w.x+.5)*CS+w.d[0]*(CS/2+0.02),fz=(w.z+.5)*CS+w.d[1]*(CS/2+0.02);
+    const P4=[[fx-along[0]*ww/2,top,fz-along[1]*ww/2],[fx+along[0]*ww/2,top,fz+along[1]*ww/2],
+      [fx+w.d[0]*out-along[0]*ww*0.75,bot,fz+w.d[1]*out-along[1]*ww*0.75],[fx+w.d[0]*out+along[0]*ww*0.75,bot,fz+w.d[1]*out+along[1]*ww*0.75]];
+    P4.forEach(p=>pos.push(p[0],p[1],p[2]));uv.push(0,1,1,1,0,0,1,0);idx.push(v,v+2,v+1,v+1,v+2,v+3);v+=4;});
+  if(v){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);
+    const m=new THREE.MeshBasicMaterial({map:shTex,color:0x1c2232,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
+    const sh=new THREE.Mesh(g,m);sh.renderOrder=2;scene.add(sh);DRESS.shafts=sh;DRESS.shaftMat=m;DRESS.fx.push(sh);}}
+
+ /* ---- a cold mist lying on the cellar floor, lit only by what lights the floor ---- */
+ {const mistTex=(()=>{const d=new Uint8Array(FS*FS*4);
+    for(let i=0;i<FS*FS;i++){const x=i%FS,y=(i/FS)|0,n=sf(FA,x,y)*0.5+sf(FC,x*2,y*2)*0.5,a=Math.pow(Math.max(0,Math.min(1,(n-0.42)*3.2)),1.6);
+      d[i*4]=d[i*4+1]=d[i*4+2]=Math.round(a*255);d[i*4+3]=255;}
+    const t=new THREE.DataTexture(d,FS,FS);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.magFilter=t.minFilter=THREE.LinearFilter;t.needsUpdate=true;return t;})();
+  const layers=isTouch?[[0.3,0.5,4]]:[[0.2,0.5,4],[0.55,0.34,2.6]];
+  layers.forEach(([hy,op,rep],i)=>{const t=mistTex.clone();t.needsUpdate=true;t.repeat.set(rep,rep*D/W);
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(W*CS,D*CS),std({color:0x565c64,roughness:1,alphaMap:t,transparent:true,opacity:op,depthWrite:false}));
+    m.rotation.x=-Math.PI/2;m.position.set(W*CS/2,hy,D*CS/2);m.renderOrder=1;m.receiveShadow=false;scene.add(m);
+    DRESS.mist.push({m,t,sp:(i?-1:1)*(0.006+i*0.004)});DRESS.fx.push(m);});}
+}
+console.log('Hollowmere: dressed the house',JSON.stringify(DRESS.n));
+/* per frame: the shafts follow the lightning; the mist drifts */
+DRESS.tick=function(dt,t,lf,dk){
+  if(DRESS.shaftMat)DRESS.shaftMat.color.setRGB(0.05,0.062,0.095).multiplyScalar((0.35+lf*6)*dk);
+  DRESS.mist.forEach((o,i)=>{o.t.offset.x=(t*o.sp)%1;o.t.offset.y=(t*o.sp*0.6+i*0.37)%1;});};
+DRESS.quality=function(){const on=settings.quality!=='low';DRESS.fx.forEach(o=>{o.visible=on;});};
 /* ---------- flames and their haloes: two point clouds, dimmed where the thing stands ---------- */
 const texFlameSq=canvasToTex(cv(64,64,(g)=>{const r=g.createRadialGradient(32,44,1,32,40,22);
   r.addColorStop(0,'rgba(255,250,230,1)');r.addColorStop(0.3,'rgba(255,205,120,.9)');r.addColorStop(0.65,'rgba(255,120,40,.35)');r.addColorStop(1,'rgba(255,80,20,0)');
@@ -3061,7 +3288,7 @@ function applyQuality(){
     renderer.shadowMap.enabled=sh;FLASH.light.castShadow=sh;
     if(sh){FLASH.light.shadow.mapSize.set(q.shadow,q.shadow);if(FLASH.light.shadow.map){FLASH.light.shadow.map.dispose();FLASH.light.shadow.map=null;}}
     scene.traverse(o=>{if(o.material){(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.needsUpdate=true);}});}
-  setupPost();
+  setupPost();DRESS.quality();
   document.body.classList.toggle('post',POST.ok);}
 function renderFrame(){
   const u=POST.u;
@@ -3506,9 +3733,29 @@ function boneSeg(len,r0,r1,seg){const pts=[],n=14;
     pts.push(new THREE.Vector2(i===0||i===n?Math.max(0.002,r*0.4):r,y));}
   const g=new THREE.LatheGeometry(pts,seg||12);g.computeVertexNormals();return g;}
 const MON_HEAD_Y=2.16;
+/* things every hunter shares: the darker skin of its limbs, its shroud, the shadow it stands in */
+let MON_X=null;
+function monShared(){if(MON_X)return MON_X;
+  const limb=skinMat.clone();limb.color.setHex(0x9c968e);
+  const shroudSet=bake(128*TQ,256*TQ,(x,y,o,w,h)=>{const u=x/w,v=y/h,fx=u*256,fy=v*512;
+    const weave=sf(FB,fx*18,fy*9)*0.12,fold=Math.sin(u*Math.PI*10+sf(FA,fx,fy*0.25)*5)*0.5+0.5;
+    let l=0.085*(0.75+weave*2)*(0.75+fold*0.35);const rot=Math.max(0,sf(FC,fx*1.4,fy*0.7)-0.5)*1.4;
+    o.r=l*(1+rot*0.6);o.g=l*(1-rot*0.2);o.b=l*(1.05-rot*0.3);o.h=0.5+weave*2+fold*0.3;o.ro=0.92;},2,'#151313');
+  const tatter=canvasToTex(cv(128,256,(c,w,h)=>{const Q=mulberry32(64);c.fillStyle='#fff';c.beginPath();c.moveTo(0,0);c.lineTo(w,0);
+    for(let x=w;x>=0;x-=4)c.lineTo(x,h*(0.55+Q()*0.45));c.fill();c.globalCompositeOperation='destination-out';
+    for(let i=0;i<22;i++){c.beginPath();c.ellipse(Q()*w,h*(0.2+Q()*0.75),2+Q()*7,4+Q()*16,(Q()-.5)*0.6,0,7);c.fill();}}),false);
+  const shroud=std(setOf(shroudSet,{alphaMap:tatter,alphaTest:0.5,side:THREE.DoubleSide,normalScale:new THREE.Vector2(0.9,0.9)}));
+  const blobTex=canvasToTex(cv(64,64,(c)=>{const r=c.createRadialGradient(32,32,2,32,32,31);r.addColorStop(0,'rgba(255,255,255,.3)');r.addColorStop(0.5,'rgba(255,255,255,.12)');r.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=r;c.fillRect(0,0,64,64);}),false);
+  const blob=new THREE.MeshBasicMaterial({color:0x000000,alphaMap:blobTex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+  /* a shroud over the shoulders and down the back: an open half-cylinder, rippled */
+  const sg=new THREE.CylinderGeometry(0.2,0.3,0.82,14,8,true,Math.PI*0.55,Math.PI*0.9);
+  {const p=sg.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),t=(0.41-y)/0.82;
+     const a=Math.atan2(x,z),rip=1+Math.sin(a*7+y*5)*0.06*t+Math.sin(a*13)*0.02;p.setXYZ(i,x*rip*1.08,y,z*rip*0.78-t*0.05);}
+   sg.translate(0,-0.36,0);sg.computeVertexNormals();}
+  return MON_X={limb,shroud,blob,shroudGeo:sg};}
 function buildMonster(){
   const g=new THREE.Group();
-  const skin=skinMat;
+  const skin=skinMat,MX=monShared(),limb=MX.limb;
   /* the face is the one from the jumpscare, laid over the front of the skull,
      so what you glimpse in your beam is what comes at you at the end */
   const faceCv=document.createElement('canvas');faceCv.width=faceCv.height=512;
@@ -3545,13 +3792,13 @@ function buildMonster(){
   const legs=[];
   [-1,1].forEach(s=>{
     const th=new THREE.Group();th.position.set(s*0.1,-0.02,0);hips.add(th);
-    add(th,boneSeg(0.56,0.074,0.05),skin);
+    add(th,boneSeg(0.56,0.074,0.05),limb);
     const kn=new THREE.Group();kn.position.y=-0.56;th.add(kn);
-    add(kn,boneSeg(0.56,0.054,0.034),skin);
+    add(kn,boneSeg(0.56,0.054,0.034),limb);
     const an=new THREE.Group();an.position.y=-0.56;kn.add(an);
     const parts=[[new THREE.SphereGeometry(0.05,12,8),M4(0,-0.02,0.06,0,0,0,0.8,0.55,1.9)],[new THREE.SphereGeometry(0.035,10,8),M4(0,-0.02,-0.02,0,0,0,1,1,1.2)]];
     for(let k=0;k<4;k++)parts.push([new THREE.CylinderGeometry(0.009,0.012,0.07,6),M4((k-1.5)*0.02,-0.04,0.17+Math.abs(k-1.2)*-0.008,Math.PI/2+0.25,0,0)]);
-    add(an,mergeGeos(parts),skin);
+    add(an,mergeGeos(parts),limb);
     legs.push({th,kn,an,s});});
 
   /* ---------- the torso: a waist you could close a hand around, ribs you can count ---------- */
@@ -3604,10 +3851,10 @@ function buildMonster(){
   const arms=[];
   [-1,1].forEach(s=>{
     const sh=new THREE.Group();sh.position.set(s*0.2,0.36,-0.01);chestG.add(sh);
-    add(sh,new THREE.SphereGeometry(0.052,12,8),skin);
-    add(sh,boneSeg(0.47,0.052,0.038),skin);
+    add(sh,new THREE.SphereGeometry(0.052,12,8),limb);
+    add(sh,boneSeg(0.47,0.052,0.038),limb);
     const el=new THREE.Group();el.position.y=-0.47;sh.add(el);
-    add(el,boneSeg(0.46,0.04,0.027),skin);
+    add(el,boneSeg(0.46,0.04,0.027),limb);
     const wr=new THREE.Group();wr.position.y=-0.46;el.add(wr);
     /* the hand: palm and five long fingers, set in a half-closed claw */
     const hp=[[new THREE.SphereGeometry(0.045,12,8),M4(0,-0.05,0,0,0,0,0.85,1.25,0.35)]],np=[];
@@ -3621,9 +3868,14 @@ function buildMonster(){
     {let m=M4(0.035*-s*-1,-0.04,0.02,0.4,0,-0.6*s);for(let k=0;k<2;k++){const L=0.055;const seg=new THREE.CylinderGeometry(0.008,0.01,L,6);seg.translate(0,-L/2,0);
       hp.push([seg,m.clone()]);m=m.clone().multiply(M4(0,-L,0,0.3,0,0));}
      const nail=new THREE.ConeGeometry(0.006,0.028,5);nail.rotateX(Math.PI);nail.translate(0,-0.01,0);np.push([nail,m]);}
-    add(wr,mergeGeos(hp),skin);add(wr,mergeGeos(np),nailMat);
+    add(wr,mergeGeos(hp),limb);add(wr,mergeGeos(np),nailMat);
     arms.push({sh,el,wr,s});});
 
+  /* ---------- a shroud, rotten black, over the shoulders and down the back ---------- */
+  const shroud=new THREE.Group();shroud.position.set(0,0.44,-0.01);chestG.add(shroud);
+  {const m=add(shroud,MX.shroudGeo,MX.shroud);m.castShadow=true;}
+  /* the dark it stands in */
+  {const b=new THREE.Mesh(new THREE.PlaneGeometry(1.1,1.1),MX.blob);b.rotation.x=-Math.PI/2;b.position.y=0.015;b.renderOrder=1;g.add(b);}
   /* ---------- neck and head ---------- */
   const neckG=new THREE.Group();neckG.position.y=0.42;chestG.add(neckG);
   const neck=lathe([[0,0.06],[0.05,0.05],[0.12,0.043],[0.2,0.046],[0.24,0.001]],16);
@@ -3679,16 +3931,16 @@ function buildMonster(){
     gl.scale.setScalar(0.01);gl.position.set(d.x*HR*0.8*0.86+0.002*s,d.y*HR*0.8*1.24+0.004,d.z*HR*0.8+0.012);headG.add(gl);eyes.push(gl);});
   /* hair: wet black strands from the crown, down past the shoulders */
   {const L=[];const R=mulberry32(77);
-   for(let i=0;i<34;i++){const a=(R()*2-1)*Math.PI*(i<6?0.35:1);   /* around the head; a few at the front */
-     const front=Math.abs(a)<0.9;if(Math.abs(a)<0.72)continue;
-     const len=front?0.32+R()*0.2:0.5+R()*0.45,wd=0.06+R()*0.07,pg=new THREE.PlaneGeometry(wd,len,1,8);pg.translate(0,-len/2,0);
+   for(let i=0;i<58;i++){const a=i<10?(i%2?1:-1)*(0.8+R()*0.2):(R()*2-1)*Math.PI;   /* around the head; ten hang at the temples */
+     const front=Math.abs(a)<1.05;if(Math.abs(a)<0.72)continue;
+     const len=front?0.3+R()*0.18:0.55+R()*0.5,wd=0.05+R()*0.07,pg=new THREE.PlaneGeometry(wd,len,1,8);pg.translate(0,-len/2,0);
      const p=pg.attributes.position;for(let k=0;k<p.count;k++){const y=-p.getY(k),t=Math.max(0,y/len);p.setZ(k,0.045*Math.min(1,Math.sqrt(t*5))+t*0.06+Math.sin(t*5+i)*0.01);}
      const el=0.55+R()*0.35,rr=HR*1.02;
      L.push([pg,M4(Math.sin(a)*rr*0.86*Math.cos(el),HR*1.24*Math.sin(el),Math.cos(a)*rr*Math.cos(el),-0.08,a,0)]);}
    const hm=add(headG,mergeGeos(L),hairMat);hm.castShadow=false;var hairMesh=hm;}
   g.traverse(o=>{if(o.isMesh){o.castShadow=o.castShadow!==false;}});
   scene.add(g);
-  return{g,hips,spine,chestG,neckG,headG,jaw,legs,arms,eyes,hair:hairMesh,headMat,skirt,
+  return{g,hips,spine,chestG,neckG,headG,jaw,legs,arms,eyes,hair:hairMesh,headMat,skirt,shroud,breathT:1+Math.random()*2,
     gait:0,px:0,pz:0,spd:0,twT:0,tw:{x:0,y:0,z:0},twc:{x:0,y:0,z:0},yaw0:0,roll:0,hunch:0.3,caughtYaw:0};
 }
 
@@ -3770,6 +4022,15 @@ function animateMonster(dt,t){
   mon.eyes.forEach(e=>{e.material.color.setHex(burn?0xff2a10:0xdfe8ff);e.material.fog=!burn;
     e.material.opacity=burn?0.85+Math.random()*0.15:Math.min(0.8,shine);e.scale.setScalar(burn?0.05+Math.sin(t*9)*0.008:0.007+shine*0.009);});
   mon.skirt.forEach((sk,i)=>{sk.rotation.x=mon.legs[i].th.rotation.x*0.5+0.06;sk.rotation.z=(i?1:-1)*0.03;});
+  if(mon.shroud){mon.shroud.rotation.x=Math.min(0.55,mon.spd*0.07)+(moving?Math.abs(sw)*0.05:Math.sin(t*0.8)*0.02)-mon.hunch*0.25;
+    mon.shroud.rotation.z=Math.sin(ph*0.5+0.6)*0.05*(moving?1:0.3);}
+  /* its breath, cold, when you are close enough to see it */
+  mon.breathT-=dt;
+  if(mon.breathT<=0){mon.breathT=(hunt?0.9:2.2)+Math.random()*1.4;
+    if(mon.g.visible&&M.goneT<=0&&(state==='play'||state==='caught')&&M.floor===P.floor&&Math.hypot(M.x-P.x,M.z-P.z)<9){
+      mon.headG.getWorldPosition(_hv);const fx=Math.sin(mon.g.rotation.y),fz=Math.cos(mon.g.rotation.y);
+      for(let i=0;i<3;i++)spawnPart(_hv.x+fx*0.14,_hv.y-0.07,_hv.z+fz*0.14,0x2c3038,
+        {x:fx*(0.25+Math.random()*0.2)+(Math.random()-.5)*0.08,y:0.06+Math.random()*0.08,z:fz*(0.25+Math.random()*0.2)+(Math.random()-.5)*0.08},1.2+Math.random()*0.5,0.16+i*0.05);}}
   if(mon.hair){mon.hair.rotation.x=Math.min(0.5,mon.spd*0.05)+Math.sin(t*1.7)*0.02;mon.hair.rotation.z=Math.sin(ph*0.5)*0.04*(moving?1:0.3);}
 }
 
@@ -4830,6 +5091,7 @@ function breachWall(){
   const wl=windowIdx.get(key);
   if(wl){wl.forEach(e=>{e[0].setMatrixAt(e[1],gone.matrix);e[0].instanceMatrix.needsUpdate=true;});windowIdx.delete(key);}
   (decorByWall.get(key)||[]).forEach(o=>{o.visible=false;});
+  (TRIMIDX.get(key)||[]).forEach(e=>{e[0].setMatrixAt(e[1],gone.matrix);e[0].instanceMatrix.needsUpdate=true;});TRIMIDX.delete(key);
   {const tile=new THREE.Mesh(boxGeo,[edgeMat,edgeMat,floorMats[SF(f)],f>0?ceilMats[SF(f-1)]:edgeMat,edgeMat,edgeMat]);
    tile.scale.set(CS,0.3,CS);tile.position.set((cx+.5)*CS,f*FH-0.15,(cz+.5)*CS);tile.receiveShadow=true;tile.castShadow=true;scene.add(tile);}
   for(let i=0;i<26;i++)spawnPart((cx+.5)*CS+(Math.random()-.5)*2,f*FH+0.6+Math.random()*2.4,
@@ -6787,6 +7049,7 @@ function updateFX(dt,t){
   const camFloor=(state==='title'||vaultOpen)?0:P.floor,under=camFloor===0;
   windowMats[0].emissiveIntensity=(0.3+lf*7)*dk;
   windowMats[1].m.color.setRGB(0.2,0.25,0.36).multiplyScalar((0.3+lf*7)*dk);
+  DRESS.tick(dt,t,lf,dk);
   moon.intensity=(0.03+lf*2.6)*(under?0.08:1)*dk;
   hemi.intensity=(1.7+lf*(under?0.3:2.5))*(DARK.t>0?0.55:1);
   const sameFloor=M.floor===P.floor;

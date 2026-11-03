@@ -16,6 +16,17 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-03-house-dressed',
+    date: '2026-11-03',
+    tag: 'CHANGE',
+    title: 'The house, rebuilt in detail',
+    body: 'The cellar walls are now rough stone of every size, damp and green near the floor. Heavy beams run overhead, timber props lean on the walls, chains hang from the joists, ' +
+      'shelves of old jars line the stone, melted candles burn at the foot of the walls, puddles throw your light back and a cold mist lies on the floor.\n\n' +
+      'Upstairs the walls have real skirting, rails and cornices. Brass sconces burn along the walls, moonlight falls through the windows in shafts, doors stand ajar, ' +
+      'runners line the corridors, planks and books are piled against the walls and webs hang in the corners. Rafters climb the attic walls.\n\n' +
+      'The thing that hunts you has changed too: greyer, darker limbs, a rotten black shroud down its back, more hair, and you can see its breath when it is close.'
+  },
+  {
     id: '2026-11-03-switch-to-v3',
     date: '2026-11-03',
     tag: 'NEW',
