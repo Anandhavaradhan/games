@@ -215,12 +215,18 @@ function teamRenamed(name,members,uid,oldName,newName){
 /* after a username change, the player's escapes carry the new name: their own solo ones, and every
    co-op entry that lists them as a member (older co-op entries can only be fixed from admin.html) */
 export async function renameEscapes(uid, name, oldName) {
-  const snap = await F.getDocs(F.query(F.collection(db, 'escapes'), F.where('uid', '==', uid), F.where('team', '==', false)));
-  const todo = snap.docs.filter(d => d.data().name !== name).map(d => [d.ref, name]);
-  try {
-    const ts = await F.getDocs(F.query(F.collection(db, 'escapes'), F.where('members', 'array-contains', uid)));
-    ts.docs.forEach(d => { const v = d.data(), t = teamRenamed(v.name, v.members, uid, oldName, name); if (t && t !== v.name) todo.push([d.ref, t]); });
-  } catch (e) { console.warn('Team entries not renamed:', e); }
+  const todo = [];
+  /* accounts are shared by V2 and V3, so the new name goes onto both boards */
+  for (const col of ALL_BOARDS) {
+    try {
+      const snap = await F.getDocs(F.query(F.collection(db, col), F.where('uid', '==', uid), F.where('team', '==', false)));
+      snap.docs.filter(d => d.data().name !== name).forEach(d => todo.push([d.ref, name]));
+    } catch (e) { console.warn('Solo entries not renamed (' + col + '):', e); }
+    try {
+      const ts = await F.getDocs(F.query(F.collection(db, col), F.where('members', 'array-contains', uid)));
+      ts.docs.forEach(d => { const v = d.data(), t = teamRenamed(v.name, v.members, uid, oldName, name); if (t && t !== v.name) todo.push([d.ref, t]); });
+    } catch (e) { console.warn('Team entries not renamed (' + col + '):', e); }
+  }
   for (let i = 0; i < todo.length; i += 400) {
     const b = F.writeBatch(db);
     todo.slice(i, i + 400).forEach(([ref, n]) => b.update(ref, { name: n }));
@@ -228,7 +234,12 @@ export async function renameEscapes(uid, name, oldName) {
   }
 }
 
-/* ---------- ESCAPES: escapes/{id}, one public document for EVERY escape ----------
+/* the fastest-escapes board this game posts to and reads: V2 uses escapes/, V3 has its own escapes_v3/.
+   Accounts, usernames and time played are shared by both. */
+export const BOARD = 'escapes_v3';
+const ALL_BOARDS = ['escapes', 'escapes_v3'];
+
+/* ---------- ESCAPES: escapes_v3/{id}, one public document for EVERY escape ----------
    { uid, name, time (seconds, 0.1 s), legend, deaths, embers, team, at }
    Solo escapes get a random id. A co-op night uses a fixed id (mp_ROOM_GO) so the
    team appears once: the first teammate out creates it, the rules refuse the rest. */
@@ -250,25 +261,25 @@ function escapeDoc(uid, e) {
   }, (e.team && Array.isArray(e.members) && e.members.length) ? { members: e.members.slice(0, 8).map(String) } : {});
 }
 export async function addEscape(uid, e, id) {
-  if (id) { await F.setDoc(F.doc(db, 'escapes', id), escapeDoc(uid, e)); return id; }
-  const r = await F.addDoc(F.collection(db, 'escapes'), escapeDoc(uid, e));
+  if (id) { await F.setDoc(F.doc(db, BOARD, id), escapeDoc(uid, e)); return id; }
+  const r = await F.addDoc(F.collection(db, BOARD), escapeDoc(uid, e));
   return r.id;
 }
 export async function loadEscape(id) {
-  const snap = await F.getDoc(F.doc(db, 'escapes', id));
+  const snap = await F.getDoc(F.doc(db, BOARD, id));
   return snap.exists() ? snap.data() : null;
 }
 /* one difficulty's board (fastest first). Filtered here rather than in the query, so old entries
    with no difficulty count as Normal and no extra Firestore index is needed. */
 export async function loadEscapes(n, diff) {
-  const snap = await F.getDocs(F.query(F.collection(db, 'escapes'), F.orderBy('time'), F.limit(Math.max(2000, n))));
+  const snap = await F.getDocs(F.query(F.collection(db, BOARD), F.orderBy('time'), F.limit(Math.max(2000, n))));
   const ms = v => (v && typeof v.toMillis === 'function') ? v.toMillis() : 0;
   return snap.docs.map(d => Object.assign({ id: d.id }, d.data()))
     .filter(r => !diff || diffOf(r) === diff)
     .sort((a, b) => a.time - b.time || ms(a.at) - ms(b.at)).slice(0, n);
 }
 export async function escapeRank(time) {
-  const snap = await F.getCountFromServer(F.query(F.collection(db, 'escapes'), F.where('time', '<', time)));
+  const snap = await F.getCountFromServer(F.query(F.collection(db, BOARD), F.where('time', '<', time)));
   return snap.data().count + 1;
 }
 

@@ -16,6 +16,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-03-v3-own-board',
+    date: '2026-11-03',
+    tag: 'NEW',
+    title: 'Hollowmere V3 has its own leaderboard',
+    body: 'Hollowmere V3 now keeps its own fastest-escapes leaderboard, starting empty, one board for each difficulty. Your escapes in V2 stay on the V2 board.\n\n' +
+      'Co-op rooms are separate too: a room made in V3 can only be joined from V3. Your account, username, legends and friends are the same in both.'
+  },
+  {
     id: '2026-11-02-hunter-every-floor',
     date: '2026-11-02',
     tag: 'NEW',

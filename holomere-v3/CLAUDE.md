@@ -15,3 +15,9 @@ Follow the format and id rules at the top of `news.js`; never change or reuse an
 - Solo pages are built for one side of that line; switching across it reloads the page (`diffNeedsNewPage`).
 - Embers and memories spawn only on cells reachable from the Heart and outside FURN_CELLS. If you move or add furniture
   or hiding places, update FURN_CELLS as well as `houseKeep`.
+
+## Kept apart from V2
+V2 and V3 share one Firebase project. Accounts, usernames, players/, friends and time played are shared.
+- Fastest escapes: V3 posts to and reads `escapes_v3/` (`BOARD` in cloud.js and admin.html). Username renames touch both boards.
+- Co-op: multiplayer.js maps `rooms`, `live`, `presence`, `watch` and `invites` to `*_v3` paths, so V2 and V3 players never meet in a room.
+- Both rules files (firestore.rules, database.rules.json) are kept identical in hollowmere-v2/ and holomere-v3/ and hold the rules for both games. Publish either copy.

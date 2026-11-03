@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  HOLLOWMERE — KEEPER'S LEDGER (admin dashboard)
+  HOLLOWMERE V3 — KEEPER'S LEDGER (admin dashboard)
   Open it at  https://<you>.github.io/<repo>/admin.html
   Only accounts listed in the Firestore collection "admins" can see any data;
   everyone else gets instructions instead (firestore.rules enforces this, not the page).
@@ -12,7 +12,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Hollowmere · Keeper's ledger</title>
+<title>Hollowmere V3 · Keeper's ledger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=IM+Fell+English:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -259,6 +259,9 @@ try{
   throw e;
 }
 
+/* BOARD: the fastest-escapes board this ledger shows (V2: escapes/, V3: escapes_v3/). Renames and guest
+   clean-up touch both boards, because accounts are shared. */
+const BOARD='escapes_v3',ALL_BOARDS=['escapes','escapes_v3'];
 /* players: every players/{uid} doc (live); board: top of escapes/{id} (live); ptBoard: top of playtime/{uid} (live) */
 let board=[], unsubBoard=null, playersLoaded=false, ptBoard=[], unsubPT=null;
 /* GUEST ACCOUNTS: guests are temporary and have no record of their own; guestStats/total holds
@@ -307,8 +310,8 @@ async function mergeOldGuests(){
         active:F.increment(Math.floor(st.activeTime||0)),escapes:F.increment(Math.floor(p.escapes||0)),at:F.serverTimestamp()},{merge:true});
       for(;;){const r=await F.getDocs(F.query(F.collection(db,'players',uid,'runs'),F.limit(300)));
         if(r.empty)break;const b=F.writeBatch(db);r.docs.forEach(d=>b.delete(d.ref));await b.commit();if(r.size<300)break;}
-      const es=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('uid','==',uid),F.where('team','==',false)));
-      for(const d of es.docs)await F.deleteDoc(d.ref);
+      for(const col of ALL_BOARDS){const es=await F.getDocs(F.query(F.collection(db,col),F.where('uid','==',uid),F.where('team','==',false)));
+        for(const d of es.docs)await F.deleteDoc(d.ref);}
       try{await F.deleteDoc(F.doc(db,'playtime',uid));}catch(e){}
       try{await F.deleteDoc(F.doc(db,'leaderboard',uid));}catch(e){}
       try{const k=unameKey(p.name),r=F.doc(db,'usernames',k),d=await F.getDoc(r);if(k&&d.exists()&&d.data().uid===uid)await F.deleteDoc(r);}catch(e){}
@@ -340,12 +343,12 @@ function teamRenamed(name,members,uid,oldName,newName){
 }
 /* put a player's new name into every co-op entry they are in (or, given an old name, every entry that has it) */
 async function renameInTeams(uid,oldName,newName){
-  const snap=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('team','==',true)));
   let n=0;
+  for(const col of ALL_BOARDS){const snap=await F.getDocs(F.query(F.collection(db,col),F.where('team','==',true)));
   for(const d of snap.docs){const v=d.data();
     const mine=Array.isArray(v.members)&&v.members.indexOf(uid)>=0;
     const t=teamRenamed(v.name,mine?v.members:null,uid,oldName,newName);
-    if(t&&t!==v.name){await F.updateDoc(d.ref,{name:t});n++;}}
+    if(t&&t!==v.name){await F.updateDoc(d.ref,{name:t});n++;}}}
   return n;
 }
 async function fixTeamName(uid){
@@ -395,6 +398,8 @@ function bestPerPlayer(list){const k=n=>String(n||'').toLowerCase().replace(/[^a
   for(const r of list){const who=r.team?'t:'+String(r.name||'').split('+').map(k).filter(Boolean).sort().join('+'):'s:'+(k(r.name)||'u:'+r.uid);
     if(seen.has(who))continue;seen.add(who);out.push(r);}return out;}
 async function migrateBoard(adminUid,force){
+  /* V3 starts with an empty board: past escapes (and the seeded team) belong to V2's board */
+  return;
   try{
     for(const e of SEED_ESCAPES){
       const ref=F.doc(db,'escapes',e.id);
@@ -502,7 +507,7 @@ A.onAuthStateChanged(auth,async u=>{
   migrateBoard(u.uid);
   seedUsernames().then(()=>{if(!localStorage.getItem('hm_playtime_seeded_v1')){seedPlaytime().then(n=>{localStorage.setItem('hm_playtime_seeded_v1','1');if(n)notice('Added '+n+' players to Most Time Played');});}});
   /* the leaderboard, live: every escape, fastest first; equal times go to whoever set theirs first */
-  unsubBoard=F.onSnapshot(F.query(F.collection(db,'escapes'),F.orderBy('time'),F.limit(500)),snap=>{
+  unsubBoard=F.onSnapshot(F.query(F.collection(db,BOARD),F.orderBy('time'),F.limit(500)),snap=>{
     board=snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>a.time-b.time||ms(a.at)-ms(b.at));
     if(playersLoaded)render();
   },e=>console.warn('Leaderboard read failed:',e));
@@ -531,7 +536,7 @@ async function removeFromBoard(id,block){
   if(!confirm(q))return;
   try{
     if(block&&uid)await F.setDoc(F.doc(db,'boardBans',uid),{name:r.name||'',bestTime:r.time||0,at:F.serverTimestamp()});
-    await F.deleteDoc(F.doc(db,'escapes',id));
+    await F.deleteDoc(F.doc(db,BOARD,id));
   }catch(e){alert('Could not remove it: '+e.message);}
 }
 async function removeFromPT(uid,block){
@@ -803,8 +808,8 @@ async function saveWithName(uid,p,newName,st){
         if(old.exists()&&old.data().uid===uid)await F.deleteDoc(F.doc(db,'usernames',oldKey));}
       /* their past solo escapes and time-played entry carry the new name */
       try{
-        const es=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('uid','==',uid),F.where('team','==',false)));
-        for(const d of es.docs)await F.updateDoc(d.ref,{name:newName});
+        for(const col of ALL_BOARDS){const es=await F.getDocs(F.query(F.collection(db,col),F.where('uid','==',uid),F.where('team','==',false)));
+          for(const d of es.docs)await F.updateDoc(d.ref,{name:newName});}
         const nt=await renameInTeams(uid,p.name,newName);   /* and the co-op entries they are in */
         if(nt)notice('Also renamed in '+nt+' co-op '+(nt===1?'entry':'entries')+'.');
         const pt=await F.getDoc(F.doc(db,'playtime',uid));
@@ -826,7 +831,7 @@ async function postToLeaderboard(uid){
   const st=p.stats||{};
   if(!st.bestTime){alert('Player has no best time set. Set one in the form and save first.');return;}
   try{
-    await F.addDoc(F.collection(db,'escapes'),{
+    await F.addDoc(F.collection(db,BOARD),{
       uid,diff:'normal',
       name:String(p.name||'Unnamed').slice(0,40),
       time:st.bestTime,

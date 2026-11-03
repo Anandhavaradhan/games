@@ -142,7 +142,14 @@ export async function init() {
   return me;
 }
 
-const R = p => D.ref(db, p);
+/* V3 keeps its co-op apart from V2: rooms, live play, presence, watching and invites live under
+   rooms_v3/, live_v3/, presence_v3/, watch_v3/ and invites_v3/, so a V2 player can never join a V3 room
+   (or see a V3 invite) and the other way round. Friends lists (friendsOf/) are shared, like accounts. */
+const V3_PATHS = new Set(['rooms', 'live', 'presence', 'watch', 'invites']);
+const R = p => {
+  const i = p.indexOf('/'), top = i < 0 ? p : p.slice(0, i);
+  return D.ref(db, V3_PATHS.has(top) ? top + '_v3' + (i < 0 ? '' : p.slice(i)) : p);
+};
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const makeCode = () => Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
 export const normCode = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);

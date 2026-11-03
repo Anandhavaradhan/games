@@ -215,18 +215,29 @@ function teamRenamed(name,members,uid,oldName,newName){
 /* after a username change, the player's escapes carry the new name: their own solo ones, and every
    co-op entry that lists them as a member (older co-op entries can only be fixed from admin.html) */
 export async function renameEscapes(uid, name, oldName) {
-  const snap = await F.getDocs(F.query(F.collection(db, 'escapes'), F.where('uid', '==', uid), F.where('team', '==', false)));
-  const todo = snap.docs.filter(d => d.data().name !== name).map(d => [d.ref, name]);
-  try {
-    const ts = await F.getDocs(F.query(F.collection(db, 'escapes'), F.where('members', 'array-contains', uid)));
-    ts.docs.forEach(d => { const v = d.data(), t = teamRenamed(v.name, v.members, uid, oldName, name); if (t && t !== v.name) todo.push([d.ref, t]); });
-  } catch (e) { console.warn('Team entries not renamed:', e); }
+  const todo = [];
+  /* accounts are shared by V2 and V3, so the new name goes onto both boards */
+  for (const col of ALL_BOARDS) {
+    try {
+      const snap = await F.getDocs(F.query(F.collection(db, col), F.where('uid', '==', uid), F.where('team', '==', false)));
+      snap.docs.filter(d => d.data().name !== name).forEach(d => todo.push([d.ref, name]));
+    } catch (e) { console.warn('Solo entries not renamed (' + col + '):', e); }
+    try {
+      const ts = await F.getDocs(F.query(F.collection(db, col), F.where('members', 'array-contains', uid)));
+      ts.docs.forEach(d => { const v = d.data(), t = teamRenamed(v.name, v.members, uid, oldName, name); if (t && t !== v.name) todo.push([d.ref, t]); });
+    } catch (e) { console.warn('Team entries not renamed (' + col + '):', e); }
+  }
   for (let i = 0; i < todo.length; i += 400) {
     const b = F.writeBatch(db);
     todo.slice(i, i + 400).forEach(([ref, n]) => b.update(ref, { name: n }));
     await b.commit();
   }
 }
+
+/* the fastest-escapes board this game posts to and reads: V2 uses escapes/, V3 has its own escapes_v3/.
+   Accounts, usernames and time played are shared by both. */
+export const BOARD = 'escapes';
+const ALL_BOARDS = ['escapes', 'escapes_v3'];
 
 /* ---------- ESCAPES: escapes/{id}, one public document for EVERY escape ----------
    { uid, name, time (seconds, 0.1 s), legend, deaths, embers, team, at }
