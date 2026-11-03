@@ -16,6 +16,13 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-03-switch-to-v3',
+    date: '2026-11-03',
+    tag: 'NEW',
+    title: 'Switch to any version',
+    body: 'SWITCH VERSION on the title screen now takes you to any version of Hollowmere: the original (V1), V2 or V3. Your account comes with you.'
+  },
+  {
     id: '2026-11-03-v3-own-board',
     date: '2026-11-03',
     tag: 'NEW',
