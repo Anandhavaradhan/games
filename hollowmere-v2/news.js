@@ -16,6 +16,13 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-03-switch-to-v3',
+    date: '2026-11-03',
+    tag: 'NEW',
+    title: 'Hollowmere V3 is open',
+    body: 'Hollowmere V3 is open: a new house every night, a hunter on every floor and its own leaderboard. Your account, legends and friends come with you. Find it under SWITCH VERSION on the title screen.'
+  },
+  {
     id: '2026-11-02-less-camera-shake',
     date: '2026-11-02',
     tag: 'CHANGE',
