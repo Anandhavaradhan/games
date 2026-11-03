@@ -736,9 +736,68 @@
     .pulse{opacity:.85}
     .vcard,.vcard:hover{transition:none;transform:none}
   }
+  /* ===== LATEST VERSION SPLASH (sends players on to Hollowmere V3) ===== */
+  #hmSplash{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    padding:20px;text-align:center;overflow-y:auto;
+    background:radial-gradient(ellipse at center,rgba(10,8,14,.95) 0%,rgba(2,3,6,.98) 82%);
+    -webkit-user-select:none;user-select:none;cursor:default}
+  #hmSplash.hidden{display:none!important}
+  #hmSplashCard{max-width:620px;margin:auto}
+  #hmSplashKicker{font-family:'Cormorant SC',serif;font-size:12px;letter-spacing:6px;color:#8a7f60}
+  #hmSplash h1{font-family:'Cormorant SC',serif;font-weight:900;font-size:clamp(26px,5vw,46px);
+    letter-spacing:4px;color:#ffbe6f;margin-top:16px;line-height:1.3;
+    text-shadow:0 0 24px rgba(255,170,80,.5),0 0 60px rgba(255,140,40,.3);animation:flick 5s infinite}
+  #hmSplash p{margin-top:18px;font-size:16px;line-height:1.6;color:#a89f8a;font-style:italic}
+  #hmSplashLink{display:inline-block;margin-top:14px;font-family:monospace;font-size:14px;color:#9fc4ff;
+    word-break:break-all;text-decoration:none;border-bottom:1px solid rgba(159,196,255,.4);pointer-events:auto}
+  #hmSplashLink:hover{color:#cfe2ff;border-color:#cfe2ff}
+  #hmSplashBtns{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:28px}
+  #hmSplashGo{border-color:#ffbe6f;color:#ffd9a0}
+  #hmSplashGo:hover{border-color:#ffd9a0;color:#fff}
+  #hmSplashStay{color:#9a927e}
 </style>
 </head>
 <body>
+<div id="hmSplash" role="dialog" aria-modal="true" aria-labelledby="hmSplashTitle">
+  <div id="hmSplashCard">
+    <div id="hmSplashKicker">AN UPDATE HAS ARRIVED</div>
+    <h1 id="hmSplashTitle">HOLLOWMERE V3<br>HAS BEEN LAUNCHED</h1>
+    <p>A new build of the house is open: a new house every night and a hunter on every floor. Your account comes with you. Go there to continue your haunting:</p>
+    <a id="hmSplashLink" href="https://anandhavaradhan.github.io/games/hollowmere-v3/" target="_blank" rel="noopener">https://anandhavaradhan.github.io/games/hollowmere-v3/</a>
+    <div id="hmSplashBtns">
+      <button id="hmSplashGo" class="ovbtn">GO TO HOLLOWMERE V3</button>
+      <button id="hmSplashStay" class="ovbtn">CONTINUE PLAYING HOLLOWMERE V2</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var splash=document.getElementById('hmSplash');
+  var stay=document.getElementById('hmSplashStay');
+  var go=document.getElementById('hmSplashGo');
+  var V3_URL='https://anandhavaradhan.github.io/games/hollowmere-v3/';
+  function isOpen(){return splash&&!splash.classList.contains('hidden');}
+  /* shown once per visit: after the player answers it, coming back to the title from the lobby,
+     a co-op night or a difficulty change (same tab) does not bring it back */
+  var SEEN='hm_v3_splash_seen';
+  function dismiss(){splash.classList.add('hidden');try{sessionStorage.setItem(SEEN,'1');}catch(e){}}
+  /* keep every click/tap on the splash from reaching the V2 title screen's
+     document-level "advance()" listener underneath */
+  splash.addEventListener('click',function(e){e.stopPropagation();});
+  splash.addEventListener('contextmenu',function(e){e.stopPropagation();});
+  /* keydown/keyup aren't blocked by z-index stacking (no hit-testing involved),
+     so intercept them in the capture phase, ahead of the game's own window
+     listener, while the splash is showing */
+  window.addEventListener('keydown',function(e){if(isOpen())e.stopPropagation();},true);
+  window.addEventListener('keyup',function(e){if(isOpen())e.stopPropagation();},true);
+  stay.addEventListener('click',function(e){e.stopPropagation();dismiss();});
+  /* arriving from another version's SWITCH VERSION button (?stay=1): the player chose this version, so no splash */
+  /* nor in co-op (?room=), while watching a friend (?watch=) or in a debug run */
+  try{var q=new URLSearchParams(location.search);if(q.get('stay')==='1'||q.get('room')||q.get('watch')||q.get('debug'))dismiss();}catch(e){}
+  try{if(sessionStorage.getItem(SEEN)==='1')splash.classList.add('hidden');}catch(e){}
+  go.addEventListener('click',function(e){e.stopPropagation();window.location.href=V3_URL;});
+})();
+</script>
 <div id="wrap">
   <canvas id="game"></canvas>
   <div id="hideOv"></div><div id="fx-vignette"></div><div id="fx-danger"></div><div id="fx-flash"></div><div id="fx-red"></div><div id="fx-grain"></div>
@@ -930,7 +989,7 @@
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
     <button id="titleStory" class="ovbtn">THE BACKSTORY</button>
     <button id="titleCoop" class="ovbtn">CO-OP — PLAY WITH FRIENDS</button>
-    <button id="titleVersion" class="ovbtn" onclick="event.stopPropagation();location.href='../HOLLOWMERE/index.html'">SWITCH VERSION — PLAY THE ORIGINAL (V1)</button>
+    <button id="titleVersion" class="ovbtn" onclick="event.stopPropagation();location.href='../HOLLOWMERE/index.html?stay=1'">SWITCH VERSION — PLAY THE ORIGINAL (V1)</button>
     <button id="titleVersionB" class="ovbtn" onclick="event.stopPropagation();location.href='../hollowmere-v3/index.html'">SWITCH VERSION — PLAY HOLLOWMERE V3</button>
     <button id="titleLeave" class="ovbtn" style="display:none">LEAVE CO-OP — BACK TO THE TITLE</button>
     <div class="diffRow" data-where="title"></div>
