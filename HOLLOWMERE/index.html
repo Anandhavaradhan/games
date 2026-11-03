@@ -472,7 +472,7 @@
     #timer{top:14px;font-size:17px}
   }
 
-  /* ===== V2 LAUNCH SPLASH ===== */
+  /* ===== LATEST VERSION SPLASH (sends players on to Hollowmere V3) ===== */
   #hmSplash{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
     padding:20px;text-align:center;overflow-y:auto;
     background:radial-gradient(ellipse at center,rgba(10,8,14,.95) 0%,rgba(2,3,6,.98) 82%);
@@ -497,11 +497,11 @@
 <div id="hmSplash" role="dialog" aria-modal="true" aria-labelledby="hmSplashTitle">
   <div id="hmSplashCard">
     <div id="hmSplashKicker">AN UPDATE HAS ARRIVED</div>
-    <h1 id="hmSplashTitle">HOLLOWMERE V2<br>HAS BEEN LAUNCHED</h1>
+    <h1 id="hmSplashTitle">HOLLOWMERE V3<br>HAS BEEN LAUNCHED</h1>
     <p>A new build of the house is open. Go there to continue your haunting:</p>
-    <a id="hmSplashLink" href="https://anandhavaradhan.github.io/games/hollowmere-v2/" target="_blank" rel="noopener">https://anandhavaradhan.github.io/games/hollowmere-v2/</a>
+    <a id="hmSplashLink" href="https://anandhavaradhan.github.io/games/hollowmere-v3/" target="_blank" rel="noopener">https://anandhavaradhan.github.io/games/hollowmere-v3/</a>
     <div id="hmSplashBtns">
-      <button id="hmSplashGo" class="ovbtn">GO TO HOLLOWMERE V2</button>
+      <button id="hmSplashGo" class="ovbtn">GO TO HOLLOWMERE V3</button>
       <button id="hmSplashStay" class="ovbtn">CONTINUE PLAYING HOLLOWMERE (V1)</button>
     </div>
   </div>
@@ -511,7 +511,7 @@
   var splash=document.getElementById('hmSplash');
   var stay=document.getElementById('hmSplashStay');
   var go=document.getElementById('hmSplashGo');
-  var V2_URL='https://anandhavaradhan.github.io/games/hollowmere-v2/';
+  var V3_URL='https://anandhavaradhan.github.io/games/hollowmere-v3/';
   function isOpen(){return splash&&!splash.classList.contains('hidden');}
   function dismiss(){splash.classList.add('hidden');}
   /* keep every click/tap on the splash from reaching the v1 title screen's
@@ -524,7 +524,10 @@
   window.addEventListener('keydown',function(e){if(isOpen())e.stopPropagation();},true);
   window.addEventListener('keyup',function(e){if(isOpen())e.stopPropagation();},true);
   stay.addEventListener('click',function(e){e.stopPropagation();dismiss();});
-  go.addEventListener('click',function(e){e.stopPropagation();window.location.href=V2_URL;});
+  /* arriving from another version's SWITCH VERSION button (?stay=1): the player chose this version, so no splash */
+  try{if(new URLSearchParams(location.search).get('stay')==='1')dismiss();}catch(e){}
+
+  go.addEventListener('click',function(e){e.stopPropagation();window.location.href=V3_URL;});
 })();
 </script>
 <div id="wrap">
@@ -645,7 +648,7 @@
     <button id="titleAccount" class="ovbtn">ACCOUNT</button>
     <button id="titleBoard" class="ovbtn">LEADERBOARD</button>
     <button id="titleSettings" class="ovbtn">SETTINGS</button>
-    <button id="titleVersion" class="ovbtn" onclick="event.stopPropagation();location.href='../hollowmere-v2/index.html'">SWITCH VERSION — PLAY HOLLOWMERE V2</button>
+    <button id="titleVersion" class="ovbtn" onclick="event.stopPropagation();location.href='../hollowmere-v2/index.html?stay=1'">SWITCH VERSION — PLAY HOLLOWMERE V2</button>
     <button id="titleVersion3" class="ovbtn" onclick="event.stopPropagation();location.href='../hollowmere-v3/index.html'">SWITCH VERSION — PLAY HOLLOWMERE V3</button>
     <div id="acctLine" class="acctline">Playing as a guest</div>
     <div class="pulse">TAP OR PRESS ENTER TO WAKE &nbsp;·&nbsp; HEADPHONES RECOMMENDED</div>
