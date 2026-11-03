@@ -16,19 +16,6 @@
    ========================================================= */
 export const NEWS = [
   {
-    id: '2026-11-02-hunter-every-floor',
-    date: '2026-11-02',
-    tag: 'NEW',
-    title: 'A hunter on every floor',
-    body: 'On Normal, Hard and Nightmare every floor of Hollowmere now has a hunter of its own, and none of them will ever leave its floor. ' +
-      'If one sees you take the stairs it can follow you all the way up or down them, but it stops at the top or the bottom. ' +
-      'Only one hunter ever holds a staircase: while one is on your heels, the hunter at the other end keeps back from the landing, so you are never caught on the stairs between two of them.\n\n' +
-      'The difficulties have moved: EASY is now the old house, the same every night, with the one slow hunter that roams every floor. ' +
-      'NORMAL plays like the old Easy, HARD like the old Normal, and NIGHTMARE is still Nightmare, all three in a new house every night with a hunter on every floor. ' +
-      'In co-op, Easy keeps one hunter per player; the other difficulties put one on every floor, shared out between you.\n\n' +
-      'Embers and memories now always lie somewhere you can walk to, out in the open: never sealed off, and never inside a crate, a bed, the hearth or a hiding place.'
-  },
-  {
     id: '2026-11-02-less-camera-shake',
     date: '2026-11-02',
     tag: 'CHANGE',
@@ -36,16 +23,6 @@ export const NEWS = [
     body: 'In first person the view now bobs, sways and shakes far less: walking, sprinting, landing, being hunted and jump scares all move the camera only faintly. ' +
       'Sprinting also widens the view much less.\n\n' +
       'If you want no camera motion at all, set CAMERA MOTION to REDUCED in settings.'
-  },
-  {
-    id: '2026-10-25-new-house-every-night',
-    date: '2026-10-25',
-    tag: 'NEW',
-    title: 'A new house every night',
-    body: 'Hollowmere no longer keeps the same floor plan. Every night the walls between its rooms come down and go back up somewhere else: new rooms, new corridors, doorways where there were walls. ' +
-      'The stairs, the front door, the Heart in the cellar, the furniture and the hiding places stay where you know them, so you can still find your way up and out.\n\n' +
-      'Solo, every new night is a new house. In co-op the host\'s room picks the house for the night, so the whole team plays the same one, and friends watching you see it too.\n\n' +
-      'The leaderboard stays fair: a house is only used if the walk from the Heart to the attic, and the walk to every corner, is about as long as in the old house.'
   },
   {
     id: '2026-10-19-same-room-next-night',

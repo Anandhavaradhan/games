@@ -259,6 +259,9 @@ try{
   throw e;
 }
 
+/* BOARD: the fastest-escapes board this ledger shows (V2: escapes/, V3: escapes_v3/). Renames and guest
+   clean-up touch both boards, because accounts are shared. */
+const BOARD='escapes',ALL_BOARDS=['escapes','escapes_v3'];
 /* players: every players/{uid} doc (live); board: top of escapes/{id} (live); ptBoard: top of playtime/{uid} (live) */
 let board=[], unsubBoard=null, playersLoaded=false, ptBoard=[], unsubPT=null;
 /* GUEST ACCOUNTS: guests are temporary and have no record of their own; guestStats/total holds
@@ -307,8 +310,8 @@ async function mergeOldGuests(){
         active:F.increment(Math.floor(st.activeTime||0)),escapes:F.increment(Math.floor(p.escapes||0)),at:F.serverTimestamp()},{merge:true});
       for(;;){const r=await F.getDocs(F.query(F.collection(db,'players',uid,'runs'),F.limit(300)));
         if(r.empty)break;const b=F.writeBatch(db);r.docs.forEach(d=>b.delete(d.ref));await b.commit();if(r.size<300)break;}
-      const es=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('uid','==',uid),F.where('team','==',false)));
-      for(const d of es.docs)await F.deleteDoc(d.ref);
+      for(const col of ALL_BOARDS){const es=await F.getDocs(F.query(F.collection(db,col),F.where('uid','==',uid),F.where('team','==',false)));
+        for(const d of es.docs)await F.deleteDoc(d.ref);}
       try{await F.deleteDoc(F.doc(db,'playtime',uid));}catch(e){}
       try{await F.deleteDoc(F.doc(db,'leaderboard',uid));}catch(e){}
       try{const k=unameKey(p.name),r=F.doc(db,'usernames',k),d=await F.getDoc(r);if(k&&d.exists()&&d.data().uid===uid)await F.deleteDoc(r);}catch(e){}
@@ -340,12 +343,12 @@ function teamRenamed(name,members,uid,oldName,newName){
 }
 /* put a player's new name into every co-op entry they are in (or, given an old name, every entry that has it) */
 async function renameInTeams(uid,oldName,newName){
-  const snap=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('team','==',true)));
   let n=0;
+  for(const col of ALL_BOARDS){const snap=await F.getDocs(F.query(F.collection(db,col),F.where('team','==',true)));
   for(const d of snap.docs){const v=d.data();
     const mine=Array.isArray(v.members)&&v.members.indexOf(uid)>=0;
     const t=teamRenamed(v.name,mine?v.members:null,uid,oldName,newName);
-    if(t&&t!==v.name){await F.updateDoc(d.ref,{name:t});n++;}}
+    if(t&&t!==v.name){await F.updateDoc(d.ref,{name:t});n++;}}}
   return n;
 }
 async function fixTeamName(uid){
@@ -803,8 +806,8 @@ async function saveWithName(uid,p,newName,st){
         if(old.exists()&&old.data().uid===uid)await F.deleteDoc(F.doc(db,'usernames',oldKey));}
       /* their past solo escapes and time-played entry carry the new name */
       try{
-        const es=await F.getDocs(F.query(F.collection(db,'escapes'),F.where('uid','==',uid),F.where('team','==',false)));
-        for(const d of es.docs)await F.updateDoc(d.ref,{name:newName});
+        for(const col of ALL_BOARDS){const es=await F.getDocs(F.query(F.collection(db,col),F.where('uid','==',uid),F.where('team','==',false)));
+          for(const d of es.docs)await F.updateDoc(d.ref,{name:newName});}
         const nt=await renameInTeams(uid,p.name,newName);   /* and the co-op entries they are in */
         if(nt)notice('Also renamed in '+nt+' co-op '+(nt===1?'entry':'entries')+'.');
         const pt=await F.getDoc(F.doc(db,'playtime',uid));

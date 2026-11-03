@@ -1,0 +1,148 @@
+{
+  "rules": {
+    "rooms": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && !newData.exists() && data.child('meta/host').val() === auth.uid",
+        "meta": {
+          ".write": "auth != null"
+        },
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        }
+      }
+    },
+    "live": {
+      "$code": {
+        ".read": "auth != null",
+        "state": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "mon": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "embers": {
+          ".write": "auth != null && !newData.exists()",
+          "$i": {
+            ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
+          }
+        },
+        "ev": {
+          "$id": {
+            ".write": "auth != null"
+          }
+        },
+        "rtc": {
+          "$to": {
+            ".write": "auth != null && auth.uid === $to && !newData.exists()",
+            "$id": {
+              ".write": "auth != null && ((!data.exists() && newData.child('from').val() === auth.uid) || (auth.uid === $to && !newData.exists()))"
+            }
+          }
+        }
+      }
+    },
+    "friendsOf": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('friendsOf').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
+      }
+    },
+    "watch": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('friendsOf').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
+      }
+    },
+    "invites": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": {
+          ".write": "auth != null && ((auth.uid === $from && auth.provider !== 'anonymous' && root.child('friendsOf').child($to).child($from).exists()) || (auth.uid === $to && !newData.exists()))",
+          ".validate": "newData.hasChildren(['c', 'n', 't']) && newData.child('c').isString() && newData.child('c').val().length <= 8 && newData.child('n').isString() && newData.child('n').val().length <= 40 && newData.child('t').val() === now"
+        }
+      }
+    },
+    "rooms_v3": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && !newData.exists() && data.child('meta/host').val() === auth.uid",
+        "meta": {
+          ".write": "auth != null"
+        },
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        }
+      }
+    },
+    "live_v3": {
+      "$code": {
+        ".read": "auth != null",
+        "state": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "mon": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        },
+        "embers": {
+          ".write": "auth != null && !newData.exists()",
+          "$i": {
+            ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
+          }
+        },
+        "ev": {
+          "$id": {
+            ".write": "auth != null"
+          }
+        },
+        "rtc": {
+          "$to": {
+            ".write": "auth != null && auth.uid === $to && !newData.exists()",
+            "$id": {
+              ".write": "auth != null && ((!data.exists() && newData.child('from').val() === auth.uid) || (auth.uid === $to && !newData.exists()))"
+            }
+          }
+        }
+      }
+    },
+    "presence_v3": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('friendsOf').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
+      }
+    },
+    "watch_v3": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('friendsOf').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $uid && auth.provider !== 'anonymous'"
+      }
+    },
+    "invites_v3": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": {
+          ".write": "auth != null && ((auth.uid === $from && auth.provider !== 'anonymous' && root.child('friendsOf').child($to).child($from).exists()) || (auth.uid === $to && !newData.exists()))",
+          ".validate": "newData.hasChildren(['c', 'n', 't']) && newData.child('c').isString() && newData.child('c').val().length <= 8 && newData.child('n').isString() && newData.child('n').val().length <= 40 && newData.child('t').val() === now"
+        }
+      }
+    }
+  }
+}
