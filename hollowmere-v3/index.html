@@ -1602,7 +1602,7 @@ function cleanSave(raw,isLocal){
       &&x.p.length>=2&&x.p.length<=COMBO_MAX&&x.p.every((id,i,a)=>BYID[id]&&!BYID[id].combo&&id!=='god'&&a.indexOf(id)===i))
     .filter((x,i,a)=>comboLatest(a,x.id)===x)
     .filter(x=>{const k=comboKey(x.p);if(seenK[k]||seenId[x.id])return false;seenK[k]=seenId[x.id]=1;return true;})
-    .slice(0,COMBO_LIMIT).map(x=>({id:x.id,p:x.p.slice()}));
+    .slice(0,isLocal?GUEST_COMBO_LIMIT:COMBO_LIMIT).map(x=>({id:x.id,p:x.p.slice()}));
   /* a combined legend you paid for is never thrown away because one of its legends went missing from the
      list (the original game used to drop legends it did not know, like the Psychopomp): a fused legend
      cannot be gifted or sold, so it is still yours, and goes back in the vault */
@@ -1658,6 +1658,22 @@ function cleanSave(raw,isLocal){
    ========================================================= */
 const COMBO_MAX=5,COMBO_LIMIT=20;
 const comboAddCost=n=>comboCost(n+1)-comboCost(n);
+/* GUESTS (KP): a guest knows every skill a player can learn (never GOD) and combines for free, as many
+   times as they like (GUEST_COMBO_LIMIT only keeps the vault usable). A guest is temporary: every new guest
+   starts with no combinations, and none of these free skills or combinations ever moves into an account
+   (see guestToAccount). Guests can never gift (giftSend needs an account, and so do the gift rules). */
+const GUEST_COMBO_LIMIT=500;
+const isGuestSave=()=>saveKey===LS_KEY;
+const comboLimit=()=>isGuestSave()?GUEST_COMBO_LIMIT:COMBO_LIMIT;
+const cmbPrice=n=>isGuestSave()?0:comboCost(n);
+const cmbAddPrice=n=>isGuestSave()?0:comboAddCost(n);
+const cmbPriceTxt=n=>n?n.toLocaleString('en-IN')+' '+EG:'FREE';
+function guestAll(s){ROSTER.forEach(c=>{if(!c.combo&&c.id!=='god'&&s.unlocked.indexOf(c.id)<0)s.unlocked.push(c.id);});return s;}
+/* a new guest: what this browser's guest slot holds, without its combinations */
+function newGuestSave(){const raw=readLocal(LS_KEY);if(raw&&typeof raw==='object'){raw.combos=[];raw.cmbPend=[];if(raw.stats)delete raw.stats.combos;}
+  return guestAll(cleanSave(raw,true));}
+/* a guest making an account takes their ether, skins and the rest, but only the five free skills */
+function guestToAccount(g){const o=JSON.parse(JSON.stringify(g));o.unlocked=FREE.slice();o.combos=[];o.cmbPend=[];return o;}
 function comboLatest(list,id){let b=null;list.forEach(x=>{if(x.id===id&&(!b||x.p.length>b.p.length))b=x;});return b;}
 /* =========================================================
    LEGEND UPGRADES — paid in ASH, which is only earned in the house (never bought with ether).
@@ -1713,7 +1729,7 @@ function comboSync(list){
   (list||[]).slice().reverse().forEach(x=>{if(!x.p.every(id=>BYID[id]))return;
     const c=comboBuild(x);ROSTER.push(c);BYID[c.id]=c;ORDER.splice(at,0,c);});
 }
-let save=cleanSave(readLocal(LS_KEY),true);
+let save=guestAll(cleanSave(readLocal(LS_KEY),true));
 /* the news inbox (NEWS INBOX, near FRIENDS): what is open, and the notices themselves once news.js has loaded */
 let NEWS_UI={open:false,list:[],filter:'all',sort:'new',device:[]};
 comboSync(save.combos);
@@ -6100,26 +6116,26 @@ function comboAddHTML(c){
   if(vAdd.id!==c.id)vAdd={id:c.id,pick:''};
   const n=c.p.length;
   if(n>=COMBO_MAX)return '<div class="vd-label">ADD A SKILL</div><div class="vup-txt">It already holds '+COMBO_MAX+' skills, the most a combination can.</div>';
-  const can=comboAddable(c),cost=comboAddCost(n);
+  const can=comboAddable(c),cost=cmbAddPrice(n);
   if(vAdd.pick&&!can.some(o=>o.id===vAdd.pick))vAdd.pick='';
   const pick=vAdd.pick,next=pick?c.p.concat(pick):null;
   const dup=!!next&&save.combos.some(x=>x.id!==c.id&&comboKey(x.p)===comboKey(next));
   const ok=!!pick&&!dup&&save.ether>=cost;
   let h='<div class="vd-label">ADD A SKILL \u2014 '+n+' TO '+(n+1)+'</div>'
-    +'<div class="vup-txt">Fuse one more skill you know into it for the difference in price: <b>'+cost.toLocaleString('en-IN')+' '+EG+'</b>. '
+    +'<div class="vup-txt">Fuse one more skill you know into it '+(cost?'for the difference in price: <b>'+cmbPriceTxt(cost)+'</b>':'for <b>FREE</b> (you are a guest)')+'. '
     +'It gains that power and keeps the higher of each stat, and the single skill stays yours.</div>';
   if(!can.length)return h+'<div class="vneed">YOU KNOW NO OTHER SKILL TO ADD \u2014 LEARN ONE FIRST</div>';
   h+='<div class="vcmb-list">'+can.map(o=>'<span class="vcmb-pick'+(o.id===pick?' on':'')+'" data-ap="'+o.id+'" style="--pt:'+o.t+'">'+(o.id===pick?'<b>+</b>':'')+escHTML(o.ab.n)+'</span>').join('')+'</div>';
   if(!pick)h+='<button class="vbtn dim" disabled>PICK A SKILL TO ADD</button>';
   else if(dup)h+='<button class="vbtn dim" disabled>YOU ALREADY HAVE THIS COMBINATION</button>';
-  else h+='<button class="vbtn'+(ok?'':' dim')+'" id="vAddGo"'+(ok?'':' disabled')+'>ADD '+escHTML(BYID[pick].ab.n)+' \u2014 '+cost.toLocaleString('en-IN')+' '+EG+'</button>'
+  else h+='<button class="vbtn'+(ok?'':' dim')+'" id="vAddGo"'+(ok?'':' disabled')+'>ADD '+escHTML(BYID[pick].ab.n)+' \u2014 '+cmbPriceTxt(cost)+'</button>'
     +(save.ether<cost?'<div class="vneed">'+EG+' '+(cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   return '<div class="vup">'+h+'</div>';
 }
 function comboAddLegend(c,pick){
   const x=c&&c.combo&&save.combos.find(y=>y.id===c.id);
   if(!x||x.p.length>=COMBO_MAX||!comboAddable(c).some(o=>o.id===pick))return '';
-  const next=x.p.concat(pick),cost=comboAddCost(x.p.length);
+  const next=x.p.concat(pick),cost=cmbAddPrice(x.p.length);
   if(save.ether<cost||save.combos.some(y=>y!==x&&comboKey(y.p)===comboKey(next)))return '';
   save.ether-=cost;x.p=next;comboSync(save.combos);comboMade(x.id);
   /* bound to it: rebuild it now so the new power is on the HUD */
@@ -6280,9 +6296,9 @@ function renderSkins(){
 function renderCombine(){
   const owned=ORDER.filter(c=>!c.combo&&c.id!=='god'&&save.unlocked.indexOf(c.id)>=0);
   vCmbPick=vCmbPick.filter(id=>owned.some(c=>c.id===id));
-  const n=vCmbPick.length,cost=comboCost(Math.max(2,n)),ps=vCmbPick.map(id=>BYID[id]);
+  const n=vCmbPick.length,cost=cmbPrice(Math.max(2,n)),ps=vCmbPick.map(id=>BYID[id]);
   const dup=n>=2&&save.combos.some(x=>comboKey(x.p)===comboKey(vCmbPick));
-  const full=save.combos.length>=COMBO_LIMIT;
+  const full=save.combos.length>=comboLimit();
   const ok=n>=2&&!dup&&!full&&save.ether>=cost;
   const lead=ps[0]||null;
   pvShow(myChar());
@@ -6292,15 +6308,16 @@ function renderCombine(){
     bars+='<div class="vd-stat"><span>'+k+'</span><span class="vd-track"><span class="vd-fill" style="width:'+v+'%"></span></span><span class="vd-val">'+v+'</span><span class="vd-mean"></span></div>';});
   let act;
   if(n<2)act='<button class="vbtn dim" disabled>PICK '+(2-n)+' MORE</button>';
-  else if(full)act='<button class="vbtn dim" disabled>THE HOLLOW HOLDS '+COMBO_LIMIT+' COMBINATIONS AT MOST</button>';
+  else if(full)act='<button class="vbtn dim" disabled>THE HOLLOW HOLDS '+comboLimit()+' COMBINATIONS AT MOST</button>';
   else if(dup)act='<button class="vbtn dim" disabled>YOU ALREADY HAVE THIS COMBINATION</button>';
-  else act='<button class="vbtn'+(ok?'':' dim')+'" id="vCmbGo"'+(ok?'':' disabled')+'>COMBINE \u2014 '+cost.toLocaleString('en-IN')+' '+EG+'</button>'
+  else act='<button class="vbtn'+(ok?'':' dim')+'" id="vCmbGo"'+(ok?'':' disabled')+'>COMBINE \u2014 '+cmbPriceTxt(cost)+'</button>'
     +(save.ether<cost?'<div class="vneed">'+EG+' '+(cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   $('vDossBody').innerHTML=
      '<div class="vd-tag"><span>\u2726 THE FORGE</span></div>'
     +'<div class="vd-name">COMBINE SKILLS</div>'
     +'<div class="vd-plain">Fuse 2 to '+COMBO_MAX+' skills the Hollow knows into one combination. It keeps <b>every</b> power \u2014 each with its own essence and cooldown, fired alone or together \u2014 and the highest of each stat. The single skills stay yours.</div>'
-    +'<div class="vcmb-price">'+[2,3,4,5].slice(0,COMBO_MAX-1).map(k=>'<span class="'+(n===k?'on':'')+'">'+k+' SKILLS \u2014 '+comboCost(k).toLocaleString('en-IN')+'</span>').join('')+'</div>'
+    +(isGuestSave()?'<div class="vcmb-price"><span class="on">GUESTS COMBINE FOR FREE, AS MANY AS THEY LIKE</span></div>'
+      :'<div class="vcmb-price">'+[2,3,4,5].slice(0,COMBO_MAX-1).map(k=>'<span class="'+(n===k?'on':'')+'">'+k+' SKILLS \u2014 '+comboCost(k).toLocaleString('en-IN')+'</span>').join('')+'</div>')
     +'<div class="vd-label">YOUR SKILLS \u2014 TAP TO PICK, IN ORDER</div>'
     +'<div class="vcmb-list">'+owned.map(c=>{const k=vCmbPick.indexOf(c.id);
         return '<span class="vcmb-pick'+(k>=0?' on':(n>=COMBO_MAX?' full':''))+'" data-cp="'+c.id+'" style="--pt:'+c.t+'">'+(k>=0?'<b>'+(k+1)+'</b>':'')+escHTML(c.ab.n)+'</span>';}).join('')+'</div>'
@@ -6319,8 +6336,8 @@ function renderCombine(){
     renderCombine();}));
   const go=$('vCmbGo');
   if(go)go.addEventListener('click',e=>{e.stopPropagation();
-    const p=vCmbPick.slice(),price=comboCost(p.length);
-    if(p.length<2||p.length>COMBO_MAX||save.ether<price||save.combos.length>=COMBO_LIMIT)return;
+    const p=vCmbPick.slice(),price=cmbPrice(p.length);
+    if(p.length<2||p.length>COMBO_MAX||save.ether<price||save.combos.length>=comboLimit())return;
     if(save.combos.some(x=>comboKey(x.p)===comboKey(p)))return;
     const id='cx'+Date.now().toString(36);
     save.ether-=price;save.combos.push({id,p});comboSync(save.combos);comboMade(id);
@@ -8131,7 +8148,7 @@ async function applyUser(u){
     if(cloudUser){
       clearTimeout(cloudTimer);cloudTimer=null;
       socialStop();giftStop();godDisable();cloudUser=null;saveKey=LS_KEY;ptReset();
-      replaceSave(cleanSave(readLocal(LS_KEY),true));newsBadge();
+      replaceSave(newGuestSave());newsBadge();
       toast('SIGNED OUT \u2014 PLAYING AS A GUEST',2.6);
     }
     renderAcct();return;
@@ -8150,7 +8167,7 @@ async function applyUser(u){
   }
   loadFailed=false;acctRetried=false;
   const isNew=!data;
-  const next=data?cleanSave(data,false):cleanSave(JSON.parse(JSON.stringify(cleanSave(readLocal(LS_KEY),true))),false);
+  const next=data?cleanSave(data,false):cleanSave(guestToAccount(cleanSave(readLocal(LS_KEY),true)),false);
   /* news read before signing in stays read */
   newsReadIds().forEach(id=>{if(next.newsRead.indexOf(id)<0)next.newsRead.push(id);});
   /* today's bounties worked at before signing in count too */

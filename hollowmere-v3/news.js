@@ -16,6 +16,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-04-guests-try-everything',
+    date: '2026-11-04',
+    tag: 'NEW',
+    title: 'Guests can try every skill',
+    body: 'Playing as a guest now gives the Hollow every skill there is to learn, and guests can combine skills for free, as many times as they like. Every new guest starts with no combinations.\n\n' +
+      'It is only for trying things out: none of it goes with you when you make an account (your account starts with the five free skills, and keeps the ether and skins you earned as a guest), and guests cannot send gifts.'
+  },
+  {
     id: '2026-11-04-coop-guests-off-board',
     date: '2026-11-04',
     tag: 'CHANGE',
