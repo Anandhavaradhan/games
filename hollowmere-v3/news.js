@@ -24,7 +24,7 @@ export const NEWS = [
       'The 41 legends have become the Hollow\'s skills. Everything you had is still yours: the skills you learned, your combinations, your upgrades and your ash. ' +
       'Equip a skill or a combination in the vault, exactly as before.\n\n' +
       'The vault has a new SKINS tab. Spend ether on new looks for the Hollow: Mistveil, Emberwraith (horns, a scythe and rising sparks), Rimeshade (a crown of ice), Gravebloom (glowing antlers), the Drowned (chains and dripping water), Blood Moon (twin blades, red eyes), Voidcaller (a broken halo) and the Pale Seraph (feathered wings and a double halo). ' +
-      'Every skin also adds a fixed bonus while you wear it: the Hollow +3 Spirit, Mistveil +6 Grace, Emberwraith +8 Might, Rimeshade +8 Wits, Gravebloom +10 Spirit, the Drowned +6 Might and +6 Spirit, Blood Moon +12 Might and +4 Grace, Voidcaller +12 Wits and +6 Spirit, and the Pale Seraph +8 to all four. The bonus goes on top of your equipped skill and its upgrades (up to 100). The friends you play with, and anyone watching you, see the skin you wear.'
+      'Every bought skin also adds a fixed bonus while you wear it (the free Hollow look has none): Mistveil +6 Grace, Emberwraith +8 Might, Rimeshade +8 Wits, Gravebloom +10 Spirit, the Drowned +6 Might and +6 Spirit, Blood Moon +12 Might and +4 Grace, Voidcaller +12 Wits and +6 Spirit, and the Pale Seraph +8 to all four. The bonus goes on top of your equipped skill and its upgrades (up to 100). The friends you play with, and anyone watching you, see the skin you wear.'
   },
   {
     id: '2026-11-03-realistic-hunter',

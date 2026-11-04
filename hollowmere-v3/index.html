@@ -1479,7 +1479,7 @@ const BYID={};ROSTER.forEach(function(c){BYID[c.id]=c;});
    ========================================================= */
 const HERO_NAME='THE HOLLOW';
 const SKINS=[
- {id:'hollow',b:[0,0,0,3],n:'THE HOLLOW',cost:0,t:'#a9d8ff',e:'#eaf8ff',look:{wpn:'sword'},
+ {id:'hollow',b:[0,0,0,0],n:'THE HOLLOW',cost:0,t:'#a9d8ff',e:'#eaf8ff',look:{wpn:'sword'},
   d:'The first shape the house ever gave you: a deep cowl with two cold lights inside it, a lantern that never goes out, and a blade of pale fire.'},
  {id:'mistveil',b:[0,6,0,0],n:'MISTVEIL',cost:250,t:'#cfdcd6',e:'#ffffff',look:{wpn:'staff',nocape:1,x:'mist'},
   d:'Grey as the fog off the lake, and half made of it. Easy to lose in a dark corridor, which is rather the point.'},
@@ -1505,7 +1505,7 @@ const SKIN_BY={};SKINS.forEach(s=>{SKIN_BY[s.id]=s;
 const skinOK=id=>!!SKIN_BY[id];
 /* every skin also adds a fixed bonus to MIGHT, GRACE, WITS and SPIRIT (on top of the skill and its upgrades, up to 100) */
 const STAT_NAMES=['MIGHT','GRACE','WITS','SPIRIT'];
-const skinBonusText=k=>k.b.every(v=>v&&v===k.b[0])?'+'+k.b[0]+' TO ALL FOUR':k.b.map((v,i)=>v?'+'+v+' '+STAT_NAMES[i]:'').filter(Boolean).join(' \u00b7 ');
+const skinBonusText=k=>k.b.every(v=>!v)?'':k.b.every(v=>v===k.b[0])?'+'+k.b[0]+' TO ALL FOUR':k.b.map((v,i)=>v?'+'+v+' '+STAT_NAMES[i]:'').filter(Boolean).join(' \u00b7 ');
 /* the ghost a skin id draws (an unknown or missing one is the Hollow) */
 const heroChar=id=>(SKIN_BY[id]||SKINS[0]).ch;
 
@@ -6060,7 +6060,7 @@ function renderSkins(){
     return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-k="'+i+'" style="--vt:'+k.t+'">'
       +'<div class="vc-top"><span>'+pad2(i+1)+'</span><span class="vc-tier">SKIN</span></div>'
       +'<div class="vc-name">'+escHTML(k.n.replace(/^THE /,''))+'</div>'
-      +'<div class="vc-role">'+escHTML(skinBonusText(k))+'</div>'
+      +'<div class="vc-role">'+(escHTML(skinBonusText(k))||'NO BONUS')+'</div>'
       +'<div class="vc-foot">'+(own(k.id)?'<span class="vc-state">'+(mySkin()===k.id?'WORN':'OWNED')+'</span>'
         :'<span class="vc-cost">'+(k.cost?EG+' '+k.cost.toLocaleString('en-IN'):'FREE')+'</span><span class="vc-state">FOR SALE</span>')+'</div></div>';
   }).join('');
@@ -6083,8 +6083,8 @@ function renderSkins(){
     +'<div class="vd-rule"></div>'
     +'<div class="vd-plain">'+escHTML(k.d)+'</div>'
     +'<div class="vd-label">WHILE YOU WEAR IT</div>'
-    +'<div class="vsk-bonus">'+escHTML(skinBonusText(k))+'</div>'
-    +'<div class="vd-plain">Added to whatever skill or combination you have equipped, on top of its upgrades (no stat goes past 100). Everyone you play with sees the skin.</div>'
+    +'<div class="vsk-bonus">'+(escHTML(skinBonusText(k))||'NO BONUS \u2014 THE HOLLOW AS IT IS')+'</div>'
+    +'<div class="vd-plain">'+(skinBonusText(k)?'':'Every other skin adds a bonus. ')+'A bonus is added to whatever skill or combination you have equipped, on top of its upgrades (no stat goes past 100). Everyone you play with sees the skin.</div>'
     +'<div class="vd-act">'+act+'</div>';
   document.documentElement.style.setProperty('--vt',k.t);$('vDoss').style.setProperty('--vt',k.t);
   const wear=$('vSkinWear');
