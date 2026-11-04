@@ -115,6 +115,12 @@ export function savePlayer(uid, data, opts) {
     if (d.stats.ups.length) d.stats.ups = F.arrayUnion(...d.stats.ups);
     else delete d.stats.ups;
   }
+  /* the Hollow's skins are bought, never taken away: added the same way */
+  if (d.stats && Array.isArray(d.stats.skins)) {
+    d.stats = Object.assign({}, d.stats);
+    if (d.stats.skins.length) d.stats.skins = F.arrayUnion(...d.stats.skins);
+    else delete d.stats.skins;
+  }
   return F.setDoc(F.doc(db, 'players', uid), d, { merge: true });
 }
 /* a legend that left the account (gifted away) leaves its upgrade levels behind */

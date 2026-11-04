@@ -28,3 +28,13 @@ clutter, webs, window shafts, cellar puddles and mist after the house is built. 
 - Wall-fixed instances go in `TRIMIDX` (wall key -> instance list) and wall groups go through `addDecor`, so `breachWall` hides them.
 - It is seeded from `HOUSE.seed`, so co-op players see the same dressing. `DRESS.fx` (shafts, mist) is hidden on LOW quality.
 - Wall props use `decorFaceOK` / `decorPlace` (the same rules as the paintings: clear of hiding places, stairs and windows).
+
+## The Hollow (one ghost) and skins
+Everyone plays one ghost, THE HOLLOW. The 41 legends in ROSTER are now its SKILLS: learning, equipping (`save.main`),
+combining and upgrading work exactly as before, only the vault's words changed. The ghost model never follows the skill:
+`myChar()` / `heroChar(skinId)` build it from `SKINS` (search `THE HOLLOW — the one ghost you play`).
+- Skins are bought with ether in the vault's SKINS tab. Each changes the look and adds a fixed stat bonus (`b`, [MIGHT,GRACE,WITS,SPIRIT]); `wearSt(c)` = `effSt(c)` + the worn skin's bonus, capped at 100, and is what `computePS` and the vault use. Never for the GOD legend. `save.skins` (owned) and `save.skin` (worn) live in
+  the account inside stats; `stats.skins` is only ever added to (arrayUnion in cloud.js). `save.skinPend` keeps a purchase
+  on the device until the account has it, like `cmbPend`.
+- Co-op state and the watch page send the skin as `sk` next to `lg`; an unknown or missing `sk` draws the default Hollow.
+- A new skin goes at the end of `SKINS` with a new id; never rename or reuse an id (players own them by id).
