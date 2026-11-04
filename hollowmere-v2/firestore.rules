@@ -305,6 +305,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // The GOD skin (with the GOD skill) lent to a player for a while: godPass/{uid} { until, by, byName, at }.
+    // Only an admin (admin.html) can give or take it back; the player can only read their own.
+    // Their game drops it once `until` has passed.
+    match /godPass/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
     // Admins are added by hand in the Firebase console; nobody can write this from the site.
     match /admins/{uid} {
       allow read: if isSelf(uid);

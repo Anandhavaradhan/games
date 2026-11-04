@@ -41,3 +41,12 @@ combining and upgrading work exactly as before, only the vault's words changed. 
 - The vault opens on SKINS; SKILLS is the second tab, with the roles and COMBINE as its subtopics.
 - Trinket skins (`TSKINS`, near the trinkets): look (`tBody`), flight (`trinketFly`, `thr`) and landing (`trinketLand`, `land`), and power (`pw`: throw range, extra linger, slow, close-range freeze), each skin stronger than the one before (KP). Owned ids share `save.skins` (they start `t_`, listed in `TSKIN_IDS`, which cleanSave needs before TSKINS exists); the one in use is `save.tskin` (stats.tskin). Bought in order too.
 - A new skin goes at the end of `SKINS` with a new id; never rename or reuse an id (players own them by id).
+
+## GOD is a skin (admins, and players an admin lends it to)
+GOD is no longer in the SKILLS tab. It is the first card in SKINS > THE HOLLOW for admins and lent players (`godSkinCard`, `renderGodSkin`).
+Wearing it (`GOD.on`, `godWorn()`) puts the GOD skill on and locks it (`setLegend` only records `save.main`, the vault's equip button is disabled),
+draws the Hollow as the last (best) skin in `SKINS` and throws the last (best) `TSKINS` (`mySkin` / `myTSkin`; `ownSkin` / `ownTSkin` are the player's own).
+Wearing any other skin, or taking GOD off, goes back to the player's own skin, trinket and skill.
+While GOD is worn, every skin and trinket skin dossier has GIVE TO GOD (`godDress`): GOD can wear any of them, owned or not, kept on the device in `hm_glook` (`godLook` / `godTLook`, best by default).
+Admins can lend it from admin.html (player drawer, GOD skin: 1 hour, 1 day or 7 days, or take it back). It is stored in `godPass/{uid}` (`until`),
+which only admins can write and only that player can read. `godCheck` watches it (`cloud.watchGodPass`) and `godPass` drops it when `until` passes. Never in the news.

@@ -1732,7 +1732,7 @@ const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id
    admin (admins/{uid}, which only that account can read), so nobody else ever sees it. Choosing it does
    not change save.main; everyone else — co-op, the watch page, the leaderboards, the run history —
    sees the legend it is dressed as (pub). */
-const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true,true]};
+const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true,true],admin:false,until:0,passUnsub:null,timer:0};
 /* which powers G / the power button fire together (the ticks on the boxes), remembered on this device */
 try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length>=4)GOD.sel=v.slice(0,5).map(Boolean).concat(v.length<5?[true]:[]);}catch(e){}
 function godToggle(i){const ps=curLegend().ab.parts||[];if(!ps[i]||godIsAuto(ps[i]))return;GOD.sel[i]=!GOD.sel[i];try{localStorage.setItem('hm_gsel',JSON.stringify(GOD.sel));}catch(e){}
@@ -1755,7 +1755,16 @@ function godBuild(){
       d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once \u2014 and, once the seal breaks, the ferry out.'}};}
 const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
 /* the skin this player wears, and the ghost it draws */
-const mySkin=()=>(save.skins||[]).indexOf(save.skin)>=0&&skinOK(save.skin)?save.skin:'hollow';
+/* GOD is a skin with its skill attached: wearing it (GOD.on) puts the GOD skill on, locks the skill,
+   and dresses the Hollow in the best skin and its trinkets in the best trinket skin */
+const godWorn=()=>GOD.on&&GOD.ok&&!!GOD.c;
+const ownSkin=()=>(save.skins||[]).indexOf(save.skin)>=0&&skinOK(save.skin)?save.skin:'hollow';
+/* what GOD wears: the best skin and trinket skin unless the player gave it another (any of them, owned or not;
+   remembered on this device) */
+const GOD_LOOK={k:'',t:''};
+try{const v=JSON.parse(localStorage.getItem('hm_glook')||'null');if(v){GOD_LOOK.k=String(v.k||'');GOD_LOOK.t=String(v.t||'');}}catch(e){}
+const godLook=()=>skinOK(GOD_LOOK.k)?GOD_LOOK.k:SKINS[SKINS.length-1].id;
+const mySkin=()=>godWorn()?godLook():ownSkin();
 const myChar=()=>heroChar(mySkin());
 /* the legend everyone else sees you as */
 const pubLegend=()=>curLegend().pub||curLegend().id;
@@ -3898,6 +3907,8 @@ function setLegend(id){
   if(id==='god'){setGod(true);return;}
   if(!BYID[id])return;
   save.main=id;saveNow();
+  /* the GOD skin holds its own skill: this one waits until the skin comes off */
+  if(godWorn())return;
   const c=BYID[id];
   const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
   /* the skill changes, the ghost does not: it is always the Hollow, in its skin */
@@ -3916,6 +3927,7 @@ function setLegend(id){
 function setSkin(id){
   if(!skinOK(id)||save.skins.indexOf(id)<0)return;
   save.skin=id;saveNow();
+  if(GOD.on){setGod(false);return;}   /* GOD off: back to this skin and your own skill */
   const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
   disposeLegend(ghost);ghost=buildLegend(myChar());ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
   ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
@@ -3934,29 +3946,59 @@ function setGod(on,quiet){
   disposeLegend(ghost);ghost=buildLegend(myChar());ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
   ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
   computePS(c);AB.cd=0;AB.cdMax=cdFor(c.ab);
+  if(typeof dressAllTrinkets==='function')dressAllTrinkets();
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
 }
+/* GOD for admins, and for anyone an admin lends it to for a while (godPass/{uid}, set in admin.html).
+   A lent GOD leaves by itself when its time is up, or at once if the admin takes it back; the player
+   is then back on the skill they had bound (save.main never changed while GOD was on). */
 async function godCheck(){
   if(!cloud||!cloudUser||cloudUser.anon||!cloud.isAdmin)return;
   const uid=cloudUser.uid;
-  if(!(await cloud.isAdmin(uid))||!cloudUser||cloudUser.uid!==uid)return;
+  if(await cloud.isAdmin(uid)){if(cloudUser&&cloudUser.uid===uid){GOD.admin=true;godGrant(uid);}return;}
+  if(!cloudUser||cloudUser.uid!==uid||typeof cloud.watchGodPass!=='function')return;
+  godStop();
+  GOD.passUnsub=cloud.watchGodPass(uid,p=>{if(!cloudUser||cloudUser.uid!==uid)return;godPass(uid,p);});
+}
+/* a lent GOD arrived, changed, was taken back or ran out */
+function godPass(uid,p){
+  clearTimeout(GOD.timer);GOD.timer=0;
+  const left=p?p.until-Date.now():0;
+  if(left>0){
+    const fresh=!GOD.ok||GOD.until!==p.until;
+    GOD.until=p.until;godGrant(uid);
+    /* setTimeout tops out near 24 days: wake then and look again */
+    GOD.timer=setTimeout(()=>godPass(uid,p),Math.min(left+250,2e9));
+    if(fresh){SFX.chime();toast('\u2726 THE KEEPER LENT YOU THE GOD SKIN FOR '+godLeft(left)+' \u2014 FIND IT IN THE VAULT',4.5);}
+    if(vaultOpen)renderVault();
+  }else if(GOD.ok&&!GOD.admin){
+    godDisable(true);
+    toast('THE GOD SKIN HAS LEFT YOU \u2014 BACK TO '+String(skillName(curLegend())).toUpperCase(),3.5);
+  }
+}
+function godLeft(ms){const m=Math.max(1,Math.round(ms/60000)),h=Math.round(m/60),d=Math.round(m/1440);
+  return m<60?m+' MIN':m<2880?h+(h===1?' HOUR':' HOURS'):d+' DAYS';}
+function godStop(){if(GOD.passUnsub){try{GOD.passUnsub();}catch(e){}GOD.passUnsub=null;}clearTimeout(GOD.timer);GOD.timer=0;}
+function godGrant(uid){
   GOD.uid=uid;GOD.ok=true;
   if(!GOD.c)GOD.c=godBuild();
-  if(!BYID.god){ROSTER.push(GOD.c);ORDER.unshift(GOD.c);BYID.god=GOD.c;ORD.god=ROSTER.length;}
+  if(!BYID.god)BYID.god=GOD.c;   /* a skin now, so not in ROSTER / ORDER (the SKILLS tab) */
   let was=false;try{was=localStorage.getItem('hm_gd:'+uid)==='1';}catch(e){}
-  if(was&&state!=='play'&&state!=='caught')setGod(true);
+  if(was&&!GOD.on&&state!=='play'&&state!=='caught')setGod(true);
   if(vaultOpen)renderVault();
 }
-function godDisable(){
+/* keep: only the skill goes (a lent GOD ran out); without it, signing out also stops listening for one */
+function godDisable(keep){
+  if(!keep){godStop();GOD.admin=false;}
+  GOD.until=0;
   if(!GOD.ok&&!BYID.god)return;
   const wasOn=GOD.on;
   GOD.ok=false;GOD.on=false;GOD.uid='';
-  const i=ROSTER.indexOf(GOD.c);if(i>=0)ROSTER.splice(i,1);
-  const j=ORDER.indexOf(GOD.c);if(j>=0)ORDER.splice(j,1);
-  delete BYID.god;delete ORD.god;
-  if(typeof vSel==='number'&&vSel>=ROSTER.length)vSel=0;
+  delete BYID.god;
+  if(typeof vSkinSel==='number'&&vSkinSel<0)vSkinSel=0;
   if(wasOn)setGod(false);
   multiSync();
+  if(vaultOpen)renderVault();
 }
 /* fire one of the god's powers (i = 0..3) from its own essence and cooldown */
 /* Testudo (ward) and Dead or Alive (reveal) run by themselves: no button, no essence. */
@@ -5815,7 +5857,7 @@ function openVault(){
   vaultOpen=true;
   if(settingsOpen)closeSettings();
   vSel=Math.max(0,ROSTER.findIndex(c=>isBound(c.id)));
-  vFilter='ALL';vCombining=false;vSkins=true;vSkinKind='ghost';vCmbPick=[];vSkinSel=Math.max(0,SKINS.findIndex(x=>x.id===mySkin()));
+  vFilter='ALL';vCombining=false;vSkins=true;vSkinKind='ghost';vCmbPick=[];vSkinSel=godWorn()?-1:Math.max(0,SKINS.findIndex(x=>x.id===mySkin()));
   $('vaultOv').classList.remove('sheet');
   renderVault();
   dressVault();
@@ -5934,7 +5976,9 @@ function renderVault(){
       +'<span class="vd-mean">'+MEAN[i]+'</span></div>';
   });
   let act;
-  if(un){
+  if(un&&godWorn()){
+    act='<button class="vbtn dim" disabled>THE GOD SKIN HOLDS ITS OWN SKILL</button><div class="vneed">TAKE OFF THE GOD SKIN TO CHANGE SKILL</div>';
+  }else if(un){
     act='<button class="vbtn'+(isBound(c.id)?' dim':'')+'" id="vSel"'+(isBound(c.id)?' disabled':'')+'>'
       +(isBound(c.id)?'EQUIPPED ON THE HOLLOW':'EQUIP THIS SKILL')+'</button>';
   }else if(!tierOpen(c.tier)){
@@ -5975,7 +6019,7 @@ function renderVault(){
 
   const sel=$('vSel');
   if(sel)sel.addEventListener('click',function(e){e.stopPropagation();
-    if(c.id==='god')setGod(true);else{if(GOD.on)setGod(false,true);setLegend(c.id);}
+    setLegend(c.id);
     renderVault();toast(skillName(c)+' \u2014 EQUIPPED',2.4);});
   const upb=$('vUp');
   if(upb)upb.addEventListener('click',function(e){e.stopPropagation();
@@ -6085,7 +6129,7 @@ function comboAddLegend(c,pick){
 /* the SKINS tab: the gallery shows the Hollow's skins, the dossier the one picked */
 /* the trinket skins (SKINS > TRINKETS): the same shop, for what you throw */
 function renderTSkins(){
-  const own=id=>(save.skins||[]).indexOf(id)>=0,cur=myTSkin();
+  const own=id=>(save.skins||[]).indexOf(id)>=0,cur=ownTSkin();
   const open=i=>TSKINS.slice(0,i).every(x=>own(x.id));
   vTSel=Math.max(0,Math.min(TSKINS.length-1,vTSel|0));
   const hex=n=>'#'+n.toString(16).padStart(6,'0');
@@ -6115,6 +6159,7 @@ function renderTSkins(){
     +'<div class="vneed">BUY '+escHTML(need.n)+' FIRST</div>';
   else act='<button class="vbtn'+(ok?'':' dim')+'" id="vTBuy"'+(ok?'':' disabled')+'>BUY \u2014 '+k.cost.toLocaleString('en-IN')+' '+EG+'</button>'
     +(ok?'':'<div class="vneed">'+EG+' '+(k.cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>');
+  if(godWorn())act=(godTLook()===k.id?'<button class="vbtn dim" disabled>GOD THROWS THIS ONE</button>':'<button class="vbtn" id="vGodTGive">GIVE THIS TRINKET TO GOD</button>')+act;
   const TH={tumble:'tumbles end over end',flat:'spins flat',wobble:'swings and rings',slow:'a high, slow lob',pulse:'low and fast, pulsing',spiral:'corkscrews'};
   const LD={glass:'bursts into green glass',sparks:'a shower of sparks and a flash',bell:'tolls three times, rings of sound rolling out',crack:'cracks open in a puff of dust',
     burst:'bursts into motes that drift up',flame:'smashes and leaves a small fire burning',void:'shatters with a violet shockwave'};
@@ -6131,6 +6176,8 @@ function renderTSkins(){
     +'<div class="vd-plain">Each trinket skin is a stronger lure than the one before it. Every trinket you find in the house takes this look and power.</div>'
     +'<div class="vd-act">'+act+'</div>';
   document.documentElement.style.setProperty('--vt',hex(k.col));$('vDoss').style.setProperty('--vt',hex(k.col));
+  const tgive=$('vGodTGive');
+  if(tgive)tgive.addEventListener('click',e=>{e.stopPropagation();godDress('t',k.id);renderVault();toast('GOD NOW THROWS '+k.n,2.4);});
   const wear=$('vTWear');
   if(wear)wear.addEventListener('click',e=>{e.stopPropagation();save.tskin=k.id;saveNow();dressAllTrinkets();renderVault();toast(k.n+' \u2014 IN USE',2.4);});
   const buy=$('vTBuy');
@@ -6142,20 +6189,49 @@ function renderTSkins(){
     save.tskin=k.id;saveNow();dressAllTrinkets();cloudPush();
     renderVault();SFX.chime();toast(k.n+' \u2014 BOUGHT, AND IN USE',2.8);});
 }
+/* the GOD skin (admins, and anyone an admin lends it to): first in the gallery, card -1 */
+function godSkinCard(){
+  if(!GOD.ok)return '';
+  const top=SKIN_BY[godLook()],cls=['vcard'];if(vSkinSel<0)cls.push('on');if(godWorn())cls.push('bound');
+  return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-k="-1" style="--vt:'+top.t+'">'
+    +'<div class="vc-top"><span>\u2726</span><span class="vc-tier">'+(GOD.admin?'ADMIN':'LENT')+'</span></div>'
+    +'<div class="vc-name">GOD</div><div class="vc-role">GOD SKILL \u00b7 '+escHTML(top.n.replace(/^THE /,''))+'</div>'
+    +'<div class="vc-foot"><span class="vc-state">'+(godWorn()?'WORN':GOD.until>Date.now()?godLeft(GOD.until-Date.now())+' LEFT':'OWNED')+'</span></div></div>';
+}
+function renderGodSkin(){
+  const top=SKIN_BY[godLook()],tk=TSKIN_BY[godTLook()],a=GOD.c.ab,on=godWorn();
+  pvShow(top.ch);
+  $('vDossBody').innerHTML=
+     '<div class="vd-tag"><span>\u2726 GOD</span><span>\u00b7</span><b>'+(GOD.admin?'KEEPER OF THE HOUSE':'LENT \u00b7 '+godLeft(GOD.until-Date.now())+' LEFT')+'</b></div>'
+    +'<div class="vd-name">GOD</div>'
+    +'<div class="vd-epi">A SKIN WITH ITS OWN SKILL</div>'
+    +'<div class="vd-rule"></div>'
+    +'<div class="vd-plain">The Hollow as '+escHTML(top.n)+', throwing the '+escHTML(tk.n)+'. The GOD skill comes with it: while you wear it, it is your only skill, and your own comes back when you take it off.</div>'
+    +'<div class="vd-plain">'+(on?'Pick any skin, or any trinket skin under TRINKETS, and press GIVE TO GOD to dress GOD in it instead.':'Once you wear it, you can give GOD any skin or trinket skin from the gallery.')+'</div>'
+    +'<div class="vd-label">ITS SKILL \u2014 '+escHTML(a.n)+'</div>'
+    +'<div class="vd-plain">'+a.p+'</div>'
+    +'<div class="vd-label">ITS TRINKET \u2014 '+escHTML(tk.n)+'</div>'
+    +'<div class="vsk-bonus">'+tskinPowerText(tk).map(escHTML).join('<br>')+'</div>'
+    +'<div class="vd-act">'+(on?'<button class="vbtn" id="vGodOff">TAKE OFF THE GOD SKIN</button>':'<button class="vbtn" id="vGodOn">WEAR THE GOD SKIN</button>')+'</div>';
+  document.documentElement.style.setProperty('--vt',top.t);$('vDoss').style.setProperty('--vt',top.t);
+  const w=$('vGodOn');if(w)w.addEventListener('click',e=>{e.stopPropagation();setGod(true);renderVault();toast('GOD \u2014 WORN',2.4);});
+  const o=$('vGodOff');if(o)o.addEventListener('click',e=>{e.stopPropagation();setGod(false);renderVault();toast('BACK TO '+String(skillName(curLegend())).toUpperCase(),2.4);});
+}
 function renderSkins(){
   if(vSkinKind==='trinket'){renderTSkins();return;}
   const own=id=>(save.skins||[]).indexOf(id)>=0;
   /* skins are collected in order: one goes on sale only once every skin before it is yours */
   const open=i=>SKINS.slice(0,i).every(x=>own(x.id));
-  vSkinSel=Math.max(0,Math.min(SKINS.length-1,vSkinSel|0));
-  $('vGrid').innerHTML=SKINS.map((k,i)=>{
-    const cls=['vcard'];if(i===vSkinSel)cls.push('on');if(mySkin()===k.id)cls.push('bound');
+  vSkinSel=Math.max(GOD.ok?-1:0,Math.min(SKINS.length-1,vSkinSel|0));
+  const worn=id=>!godWorn()&&mySkin()===id;
+  $('vGrid').innerHTML=godSkinCard()+SKINS.map((k,i)=>{
+    const cls=['vcard'];if(i===vSkinSel)cls.push('on');if(worn(k.id))cls.push('bound');
     if(!own(k.id))cls.push('sealed',!open(i)?'locked':save.ether>=k.cost?'afford':'poor');
     return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-k="'+i+'" style="--vt:'+k.t+'">'
       +'<div class="vc-top"><span>'+pad2(i+1)+'</span><span class="vc-tier">SKIN</span></div>'
       +'<div class="vc-name">'+escHTML(k.n.replace(/^THE /,''))+'</div>'
       +'<div class="vc-role">'+(escHTML(skinBonusText(k))||'NO BONUS')+'</div>'
-      +'<div class="vc-foot">'+(own(k.id)?'<span class="vc-state">'+(mySkin()===k.id?'WORN':'OWNED')+'</span>'
+      +'<div class="vc-foot">'+(own(k.id)?'<span class="vc-state">'+(worn(k.id)?'WORN':'OWNED')+'</span>'
         :!open(i)?'<span class="vc-cost lock">LOCKED</span><span class="vc-state">'+EG+' '+k.cost.toLocaleString('en-IN')+'</span>'
         :'<span class="vc-cost">'+(k.cost?EG+' '+k.cost.toLocaleString('en-IN'):'FREE')+'</span><span class="vc-state">FOR SALE</span>')+'</div></div>';
   }).join('');
@@ -6164,16 +6240,18 @@ function renderSkins(){
     if(typeof SFX.uiPick==='function')SFX.uiPick();
     if(isTouch)$('vaultOv').classList.add('sheet');
     renderVault();}));
-  const k=SKINS[vSkinSel],has=own(k.id),worn=mySkin()===k.id,ok=save.ether>=k.cost,isOpen=open(vSkinSel);
+  if(vSkinSel<0){renderGodSkin();return;}
+  const k=SKINS[vSkinSel],has=own(k.id),wornK=worn(k.id),ok=save.ether>=k.cost,isOpen=open(vSkinSel);
   const need=SKINS.find((x,i)=>i<vSkinSel&&!own(x.id));
   pvShow(k.ch);
   let act;
-  if(worn)act='<button class="vbtn dim" disabled>THE HOLLOW WEARS THIS SKIN</button>';
+  if(wornK)act='<button class="vbtn dim" disabled>THE HOLLOW WEARS THIS SKIN</button>';
   else if(has)act='<button class="vbtn" id="vSkinWear">WEAR THIS SKIN</button>';
   else if(!isOpen)act='<button class="vbtn dim" disabled>LOCKED \u2014 SKINS ARE COLLECTED IN ORDER</button>'
     +'<div class="vneed">BUY '+escHTML(need.n)+' FIRST</div>';
   else act='<button class="vbtn'+(ok?'':' dim')+'" id="vSkinBuy"'+(ok?'':' disabled')+'>BUY \u2014 '+k.cost.toLocaleString('en-IN')+' '+EG+'</button>'
     +(ok?'':'<div class="vneed">'+EG+' '+(k.cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>');
+  if(godWorn())act=(godLook()===k.id?'<button class="vbtn dim" disabled>GOD WEARS THIS SKIN</button>':'<button class="vbtn" id="vGodGive">GIVE THIS SKIN TO GOD</button>')+act;
   $('vDossBody').innerHTML=
      '<div class="vd-tag"><span>\u2727 SKIN '+pad2(vSkinSel+1)+' / '+SKINS.length+'</span><span>\u00b7</span><b>'+(has?'OWNED':isOpen?'FOR SALE':'LOCKED')+'</b></div>'
     +'<div class="vd-name">'+escHTML(k.n)+'</div>'
@@ -6185,6 +6263,8 @@ function renderSkins(){
     +'<div class="vd-plain">'+(skinBonusText(k)?'':'Every other skin adds a bonus. ')+'A bonus is added to whatever skill or combination you have equipped, on top of its upgrades (no stat goes past 100). Everyone you play with sees the skin.</div>'
     +'<div class="vd-act">'+act+'</div>';
   document.documentElement.style.setProperty('--vt',k.t);$('vDoss').style.setProperty('--vt',k.t);
+  const give=$('vGodGive');
+  if(give)give.addEventListener('click',e=>{e.stopPropagation();godDress('k',k.id);renderVault();toast('GOD NOW WEARS '+k.n,2.4);});
   const wear=$('vSkinWear');
   if(wear)wear.addEventListener('click',e=>{e.stopPropagation();setSkin(k.id);renderVault();toast(k.n+' \u2014 WORN',2.4);});
   const buy=$('vSkinBuy');
@@ -6244,7 +6324,6 @@ function renderCombine(){
     if(save.combos.some(x=>comboKey(x.p)===comboKey(p)))return;
     const id='cx'+Date.now().toString(36);
     save.ether-=price;save.combos.push({id,p});comboSync(save.combos);comboMade(id);
-    if(GOD.on)setGod(false,true);
     setLegend(id);
     vCombining=false;vCmbPick=[];vSel=ROSTER.indexOf(BYID[id]);vFilter='ALL';
     renderVault();
@@ -6718,7 +6797,18 @@ function tskinPowerText(k){const p=k.pw,o=['THROWS '+p.range+' M'];
   if(p.slow)o.push('SLOWS IT '+Math.round((1-p.slowMul)*100)+'% FOR '+p.slow+' S');
   if(p.stun)o.push('FREEZES IT '+p.stun+' S IF IT IS WITHIN '+p.stunR+' M');
   return o;}
-const myTSkin=()=>(save.skins||[]).indexOf(save.tskin)>=0&&tskinOK(save.tskin)?save.tskin:'t_bottle';
+const ownTSkin=()=>(save.skins||[]).indexOf(save.tskin)>=0&&tskinOK(save.tskin)?save.tskin:'t_bottle';
+const godTLook=()=>tskinOK(GOD_LOOK.t)?GOD_LOOK.t:TSKINS[TSKINS.length-1].id;
+const myTSkin=()=>godWorn()?godTLook():ownTSkin();
+/* give GOD another skin (kind 'k') or trinket skin (kind 't') */
+function godDress(kind,id){
+  GOD_LOOK[kind]=id;try{localStorage.setItem('hm_glook',JSON.stringify(GOD_LOOK));}catch(e){}
+  if(!godWorn())return;
+  if(kind==='t'){dressAllTrinkets();return;}
+  const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
+  disposeLegend(ghost);ghost=buildLegend(myChar());ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
+  ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
+}
 /* the body of a trinket: built from shared geometry and materials (made once per skin) */
 const TB={};
 function tBody(id){

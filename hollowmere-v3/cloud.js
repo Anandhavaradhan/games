@@ -403,6 +403,15 @@ export function watchGifts(me, cb) {
     s => cb(s.docs.map(d => Object.assign({ id: d.id }, d.data()))), e => console.warn('Gifts read failed:', e));
 }
 
+/* the GOD skin an admin lent to this account: godPass/{uid} { until, by, byName, at }, written only by
+   admins (admin.html). cb gets { until: ms, byName } or null. Returns an unsubscribe function. */
+export function watchGodPass(uid, cb) {
+  return F.onSnapshot(F.doc(db, 'godPass', uid), d => {
+    const g = d.exists() ? d.data() : null, u = g && g.until && g.until.toMillis ? g.until.toMillis() : 0;
+    cb(u ? { until: u, byName: String(g.byName || '') } : null);
+  }, e => { console.warn('God pass read failed:', e); cb(null); });
+}
+
 /* true when this account is listed in admins/{uid} (only the account itself can read that) */
 export async function isAdmin(uid) {
   try { return (await F.getDoc(F.doc(db, 'admins', uid))).exists(); } catch (e) { return false; }
