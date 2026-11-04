@@ -1658,9 +1658,10 @@ function cleanSave(raw,isLocal){
    ========================================================= */
 const COMBO_MAX=5,COMBO_LIMIT=20;
 const comboAddCost=n=>comboCost(n+1)-comboCost(n);
-/* GUESTS (KP): a guest knows every skill a player can learn (never GOD) and combines for free, as many
-   times as they like (GUEST_COMBO_LIMIT only keeps the vault usable). A guest is temporary: every new guest
-   starts with no combinations, and none of these free skills or combinations ever moves into an account
+/* GUESTS (KP): a guest has everything except GOD: every skill a player can learn, fully upgraded, every
+   skin and trinket skin, and combines for free, as many times as they like (GUEST_COMBO_LIMIT only keeps
+   the vault usable). A guest is temporary: every new guest starts with no combinations, and nothing a guest
+   has or did (ether, ash, skills, skins, combinations, escapes, stats, bounties) ever moves into an account
    (see guestToAccount). Guests can never gift (giftSend needs an account, and so do the gift rules). */
 const GUEST_COMBO_LIMIT=500;
 const isGuestSave=()=>saveKey===LS_KEY;
@@ -1668,12 +1669,15 @@ const comboLimit=()=>isGuestSave()?GUEST_COMBO_LIMIT:COMBO_LIMIT;
 const cmbPrice=n=>isGuestSave()?0:comboCost(n);
 const cmbAddPrice=n=>isGuestSave()?0:comboAddCost(n);
 const cmbPriceTxt=n=>n?n.toLocaleString('en-IN')+' '+EG:'FREE';
-function guestAll(s){ROSTER.forEach(c=>{if(!c.combo&&c.id!=='god'&&s.unlocked.indexOf(c.id)<0)s.unlocked.push(c.id);});return s;}
+function guestAll(s){
+  ROSTER.forEach(c=>{if(c.combo||c.id==='god')return;if(s.unlocked.indexOf(c.id)<0)s.unlocked.push(c.id);s.ups[c.id]=UP_MAX;});
+  SKINS.concat(TSKIN_IDS.map(id=>({id}))).forEach(k=>{if(s.skins.indexOf(k.id)<0)s.skins.push(k.id);});
+  s.skinPend=[];return s;}
 /* a new guest: what this browser's guest slot holds, without its combinations */
 function newGuestSave(){const raw=readLocal(LS_KEY);if(raw&&typeof raw==='object'){raw.combos=[];raw.cmbPend=[];if(raw.stats)delete raw.stats.combos;}
   return guestAll(cleanSave(raw,true));}
-/* a guest making an account takes their ether, skins and the rest, but only the five free skills */
-function guestToAccount(g){const o=JSON.parse(JSON.stringify(g));o.unlocked=FREE.slice();o.combos=[];o.cmbPend=[];return o;}
+/* a guest making an account takes nothing with them: the account starts fresh (only the music setting and the news they read stay) */
+function guestToAccount(g){const o=freshSave();o.music=g.music;o.newsRead=(g.newsRead||[]).slice();return o;}
 function comboLatest(list,id){let b=null;list.forEach(x=>{if(x.id===id&&(!b||x.p.length>b.p.length))b=x;});return b;}
 /* =========================================================
    LEGEND UPGRADES — paid in ASH, which is only earned in the house (never bought with ether).
@@ -8170,8 +8174,8 @@ async function applyUser(u){
   const next=data?cleanSave(data,false):cleanSave(guestToAccount(cleanSave(readLocal(LS_KEY),true)),false);
   /* news read before signing in stays read */
   newsReadIds().forEach(id=>{if(next.newsRead.indexOf(id)<0)next.newsRead.push(id);});
-  /* today's bounties worked at before signing in count too */
-  if(save.bty&&save.bty.d===todayKey()){
+  /* today's bounties worked at before signing in count too (never a guest's: nothing a guest did counts) */
+  if(!isGuestSave()&&save.bty&&save.bty.d===todayKey()){
     if(next.bty.d!==save.bty.d)next.bty={d:save.bty.d,p:{},done:[]};
     Object.keys(save.bty.p).forEach(id=>{next.bty.p[id]=Math.max(next.bty.p[id]||0,save.bty.p[id]);});
     save.bty.done.forEach(id=>{if(next.bty.done.indexOf(id)<0)next.bty.done.push(id);});}
