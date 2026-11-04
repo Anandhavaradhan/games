@@ -2,9 +2,11 @@ package io.github.anandhavaradhan.hollowmere;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.Manifest;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -17,6 +19,7 @@ import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.JsPromptResult;
 import android.webkit.JsResult;
+import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebResourceRequest;
@@ -73,6 +76,8 @@ public class MainActivity extends Activity {
             + "s.id='hm-app-css';s.textContent=c;(document.head||document.documentElement).appendChild(s);}"
             + "if(document.documentElement)a();document.addEventListener('DOMContentLoaded',a);})();";
 
+    private static final int REQ_MIC = 71;
+    private PermissionRequest pendingMic;   // the page's microphone request, waiting for the phone's permission box
     private WebView web;
     private WebViewAssetLoader assets;
 
@@ -150,6 +155,26 @@ public class MainActivity extends Activity {
                 return true;
             }
 
+            /* co-op voice chat asks for the microphone (getUserMedia): ask the phone for it at that moment */
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                boolean wantsMic = false;
+                for (String r : request.getResources()) if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) wantsMic = true;
+                if (!wantsMic || !HOST.equals(request.getOrigin().getHost())) { request.deny(); return; }
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                } else {
+                    if (pendingMic != null) pendingMic.deny();
+                    pendingMic = request;
+                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+                }
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (request == pendingMic) pendingMic = null;
+            }
+
             @Override
             public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {
                 result.cancel();
@@ -208,6 +233,19 @@ public class MainActivity extends Activity {
             return new WebResourceResponse("text/javascript", "utf-8", 200, "OK", h, in);
         } catch (IOException e) {
             return null;  // not packed: let the WebView fetch it from the internet
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        if (code != REQ_MIC || pendingMic == null) return;
+        PermissionRequest r = pendingMic;
+        pendingMic = null;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            r.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+        } else {
+            r.deny();   // the game then plays on without voice chat
         }
     }
 
