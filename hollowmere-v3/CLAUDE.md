@@ -33,7 +33,7 @@ clutter, webs, window shafts, cellar puddles and mist after the house is built. 
 Everyone plays one ghost, THE HOLLOW. The 41 legends in ROSTER are now its SKILLS: learning, equipping (`save.main`),
 combining and upgrading work exactly as before, only the vault's words changed. The ghost model never follows the skill:
 `myChar()` / `heroChar(skinId)` build it from `SKINS` (search `THE HOLLOW — the one ghost you play`).
-- Skins are looks only, bought with ether in the vault's SKINS tab. `save.skins` (owned) and `save.skin` (worn) live in
+- Skins are bought with ether in the vault's SKINS tab. Each changes the look and adds a fixed stat bonus (`b`, [MIGHT,GRACE,WITS,SPIRIT]); `wearSt(c)` = `effSt(c)` + the worn skin's bonus, capped at 100, and is what `computePS` and the vault use. Never for the GOD legend. `save.skins` (owned) and `save.skin` (worn) live in
   the account inside stats; `stats.skins` is only ever added to (arrayUnion in cloud.js). `save.skinPend` keeps a purchase
   on the device until the account has it, like `cmbPend`.
 - Co-op state and the watch page send the skin as `sk` next to `lg`; an unknown or missing `sk` draws the default Hollow.
