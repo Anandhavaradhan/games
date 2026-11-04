@@ -41,3 +41,8 @@ combining and upgrading work exactly as before, only the vault's words changed. 
 - The vault opens on SKINS; SKILLS is the second tab, with the roles and COMBINE as its subtopics.
 - Trinket skins (`TSKINS`, near the trinkets): look (`tBody`), flight (`trinketFly`, `thr`) and landing (`trinketLand`, `land`), and power (`pw`: throw range, extra linger, slow, close-range freeze), each skin stronger than the one before (KP). Owned ids share `save.skins` (they start `t_`, listed in `TSKIN_IDS`, which cleanSave needs before TSKINS exists); the one in use is `save.tskin` (stats.tskin). Bought in order too.
 - A new skin goes at the end of `SKINS` with a new id; never rename or reuse an id (players own them by id).
+
+## Lending GOD
+Admins can lend the GOD skill to any player for a while from admin.html (player drawer, GOD skill: 1 hour, 1 day or 7 days, or take it back).
+It is stored in `godPass/{uid}` (`until`), which only admins can write and only that player can read. `godCheck` watches it
+(`cloud.watchGodPass`): GOD joins their vault until `until`, then `godPass` drops it and they are back on `save.main`. Never in the news.

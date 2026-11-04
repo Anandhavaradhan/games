@@ -1732,7 +1732,7 @@ const isBound=id=>id==='god'?(GOD.on&&GOD.ok):(!(GOD.on&&GOD.ok)&&save.main===id
    admin (admins/{uid}, which only that account can read), so nobody else ever sees it. Choosing it does
    not change save.main; everyone else — co-op, the watch page, the leaderboards, the run history —
    sees the legend it is dressed as (pub). */
-const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true,true]};
+const GOD={on:false,ok:false,uid:'',c:null,st:[],sel:[true,true,true,true,true],admin:false,until:0,passUnsub:null,timer:0};
 /* which powers G / the power button fire together (the ticks on the boxes), remembered on this device */
 try{const v=JSON.parse(localStorage.getItem('hm_gsel')||'null');if(Array.isArray(v)&&v.length>=4)GOD.sel=v.slice(0,5).map(Boolean).concat(v.length<5?[true]:[]);}catch(e){}
 function godToggle(i){const ps=curLegend().ab.parts||[];if(!ps[i]||godIsAuto(ps[i]))return;GOD.sel[i]=!GOD.sel[i];try{localStorage.setItem('hm_gsel',JSON.stringify(GOD.sel));}catch(e){}
@@ -3936,18 +3936,48 @@ function setGod(on,quiet){
   computePS(c);AB.cd=0;AB.cdMax=cdFor(c.ab);
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
 }
+/* GOD for admins, and for anyone an admin lends it to for a while (godPass/{uid}, set in admin.html).
+   A lent GOD leaves by itself when its time is up, or at once if the admin takes it back; the player
+   is then back on the skill they had bound (save.main never changed while GOD was on). */
 async function godCheck(){
   if(!cloud||!cloudUser||cloudUser.anon||!cloud.isAdmin)return;
   const uid=cloudUser.uid;
-  if(!(await cloud.isAdmin(uid))||!cloudUser||cloudUser.uid!==uid)return;
+  if(await cloud.isAdmin(uid)){if(cloudUser&&cloudUser.uid===uid){GOD.admin=true;godGrant(uid);}return;}
+  if(!cloudUser||cloudUser.uid!==uid||typeof cloud.watchGodPass!=='function')return;
+  godStop();
+  GOD.passUnsub=cloud.watchGodPass(uid,p=>{if(!cloudUser||cloudUser.uid!==uid)return;godPass(uid,p);});
+}
+/* a lent GOD arrived, changed, was taken back or ran out */
+function godPass(uid,p){
+  clearTimeout(GOD.timer);GOD.timer=0;
+  const left=p?p.until-Date.now():0;
+  if(left>0){
+    const fresh=!GOD.ok||GOD.until!==p.until;
+    GOD.until=p.until;godGrant(uid);
+    /* setTimeout tops out near 24 days: wake then and look again */
+    GOD.timer=setTimeout(()=>godPass(uid,p),Math.min(left+250,2e9));
+    if(fresh){SFX.chime();toast('\u2726 THE KEEPER LENT YOU GOD FOR '+godLeft(left)+' \u2014 FIND IT IN THE VAULT',4.5);}
+    if(vaultOpen)renderVault();
+  }else if(GOD.ok&&!GOD.admin){
+    godDisable(true);
+    toast('GOD HAS LEFT YOU \u2014 BACK TO '+String(skillName(curLegend())).toUpperCase(),3.5);
+  }
+}
+function godLeft(ms){const m=Math.max(1,Math.round(ms/60000)),h=Math.round(m/60),d=Math.round(m/1440);
+  return m<60?m+' MIN':m<2880?h+(h===1?' HOUR':' HOURS'):d+' DAYS';}
+function godStop(){if(GOD.passUnsub){try{GOD.passUnsub();}catch(e){}GOD.passUnsub=null;}clearTimeout(GOD.timer);GOD.timer=0;}
+function godGrant(uid){
   GOD.uid=uid;GOD.ok=true;
   if(!GOD.c)GOD.c=godBuild();
   if(!BYID.god){ROSTER.push(GOD.c);ORDER.unshift(GOD.c);BYID.god=GOD.c;ORD.god=ROSTER.length;}
   let was=false;try{was=localStorage.getItem('hm_gd:'+uid)==='1';}catch(e){}
-  if(was&&state!=='play'&&state!=='caught')setGod(true);
+  if(was&&!GOD.on&&state!=='play'&&state!=='caught')setGod(true);
   if(vaultOpen)renderVault();
 }
-function godDisable(){
+/* keep: only the skill goes (a lent GOD ran out); without it, signing out also stops listening for one */
+function godDisable(keep){
+  if(!keep){godStop();GOD.admin=false;}
+  GOD.until=0;
   if(!GOD.ok&&!BYID.god)return;
   const wasOn=GOD.on;
   GOD.ok=false;GOD.on=false;GOD.uid='';
@@ -3957,6 +3987,7 @@ function godDisable(){
   if(typeof vSel==='number'&&vSel>=ROSTER.length)vSel=0;
   if(wasOn)setGod(false);
   multiSync();
+  if(vaultOpen)renderVault();
 }
 /* fire one of the god's powers (i = 0..3) from its own essence and cooldown */
 /* Testudo (ward) and Dead or Alive (reveal) run by themselves: no button, no essence. */
@@ -5949,7 +5980,7 @@ function renderVault(){
         +' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   }
   $('vDossBody').innerHTML=
-     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':c.combo?'COMBINATION \u00b7 '+c.p.length+' SKILLS':'SKILL '+pad2(ORD[c.id])+' / '+BASE_COUNT)+'</span><span>\u00b7</span>'
+     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726'+(GOD.until>Date.now()?' LENT \u00b7 '+godLeft(GOD.until-Date.now())+' LEFT':''):c.combo?'COMBINATION \u00b7 '+c.p.length+' SKILLS':'SKILL '+pad2(ORD[c.id])+' / '+BASE_COUNT)+'</span><span>\u00b7</span>'
       +'<b>'+c.r+'</b></div>'
     +'<div class="vd-note">'+ROLE_NOTE[c.r]+'</div>'
     +'<div class="vd-name">'+escHTML(skillName(c))+'</div>'
