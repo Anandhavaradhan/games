@@ -39,5 +39,5 @@ combining and upgrading work exactly as before, only the vault's words changed. 
 - Co-op state and the watch page send the skin as `sk` next to `lg`; an unknown or missing `sk` draws the default Hollow.
 - Skins are collected in order: a skin is for sale only once every skin before it in `SKINS` is owned (`renderSkins`).
 - The vault opens on SKINS; SKILLS is the second tab, with the roles and COMBINE as its subtopics.
-- Trinket skins (`TSKINS`, near the trinkets): look (`tBody`), flight (`trinketFly`, `thr`) and landing (`trinketLand`, `land`); looks only. Owned ids share `save.skins` (they start `t_`, listed in `TSKIN_IDS`, which cleanSave needs before TSKINS exists); the one in use is `save.tskin` (stats.tskin). Bought in order too.
+- Trinket skins (`TSKINS`, near the trinkets): look (`tBody`), flight (`trinketFly`, `thr`) and landing (`trinketLand`, `land`), and power (`pw`: throw range, extra linger, slow, close-range freeze), each skin stronger than the one before (KP). Owned ids share `save.skins` (they start `t_`, listed in `TSKIN_IDS`, which cleanSave needs before TSKINS exists); the one in use is `save.tskin` (stats.tskin). Bought in order too.
 - A new skin goes at the end of `SKINS` with a new id; never rename or reuse an id (players own them by id).
