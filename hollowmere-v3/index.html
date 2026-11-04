@@ -1759,7 +1759,12 @@ const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
    and dresses the Hollow in the best skin and its trinkets in the best trinket skin */
 const godWorn=()=>GOD.on&&GOD.ok&&!!GOD.c;
 const ownSkin=()=>(save.skins||[]).indexOf(save.skin)>=0&&skinOK(save.skin)?save.skin:'hollow';
-const mySkin=()=>godWorn()?SKINS[SKINS.length-1].id:ownSkin();
+/* what GOD wears: the best skin and trinket skin unless the player gave it another (any of them, owned or not;
+   remembered on this device) */
+const GOD_LOOK={k:'',t:''};
+try{const v=JSON.parse(localStorage.getItem('hm_glook')||'null');if(v){GOD_LOOK.k=String(v.k||'');GOD_LOOK.t=String(v.t||'');}}catch(e){}
+const godLook=()=>skinOK(GOD_LOOK.k)?GOD_LOOK.k:SKINS[SKINS.length-1].id;
+const mySkin=()=>godWorn()?godLook():ownSkin();
 const myChar=()=>heroChar(mySkin());
 /* the legend everyone else sees you as */
 const pubLegend=()=>curLegend().pub||curLegend().id;
@@ -6154,6 +6159,7 @@ function renderTSkins(){
     +'<div class="vneed">BUY '+escHTML(need.n)+' FIRST</div>';
   else act='<button class="vbtn'+(ok?'':' dim')+'" id="vTBuy"'+(ok?'':' disabled')+'>BUY \u2014 '+k.cost.toLocaleString('en-IN')+' '+EG+'</button>'
     +(ok?'':'<div class="vneed">'+EG+' '+(k.cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>');
+  if(godWorn())act=(godTLook()===k.id?'<button class="vbtn dim" disabled>GOD THROWS THIS ONE</button>':'<button class="vbtn" id="vGodTGive">GIVE THIS TRINKET TO GOD</button>')+act;
   const TH={tumble:'tumbles end over end',flat:'spins flat',wobble:'swings and rings',slow:'a high, slow lob',pulse:'low and fast, pulsing',spiral:'corkscrews'};
   const LD={glass:'bursts into green glass',sparks:'a shower of sparks and a flash',bell:'tolls three times, rings of sound rolling out',crack:'cracks open in a puff of dust',
     burst:'bursts into motes that drift up',flame:'smashes and leaves a small fire burning',void:'shatters with a violet shockwave'};
@@ -6170,6 +6176,8 @@ function renderTSkins(){
     +'<div class="vd-plain">Each trinket skin is a stronger lure than the one before it. Every trinket you find in the house takes this look and power.</div>'
     +'<div class="vd-act">'+act+'</div>';
   document.documentElement.style.setProperty('--vt',hex(k.col));$('vDoss').style.setProperty('--vt',hex(k.col));
+  const tgive=$('vGodTGive');
+  if(tgive)tgive.addEventListener('click',e=>{e.stopPropagation();godDress('t',k.id);renderVault();toast('GOD NOW THROWS '+k.n,2.4);});
   const wear=$('vTWear');
   if(wear)wear.addEventListener('click',e=>{e.stopPropagation();save.tskin=k.id;saveNow();dressAllTrinkets();renderVault();toast(k.n+' \u2014 IN USE',2.4);});
   const buy=$('vTBuy');
@@ -6184,14 +6192,14 @@ function renderTSkins(){
 /* the GOD skin (admins, and anyone an admin lends it to): first in the gallery, card -1 */
 function godSkinCard(){
   if(!GOD.ok)return '';
-  const top=SKINS[SKINS.length-1],cls=['vcard'];if(vSkinSel<0)cls.push('on');if(godWorn())cls.push('bound');
+  const top=SKIN_BY[godLook()],cls=['vcard'];if(vSkinSel<0)cls.push('on');if(godWorn())cls.push('bound');
   return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-k="-1" style="--vt:'+top.t+'">'
     +'<div class="vc-top"><span>\u2726</span><span class="vc-tier">'+(GOD.admin?'ADMIN':'LENT')+'</span></div>'
-    +'<div class="vc-name">GOD</div><div class="vc-role">GOD SKILL \u00b7 BEST SKINS</div>'
+    +'<div class="vc-name">GOD</div><div class="vc-role">GOD SKILL \u00b7 '+escHTML(top.n.replace(/^THE /,''))+'</div>'
     +'<div class="vc-foot"><span class="vc-state">'+(godWorn()?'WORN':GOD.until>Date.now()?godLeft(GOD.until-Date.now())+' LEFT':'OWNED')+'</span></div></div>';
 }
 function renderGodSkin(){
-  const top=SKINS[SKINS.length-1],tk=TSKINS[TSKINS.length-1],a=GOD.c.ab,on=godWorn();
+  const top=SKIN_BY[godLook()],tk=TSKIN_BY[godTLook()],a=GOD.c.ab,on=godWorn();
   pvShow(top.ch);
   $('vDossBody').innerHTML=
      '<div class="vd-tag"><span>\u2726 GOD</span><span>\u00b7</span><b>'+(GOD.admin?'KEEPER OF THE HOUSE':'LENT \u00b7 '+godLeft(GOD.until-Date.now())+' LEFT')+'</b></div>'
@@ -6199,6 +6207,7 @@ function renderGodSkin(){
     +'<div class="vd-epi">A SKIN WITH ITS OWN SKILL</div>'
     +'<div class="vd-rule"></div>'
     +'<div class="vd-plain">The Hollow as '+escHTML(top.n)+', throwing the '+escHTML(tk.n)+'. The GOD skill comes with it: while you wear it, it is your only skill, and your own comes back when you take it off.</div>'
+    +'<div class="vd-plain">'+(on?'Pick any skin, or any trinket skin under TRINKETS, and press GIVE TO GOD to dress GOD in it instead.':'Once you wear it, you can give GOD any skin or trinket skin from the gallery.')+'</div>'
     +'<div class="vd-label">ITS SKILL \u2014 '+escHTML(a.n)+'</div>'
     +'<div class="vd-plain">'+a.p+'</div>'
     +'<div class="vd-label">ITS TRINKET \u2014 '+escHTML(tk.n)+'</div>'
@@ -6242,6 +6251,7 @@ function renderSkins(){
     +'<div class="vneed">BUY '+escHTML(need.n)+' FIRST</div>';
   else act='<button class="vbtn'+(ok?'':' dim')+'" id="vSkinBuy"'+(ok?'':' disabled')+'>BUY \u2014 '+k.cost.toLocaleString('en-IN')+' '+EG+'</button>'
     +(ok?'':'<div class="vneed">'+EG+' '+(k.cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>');
+  if(godWorn())act=(godLook()===k.id?'<button class="vbtn dim" disabled>GOD WEARS THIS SKIN</button>':'<button class="vbtn" id="vGodGive">GIVE THIS SKIN TO GOD</button>')+act;
   $('vDossBody').innerHTML=
      '<div class="vd-tag"><span>\u2727 SKIN '+pad2(vSkinSel+1)+' / '+SKINS.length+'</span><span>\u00b7</span><b>'+(has?'OWNED':isOpen?'FOR SALE':'LOCKED')+'</b></div>'
     +'<div class="vd-name">'+escHTML(k.n)+'</div>'
@@ -6253,6 +6263,8 @@ function renderSkins(){
     +'<div class="vd-plain">'+(skinBonusText(k)?'':'Every other skin adds a bonus. ')+'A bonus is added to whatever skill or combination you have equipped, on top of its upgrades (no stat goes past 100). Everyone you play with sees the skin.</div>'
     +'<div class="vd-act">'+act+'</div>';
   document.documentElement.style.setProperty('--vt',k.t);$('vDoss').style.setProperty('--vt',k.t);
+  const give=$('vGodGive');
+  if(give)give.addEventListener('click',e=>{e.stopPropagation();godDress('k',k.id);renderVault();toast('GOD NOW WEARS '+k.n,2.4);});
   const wear=$('vSkinWear');
   if(wear)wear.addEventListener('click',e=>{e.stopPropagation();setSkin(k.id);renderVault();toast(k.n+' \u2014 WORN',2.4);});
   const buy=$('vSkinBuy');
@@ -6786,7 +6798,17 @@ function tskinPowerText(k){const p=k.pw,o=['THROWS '+p.range+' M'];
   if(p.stun)o.push('FREEZES IT '+p.stun+' S IF IT IS WITHIN '+p.stunR+' M');
   return o;}
 const ownTSkin=()=>(save.skins||[]).indexOf(save.tskin)>=0&&tskinOK(save.tskin)?save.tskin:'t_bottle';
-const myTSkin=()=>godWorn()?TSKINS[TSKINS.length-1].id:ownTSkin();
+const godTLook=()=>tskinOK(GOD_LOOK.t)?GOD_LOOK.t:TSKINS[TSKINS.length-1].id;
+const myTSkin=()=>godWorn()?godTLook():ownTSkin();
+/* give GOD another skin (kind 'k') or trinket skin (kind 't') */
+function godDress(kind,id){
+  GOD_LOOK[kind]=id;try{localStorage.setItem('hm_glook',JSON.stringify(GOD_LOOK));}catch(e){}
+  if(!godWorn())return;
+  if(kind==='t'){dressAllTrinkets();return;}
+  const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
+  disposeLegend(ghost);ghost=buildLegend(myChar());ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
+  ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
+}
 /* the body of a trinket: built from shared geometry and materials (made once per skin) */
 const TB={};
 function tBody(id){

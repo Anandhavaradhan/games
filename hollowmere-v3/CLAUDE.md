@@ -47,5 +47,6 @@ GOD is no longer in the SKILLS tab. It is the first card in SKINS > THE HOLLOW f
 Wearing it (`GOD.on`, `godWorn()`) puts the GOD skill on and locks it (`setLegend` only records `save.main`, the vault's equip button is disabled),
 draws the Hollow as the last (best) skin in `SKINS` and throws the last (best) `TSKINS` (`mySkin` / `myTSkin`; `ownSkin` / `ownTSkin` are the player's own).
 Wearing any other skin, or taking GOD off, goes back to the player's own skin, trinket and skill.
+While GOD is worn, every skin and trinket skin dossier has GIVE TO GOD (`godDress`): GOD can wear any of them, owned or not, kept on the device in `hm_glook` (`godLook` / `godTLook`, best by default).
 Admins can lend it from admin.html (player drawer, GOD skin: 1 hour, 1 day or 7 days, or take it back). It is stored in `godPass/{uid}` (`until`),
 which only admins can write and only that player can read. `godCheck` watches it (`cloud.watchGodPass`) and `godPass` drops it when `until` passes. Never in the news.
