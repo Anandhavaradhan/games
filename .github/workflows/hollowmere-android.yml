@@ -1,0 +1,52 @@
+# Builds the Hollowmere V3 Android app (hollowmere-v3-android/, with the game from hollowmere-v3/ packed inside)
+# as an unsigned release APK.
+# The APK is signed afterwards with the app's release key, which is kept out of this repo.
+name: Hollowmere V3 Android APK
+
+on:
+  push:
+    paths:
+      - 'hollowmere-v3-android/**'
+      - 'hollowmere-v3/**'
+      - '.github/workflows/hollowmere-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # to publish the unsigned build to the hollowmere-android-build branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Fetch three.js and the Firebase SDK to pack into the app
+        run: hollowmere-v3-android/fetch-vendor.sh
+      - name: Build unsigned release APK
+        working-directory: hollowmere-v3-android
+        run: gradle --no-daemon assembleRelease -PversionCode=${{ github.run_number }}
+      - name: Collect APK and the signing tool
+        run: |
+          mkdir out
+          cp hollowmere-v3-android/app/build/outputs/apk/release/*.apk out/
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          cp "$BT/lib/apksigner.jar" "$BT/zipalign" out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hollowmere-v3-unsigned
+          path: out/
+          retention-days: 14
+      # The unsigned APK also goes to its own branch so it can be fetched with plain git and signed.
+      - name: Publish unsigned build to the hollowmere-android-build branch
+        run: |
+          cd out
+          git init -q -b hollowmere-android-build
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com add .
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -qm "Unsigned Hollowmere V3 APK, build ${{ github.run_number }} (${{ github.sha }})"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" hollowmere-android-build

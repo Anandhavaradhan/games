@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+// CI passes -PversionCode=<run number> so every build can install over the last one
+def buildNo = (project.findProperty('versionCode') ?: '1').toString()
+
+android {
+    namespace 'io.github.anandhavaradhan.hollowmere'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.anandhavaradhan.hollowmere'
+        minSdk 24
+        targetSdk 35
+        versionCode buildNo.toInteger()
+        versionName '3.0.' + buildNo
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'androidx.credentials:credentials:1.3.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
+}
+
+/* The game itself: hollowmere-v3/ is copied into the APK at build time (assets/www), so every build
+   carries the current game. vendor/ (three.js and the Firebase SDK, fetched by fetch-vendor.sh) goes to
+   assets/vendor so the game starts without the internet. */
+def gameAssets = layout.buildDirectory.dir('gameAssets')
+tasks.register('copyGame', Copy) {
+    into gameAssets
+    from(rootProject.file('../hollowmere-v3')) {
+        include '*.html', '*.js', '*.mp3'
+        exclude 'admin.html'
+        into 'www'
+    }
+    from(rootProject.file('vendor')) { into 'vendor' }
+}
+android.sourceSets.main.assets.srcDir gameAssets
+preBuild.dependsOn 'copyGame'

@@ -70,8 +70,22 @@ const keepSignedIn = async () => {
   if (!storageOk('localStorage')) return;   /* blocked: stay with what works (memory / tab) */
   try { await A.setPersistence(auth, A.browserLocalPersistence); } catch (e) {}
 };
+/* In the Android app (hollowmere-v3-android/) Google refuses its sign-in page inside the app's WebView,
+   so the app signs in natively and hands back a Google ID token (window.HollowmereAndroid.googleSignIn). */
+const androidApp = () => typeof window !== 'undefined' && window.HollowmereAndroid && window.HollowmereAndroid.googleSignIn;
+const androidGoogleToken = () => new Promise((resolve, reject) => {
+  window.__hmGoogleDone = (token, err) => {
+    window.__hmGoogleDone = null;
+    if (token) return resolve(token);
+    const e = new Error(err === 'cancelled' ? '' : 'Google sign-in did not work on this device: ' + (err || 'unknown error'));
+    e.code = err === 'cancelled' ? 'auth/popup-closed-by-user' : 'auth/android-google';
+    reject(e);
+  };
+  window.HollowmereAndroid.googleSignIn();
+});
 export async function signInGoogle() {
   await keepSignedIn();
+  if (androidApp()) return A.signInWithCredential(auth, A.GoogleAuthProvider.credential(await androidGoogleToken()));
   const provider = new A.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   try { await A.signInWithPopup(auth, provider); }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appName">Hollowmere</string>
+    <!-- the Firebase project's Web OAuth client (public): native Google sign-in asks for an ID token for it -->
+    <string name="googleWebClientId">963512944966-r7194pvgagf98ndg0pi04gq0r0316ic3.apps.googleusercontent.com</string>
+</resources>
