@@ -513,6 +513,8 @@
   /* combining legends */
   .vchip.cmb{color:#ffcf8a;border-color:rgba(255,207,138,.5)}
   .vchip.cmb.on{background:rgba(255,207,138,.12)}
+  .vchip.cmb.skin{color:#bfe3ff;border-color:rgba(191,227,255,.5)}
+  .vchip.cmb.skin.on{background:rgba(191,227,255,.12)}
   .vcmb-price{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
   .vcmb-price span{font-size:10px;letter-spacing:1.5px;padding:5px 8px;border:1px solid #33302a;color:#8f8874}
   .vcmb-price span.on{border-color:#ffcf8a;color:#ffcf8a}
@@ -910,18 +912,18 @@
       <b>SHIFT</b> run (loud, burns Essence) &nbsp;·&nbsp; <b>C / RIGHT MOUSE</b> creep — light cupped, silent, nearly unseen<br>
       <b>F</b> hide in a wardrobe or crate — safe, but you can't move until you press it again<br>
       <b>R</b> shift your soul back to the Heart — only you move; the embers and the thing stay put (blocked while it is near)<br>
-      <b>G</b> your legend’s power — name, cooldown and cost sit at the foot of the screen<br>
+      <b>G</b> your equipped skill — name, cooldown and cost sit at the foot of the screen<br>
       <b>T</b> throw a trinket you picked up — it shatters, and the thing goes to look<br>
       <b>V</b> the vault · <b>ESC</b> settings
     </div>
     <div class="controls hidden" id="ctrlTouch">
       <b>LEFT THUMB</b> press &amp; drag to walk &nbsp;·&nbsp; <b>RIGHT THUMB</b> drag to look<br>
       hold <b>BURST</b> to run (loud) &nbsp;·&nbsp; hold <b>VEIL</b> to creep, light cupped, nearly unseen<br>
-      tap <b>POWER</b> for your legend’s ability &nbsp;·&nbsp; tap <b>THROW</b> to lob a trinket and lure it away<br>
+      tap <b>POWER</b> for your equipped skill &nbsp;·&nbsp; tap <b>THROW</b> to lob a trinket and lure it away<br>
       <b>HIDE</b> tucks you into a nearby wardrobe or crate — safe, but you can't move until you tap it again<br>
       <b>HEART</b> shifts only you back to the Heart (blocked while the thing is near) &nbsp;·&nbsp; <b>⚙</b> settings
     </div>
-    <button id="btnVault" class="ovbtn">THE VAULT — 41 LEGENDS</button>
+    <button id="btnVault" class="ovbtn">THE VAULT — SKILLS &amp; SKINS</button>
     <button id="titleAccount" class="ovbtn">ACCOUNT</button>
     <button id="titleBoard" class="ovbtn">LEADERBOARD</button>
     <button id="titleFriends" class="ovbtn">FRIENDS</button>
@@ -993,9 +995,9 @@
         <path d="M50 12 L81 66 L19 66 Z"/>
       </g></svg>
     <div id="vHead">
-      <div id="vTitle">THE VAULT OF LEGENDS</div>
+      <div id="vTitle">THE HOLLOW — SKILLS &amp; SKINS</div>
       <div id="vWallet"><svg class="eg" viewBox="0 0 24 24" aria-hidden="true"><use href="#ethglyph"/></svg>
-        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; <span class="ash"></span> ASH <b id="vAsh">0</b> &nbsp;·&nbsp; DECLASSIFIED <b id="vCount">5</b>/<span id="vTotal">41</span></div>
+        ETHER <b id="vEther">0</b> &nbsp;·&nbsp; <span class="ash"></span> ASH <b id="vAsh">0</b> &nbsp;·&nbsp; SKILLS <b id="vCount">5</b>/<span id="vTotal">41</span> &nbsp;·&nbsp; SKINS <b id="vSkinCount">1</b>/<span id="vSkinTotal">9</span></div>
       <div id="vClose">CLOSE</div>
     </div>
     <div id="vClaim" style="display:none"></div>
@@ -1464,6 +1466,44 @@ const ROSTER=[
 
 const BYID={};ROSTER.forEach(function(c){BYID[c.id]=c;});
 
+/* =========================================================
+   THE HOLLOW — the one ghost you play. Every legend above is now a SKILL the Hollow can
+   learn and equip (and fuse into combinations); nobody walks the house looking like a
+   legend any more. What the Hollow looks like is its SKIN, bought with ether in the vault's
+   SKINS tab. Skins are looks only: they never change a stat or a power.
+   Skins live in the account inside stats (stats.skins is only ever added to, like the
+   combined legends; stats.skin is the one worn), so the account rules need no change.
+   Everyone else (co-op, the watch page) sees your skin: it travels as `sk` beside `lg`.
+   ========================================================= */
+const HERO_NAME='THE HOLLOW';
+const SKINS=[
+ {id:'hollow',n:'THE HOLLOW',cost:0,t:'#bfe3ff',look:{wpn:'sword'},
+  d:'The first shape the house ever gave you: a pale cowl, a lantern that never goes out, and a blade of cold light.'},
+ {id:'mistveil',n:'MISTVEIL',cost:250,t:'#d6e4dc',look:{wpn:'staff',nocape:1},
+  d:'Grey as the fog off the lake. Easy to lose in a dark corridor, which is rather the point.'},
+ {id:'emberwraith',n:'EMBERWRAITH',cost:500,t:'#ff8a4a',look:{wpn:'scythe',x:'horns'},
+  d:'What is left of you after the fire. The lantern burns orange now, and so do you.'},
+ {id:'rimeshade',n:'RIMESHADE',cost:650,t:'#a9e8ff',look:{wpn:'katana',x:'crown'},
+  d:'Crowned in frost. The rooms you pass through stay cold for an hour afterwards.'},
+ {id:'gravebloom',n:'GRAVEBLOOM',cost:800,t:'#9fe8b0',look:{wpn:'staff',x:'antlers'},
+  d:'Moss in the hood, roots for a crown. The garden behind the manor remembers you.'},
+ {id:'drowned',n:'THE DROWNED',cost:900,t:'#57e8c2',look:{wpn:'spear',x:'chains'},
+  d:'Pulled up from the lake still wearing its chains. It drips where it walks.'},
+ {id:'bloodmoon',n:'BLOOD MOON',cost:1200,t:'#ff4f6a',look:{wpn:'dual',x:'horns'},
+  d:'The colour the sky turns on the worst nights in Hollowmere. The thing in the house knows it.'},
+ {id:'voidcaller',n:'VOIDCALLER',cost:1800,t:'#a88fe8',look:{wpn:'tome',x:'halo'},
+  d:'A ghost that went further into the dark than ghosts are meant to go, and came back reading.'},
+ {id:'seraph',n:'PALE SERAPH',cost:2500,t:'#fff0c0',look:{wpn:'spear',x:'halo',wings:1},
+  d:'Winged, haloed and gilded. The rarest look in the vault, and the loudest way to be dead.'}
+];
+const SKIN_BY={};SKINS.forEach(s=>{SKIN_BY[s.id]=s;
+  /* what buildLegend draws: the same ghost every time, dressed by the skin */
+  const lk=Object.assign({hero:1,hat:'cowl',lantern:1,cape:s.look.nocape?0:1,scarf:1},s.look);
+  s.ch={id:'skin_'+s.id,n:s.n,t:s.t,look:lk};});
+const skinOK=id=>!!SKIN_BY[id];
+/* the ghost a skin id draws (an unknown or missing one is the Hollow) */
+const heroChar=id=>(SKIN_BY[id]||SKINS[0]).ch;
+
 /* The leagues are worked through in order, so the gallery is laid out in
    that order and numbered along it: I, then II, then III, then IV. */
 const ORDER=ROSTER.slice().sort(function(a,b){
@@ -1510,7 +1550,7 @@ const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','me
 /* the ids today's bounties can have (see DAILY_POOL) */
 const DAILY_IDS_SAVE=['d_emb','d_mem','d_lure','d_close','d_hunt','d_esc','d_hide','d_bnt'];
 function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
-function freshSave(){return {bty:{d:'',p:{},done:[]},combos:[],cmbPend:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
+function freshSave(){return {skins:['hollow'],skin:'hollow',skinPend:[],bty:{d:'',p:{},done:[]},combos:[],cmbPend:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
    new account. A signed-in account's local copy (LS_KEY:uid) stays in localStorage as before. */
@@ -1577,6 +1617,13 @@ function cleanSave(raw,isLocal){
     if(bty.p&&typeof bty.p==='object')Object.keys(bty.p).forEach(id=>{const n=bty.p[id];
       if(DAILY_IDS_SAVE.indexOf(id)>=0&&typeof n==='number'&&isFinite(n)&&n>0)out.bty.p[id]=Math.min(1e4,Math.floor(n));});
     if(Array.isArray(bty.done))out.bty.done=bty.done.filter((id,i,a)=>DAILY_IDS_SAVE.indexOf(id)>=0&&a.indexOf(id)===i);}
+  /* the Hollow's skins (kept in the cloud inside stats, like the combined legends) */
+  const sk=Array.isArray(src.skins)?src.skins:(src.stats&&Array.isArray(src.stats.skins))?src.stats.skins:[];
+  out.skins=['hollow'].concat(sk.filter((id,i,a)=>id!=='hollow'&&skinOK(id)&&a.indexOf(id)===i));
+  const worn=typeof src.skin==='string'?src.skin:(src.stats&&typeof src.stats.skin==='string')?src.stats.skin:'hollow';
+  out.skin=out.skins.indexOf(worn)>=0?worn:'hollow';
+  /* skins bought on this device that the account has not confirmed yet (only kept on the device) */
+  if(Array.isArray(src.skinPend))out.skinPend=src.skinPend.filter((id,i,a)=>out.skins.indexOf(id)>=0&&id!=='hollow'&&a.indexOf(id)===i);
   if(BYID[src.main]&&!BYID[src.main].combo&&out.unlocked.indexOf(src.main)>=0)out.main=src.main;
   else if(out.combos.some(x=>x.id===src.main))out.main=src.main;
   return out;
@@ -1617,6 +1664,8 @@ function effSt(c){
 const comboCost=n=>10000*Math.pow(2,Math.max(0,n-2));
 const comboKey=p=>p.slice().sort().join('|');
 const shortName=c=>c.n.replace(/^THE\s+/,'');
+/* what the vault calls an entry now that every legend is a skill of the Hollow */
+const skillName=c=>c.id==='god'?c.n:c.ab.n;
 function comboBuild(x){
   const tc=t=>String(t).toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase());
   const parts=x.p.map(id=>BYID[id]),b=parts[0];
@@ -1686,6 +1735,9 @@ function godBuild(){
       p:'Dead or Alive marks the house the moment the night starts, and Testudo raises itself again every time it reloads \u2014 both on their own. The keeper\u2019s essence never runs out, so veil and burst as long as you like. Horseborn has no cooldown at all; Unerring Arrow and Last Ferry each have their own: fire one (keys 3\u20135, or tap its icon) or the ticked ones together (G or ALL). Last Ferry carries you straight out once every ember is gathered. Hold an icon (or Alt + 3\u20135) to tick or untick it.',
       d:'Two grabs soaked and stunned, every ember, memory and the thing marked, the nearest ember pulled into your hands, and fourteen seconds fast and silent at once \u2014 and, once the seal breaks, the ferry out.'}};}
 const curLegend=()=>(GOD.on&&GOD.ok&&GOD.c)?GOD.c:(BYID[save.main]||ROSTER[0]);
+/* the skin this player wears, and the ghost it draws */
+const mySkin=()=>(save.skins||[]).indexOf(save.skin)>=0&&skinOK(save.skin)?save.skin:'hollow';
+const myChar=()=>heroChar(mySkin());
 /* the legend everyone else sees you as */
 const pubLegend=()=>curLegend().pub||curLegend().id;
 
@@ -3430,6 +3482,27 @@ function buildLegend(c,parent){
       H(PL(0.18,0.09),-0.16,hy+0.09,-0.02,0,0,-0.5);break;
     case'horned':H(CO(0.17,0.38),0,hy+0.08,-0.02,0.25);H(CO(0.03,0.2),0.13,hy+0.12,0,0,0,-1.4);
       H(CO(0.03,0.2),-0.13,hy+0.12,0,0,0,1.4);break;
+    case'cowl':{   /* THE HOLLOW: a deep cowl, nothing inside it but two lights */
+      const hd=H(CO(0.21,0.36),0,hy+0.06,-0.045,0.38);hd.scale.z=1.15;
+      H(TO(0.15,0.024,Math.PI*1.2),0,hy-0.02,0.075,0.25,0,-Math.PI*0.1);   /* the hood's lip */
+      const eyeGeo=SP(0.024);
+      [0.047,-0.047].forEach(x=>{const e=new THREE.Mesh(eyeGeo,coreMat);e.position.set(x,0.005,0.115);e.scale.set(1,0.62,1);headGrp.add(e);});
+      break;}
+  }
+  /* the Hollow's skins: what sits on (or around) the cowl */
+  if(lk.hero){
+    switch(lk.x){
+      case'horns':H(CO(0.04,0.3),0.15,hy+0.18,-0.04,-0.2,0,-0.75);H(CO(0.04,0.3),-0.15,hy+0.18,-0.04,-0.2,0,0.75);break;
+      case'crown':H(TO(0.15,0.012),0,hy+0.17,-0.01,Math.PI/2);
+        for(let i=0;i<5;i++){const a=(i-2)*0.42;H(CO(0.02,0.13),Math.sin(a)*0.15,hy+0.23,Math.cos(a)*0.15-0.01);}break;
+      case'antlers':[1,-1].forEach(sg=>{H(CO(0.022,0.34),sg*0.13,hy+0.24,-0.05,0,0,-sg*0.6);
+        H(CO(0.016,0.16),sg*0.2,hy+0.3,-0.05,0,0,-sg*1.3);});break;
+      case'halo':H(TO(0.17,0.012),0,hy+0.36,-0.04,Math.PI/2-0.25);break;
+      case'chains':for(let i=0;i<6;i++){const a=i/6*Math.PI*2;R(TO(0.045,0.01),Math.cos(a)*0.2,0.95+Math.sin(i*1.7)*0.04,Math.sin(a)*0.2,0,a,0.4);}break;
+    }
+    /* a mantle across the shoulders */
+    R(SP(0.085),0.17,sy+0.03,0).scale.set(1.2,0.7,1.1);
+    R(SP(0.085),-0.17,sy+0.03,0).scale.set(1.2,0.7,1.1);
   }
 
   /* --- weapons ride in the hands, so they swing with the arms --- */
@@ -3454,8 +3527,23 @@ function buildLegend(c,parent){
     case'tome':RH(B(0.17,0.06,0.22),hx,wy+0.05,0.12,0.3);break;
   }
 
+  /* the Hollow's lantern: hangs from the left hand and swings with it */
+  if(lk.lantern){
+    const ly=wy-0.2;
+    LH(CY(0.006,0.006,0.16,5),-hx,ly+0.14,0.06);
+    LH(B(0.1,0.025,0.1),-hx,ly+0.07,0.06);
+    LH(B(0.1,0.025,0.1),-hx,ly-0.07,0.06);
+    [[0.04,0.04],[-0.04,0.04],[0.04,-0.04],[-0.04,-0.04]].forEach(q=>LH(B(0.012,0.14,0.012),-hx+q[0],ly,0.06+q[1]));
+    const fl=new THREE.Mesh(SP(0.045),coreMat);fl.position.set(-hx+sx,ly-sy,0.06-sz);pivL.add(fl);
+  }
   /* --- trailing cloth, hung so it can swing --- */
-  let cape=null; const wings=[];
+  let cape=null,scarf=null; const wings=[];
+  if(lk.scarf){
+    const hook=new THREE.Group(); hook.position.set(0.05,1.42,-0.09); rider.add(hook);
+    const m1=new THREE.Mesh(PL(0.08,0.62),mat); m1.position.set(0,-0.26,0); hook.add(m1);
+    const m2=new THREE.Mesh(PL(0.07,0.48),mat); m2.position.set(-0.09,-0.2,0.01); m2.rotation.z=0.12; hook.add(m2);
+    scarf=hook;
+  }
   if(lk.cape){
     const hook=new THREE.Group(); hook.position.set(0,1.42,-0.16); rider.add(hook);
     const m=new THREE.Mesh(PL(0.55,0.95),mat); m.position.y=-0.37; hook.add(m);
@@ -3480,8 +3568,9 @@ function buildLegend(c,parent){
   const wisps=[];
   if(!lk.nowisp){
     const wispGeo=new THREE.ConeGeometry(0.05,0.3,4);geos.push(wispGeo);
-    for(let i=0;i<5;i++){
-      const ang=i/5*Math.PI*2+Math.random()*0.3;
+    const nw=lk.hero?8:5;
+    for(let i=0;i<nw;i++){
+      const ang=i/nw*Math.PI*2+Math.random()*0.3;
       const bx=Math.cos(ang)*0.16, bz=Math.sin(ang)*0.16;
       const w=new THREE.Mesh(wispGeo,mat);
       w.position.set(bx,mounted?0.22:0.1,bz);w.rotation.x=Math.PI;
@@ -3493,7 +3582,7 @@ function buildLegend(c,parent){
   host.add(outer);
   const light=new THREE.PointLight(tint,30,13,2);host.add(light);
   return{g:outer,inner,rig,mat,coreMat,body,core,wisps,light,geos,legend:c,host:host,phase:0,
-    parts:{rig,rider,robe,head:headGrp,pivL,pivR,cape,wings,legs,mounted}};
+    parts:{rig,rider,robe,head:headGrp,pivL,pivR,cape,scarf,wings,legs,mounted}};
 }
 
 /* ---------------------------------------------------------
@@ -3538,6 +3627,10 @@ function animateLegend(gh,dt,t,st){
     p.cape.rotation.x=0.10+mv*0.55+Math.sin(t*5.4)*(0.03+mv*0.08);
     p.cape.rotation.z=Math.sin(t*3.1)*0.05*(0.4+mv);
   }
+  if(p.scarf){
+    p.scarf.rotation.x=0.25+mv*0.85+Math.sin(t*6.1)*(0.05+mv*0.12);
+    p.scarf.rotation.z=Math.sin(t*3.7+1)*0.12*(0.4+mv);
+  }
   p.wings.forEach(function(w,i){
     const s=i?-1:1;
     w.rotation.z=w.userData.z0+s*Math.sin(t*4.2+i)*(0.10+mv*0.22);
@@ -3572,15 +3665,25 @@ function setLegend(id){
   save.main=id;saveNow();
   const c=BYID[id];
   const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
-  disposeLegend(ghost);
-  ghost=buildLegend(c);
-  ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
-  ghost.g.scale.setScalar(0.92);
-  ghost.mat.opacity=0.85;
+  /* the skill changes, the ghost does not: it is always the Hollow, in its skin */
+  if(!ghost||!ghost.legend||ghost.legend.id!==myChar().id){
+    disposeLegend(ghost);
+    ghost=buildLegend(myChar());
+    ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
+    ghost.g.scale.setScalar(0.92);
+    ghost.mat.opacity=0.85;}
   computePS(c);
   AB.cd=0;AB.cdMax=cdFor(c.ab);
   if(typeof multiSync==='function')multiSync();
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
+}
+/* wearing a skin: only the look changes (and everyone else sees it on the next update) */
+function setSkin(id){
+  if(!skinOK(id)||save.skins.indexOf(id)<0)return;
+  save.skin=id;saveNow();
+  const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
+  disposeLegend(ghost);ghost=buildLegend(myChar());ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
+  ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
 }
 /* the account-only legend: switch it on or off (remembered on this device for this account) */
 function godSave(){try{if(GOD.uid)localStorage.setItem('hm_gd:'+GOD.uid,GOD.on?'1':'0');}catch(e){}}
@@ -3591,7 +3694,7 @@ function setGod(on,quiet){
   if(quiet)return;
   const c=curLegend();
   const keepPos={x:ghost?ghost.g.position.x:0,y:ghost?ghost.g.position.y:0,z:ghost?ghost.g.position.z:0};
-  disposeLegend(ghost);ghost=buildLegend(c);ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
+  disposeLegend(ghost);ghost=buildLegend(myChar());ghost.g.position.set(keepPos.x,keepPos.y,keepPos.z);
   ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;
   computePS(c);AB.cd=0;AB.cdMax=cdFor(c.ab);
   if(typeof refreshLegendHUD==='function')refreshLegendHUD();
@@ -4079,7 +4182,7 @@ function animateMonster(dt,t){
   if(mon.hair){mon.hair.rotation.x=Math.min(0.5,mon.spd*0.05)+Math.sin(t*1.7)*0.02;mon.hair.rotation.z=Math.sin(ph*0.5)*0.04*(moving?1:0.3);}
 }
 
-let ghost=buildLegend(curLegend());
+let ghost=buildLegend(myChar());
 let mon=buildMonster();
 
 /* --- embers: 2 per floor, randomised every run --- */
@@ -5028,11 +5131,11 @@ function startDecoy(t,roam,mimic){
   DECOY.x=(n.x+.5)*CS;DECOY.z=(n.z+.5)*CS;DECOY.f=n.f;
   /* it leaves from where you stand and runs out ahead before it starts to wander */
   decoyMesh.position.set(P.x,P.floor*FH+0.7,P.z);
-  decoyMesh.children[0].material.color.set(curLegend().t);
-  decoyMesh.children[1].material.color.set(curLegend().t);
+  decoyMesh.children[0].material.color.set(myChar().t);
+  decoyMesh.children[1].material.color.set(myChar().t);
   clearDecoyCopy();
   if(mimic){
-    const cp=buildLegend(curLegend());
+    const cp=buildLegend(myChar());
     scene.remove(cp.light);   /* no extra light: adding one recompiles every lit material */
     cp.g.scale.setScalar(0.92);cp.g.position.set(P.x,P.y+0.22,P.z);
     DECOY.copy=cp;DECOY.yaw=ghostYaw;
@@ -5403,7 +5506,7 @@ function abActive(){
 }
 function refreshLegendHUD(){
   const c=curLegend();
-  $('ablegend').textContent=c.n;
+  $('ablegend').textContent=HERO_NAME+(c.combo?' \u00b7 COMBINATION':c.id==='god'?' \u00b7 GOD':'');
   $('abname').textContent=c.ab.n;
   document.documentElement.style.setProperty('--vt',c.t);
   const word=c.ab.n.replace(/^(THE|A|AN)\s+/,'').split(/[\s,]+/)[0].replace(/[^A-Z0-9]/g,'');
@@ -5469,13 +5572,13 @@ function previewGhost(t){
 }
 
 /* --- THE VAULT ------------------------------------------------- */
-let vaultOpen=false,vSel=0,vaultRed=null,vFilter='ALL',vCombining=false,vCmbPick=[],vAdd={id:'',pick:''};
+let vaultOpen=false,vSel=0,vaultRed=null,vFilter='ALL',vCombining=false,vSkins=false,vSkinSel=0,vCmbPick=[],vAdd={id:'',pick:''};
 function openVault(){
   if(vaultOpen)return;
   vaultOpen=true;
   if(settingsOpen)closeSettings();
   vSel=Math.max(0,ROSTER.findIndex(c=>isBound(c.id)));
-  vFilter='ALL';vCombining=false;vCmbPick=[];
+  vFilter='ALL';vCombining=false;vSkins=false;vCmbPick=[];vSkinSel=Math.max(0,SKINS.findIndex(x=>x.id===mySkin()));
   $('vaultOv').classList.remove('sheet');
   renderVault();
   dressVault();
@@ -5509,26 +5612,33 @@ function renderVault(){
   $('vEther').textContent=save.ether;
   $('vAsh').textContent=save.ash||0;
   $('vCount').textContent=save.unlocked.length;$('vTotal').textContent=BASE_COUNT;
+  $('vSkinCount').textContent=(save.skins||['hollow']).length;$('vSkinTotal').textContent=SKINS.length;
   refreshClaims();
 
   /* --- filters --- */
   const counts={ALL:ROSTER.length};
   ROLES.forEach(function(r){counts[r]=ROSTER.filter(function(c){return c.r===r;}).length;});
   $('vFilters').innerHTML=['ALL'].concat(ROLES).map(function(r){
-    return '<button class="vchip'+(r===vFilter?' on':'')+'" data-r="'+r+'">'
+    return '<button class="vchip'+(r===vFilter&&!vSkins?' on':'')+'" data-r="'+r+'">'
       +r+'<i>'+counts[r]+'</i></button>';}).join('')
-    +'<button class="vchip cmb'+(vCombining?' on':'')+'" id="vCmbBtn">\u2726 COMBINE</button>';
+    +'<button class="vchip cmb'+(vCombining?' on':'')+'" id="vCmbBtn">\u2726 COMBINE</button>'
+    +'<button class="vchip cmb skin'+(vSkins?' on':'')+'" id="vSkinBtn">\u2727 SKINS<i>'+SKINS.length+'</i></button>';
+  $('vSkinBtn').addEventListener('click',function(e){e.stopPropagation();
+    vSkins=true;vCombining=false;
+    if(typeof SFX.uiPick==='function')SFX.uiPick();
+    renderVault();});
   $('vCmbBtn').addEventListener('click',function(e){e.stopPropagation();
-    vCombining=true;vCmbPick=[];
+    vCombining=true;vSkins=false;vCmbPick=[];
     if(typeof SFX.uiPick==='function')SFX.uiPick();
     if(isTouch)$('vaultOv').classList.add('sheet');
     renderVault();});
   Array.prototype.forEach.call($('vFilters').querySelectorAll('[data-r]'),function(ch){
     ch.addEventListener('click',function(e){e.stopPropagation();
-      vFilter=ch.getAttribute('data-r');vCombining=false;
+      vFilter=ch.getAttribute('data-r');vCombining=false;vSkins=false;
       if(typeof SFX.uiPick==='function')SFX.uiPick();
       renderVault();});
   });
+  if(vSkins){renderSkins();return;}
 
   /* --- the gallery --- */
   const list=vaultList();
@@ -5541,10 +5651,10 @@ function renderVault(){
     if(!un)cls.push('sealed',!open?'locked':(save.ether>=cost?'afford':'poor'));
     return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-i="'+i+'" style="--vt:'+c.t+'">'
       +'<div class="vc-top"><span>'+(c.id==='god'?'\u2726':c.combo?'+':pad2(ORD[c.id]))+'</span><span class="vc-tier">'+(c.combo?'COMBINED':'TIER '+TIER_NAME[c.tier])+'</span></div>'
-      +'<div class="vc-name">'+c.n.replace(/^THE /,'')+'</div>'
+      +'<div class="vc-name">'+escHTML(skillName(c))+'</div>'
       +'<div class="vc-role">'+c.r+'</div>'
       +'<div class="vc-foot">'
-        +(un?'<span class="vc-state">'+(isBound(c.id)?'BOUND':'READY')+'</span>'
+        +(un?'<span class="vc-state">'+(isBound(c.id)?'EQUIPPED':'LEARNED')+'</span>'
           :!open?'<span class="vc-cost lock">LOCKED</span><span class="vc-state">SEALED</span>'
             :'<span class="vc-cost">'+(cost?EG+' '+cost:'FREE')+'</span>'
              +'<span class="vc-state">SEALED</span>')
@@ -5552,7 +5662,7 @@ function renderVault(){
   }).join('');
   Array.prototype.forEach.call($('vGrid').children,function(card){
     card.addEventListener('click',function(e){e.stopPropagation();
-      vSel=parseInt(card.getAttribute('data-i'),10);vCombining=false;
+      vSel=parseInt(card.getAttribute('data-i'),10);vCombining=false;vSkins=false;
       if(typeof SFX.uiPick==='function')SFX.uiPick();
       if(isTouch)$('vaultOv').classList.add('sheet');
       renderVault();});
@@ -5561,8 +5671,8 @@ function renderVault(){
   if(vCombining){renderCombine();return;}
   /* --- the dossier --- */
   const c=ROSTER[vSel],un=isUnlocked(c.id),cost=TIER_COST[c.tier],a=c.ab;
-  /* the highlighted ghost stands in the dossier's own little scene */
-  pvShow(c);
+  /* the Hollow stands in the dossier's own little scene (in the skin it wears) */
+  pvShow(myChar());
   const KEYS=['MIGHT','GRACE','WITS','SPIRIT'];
   const MEAN=['force \u00b7 burst speed','quiet \u00b7 drift speed','reach \u00b7 memory','nerve \u00b7 essence'];
   let bars='';
@@ -5577,27 +5687,26 @@ function renderVault(){
   let act;
   if(un){
     act='<button class="vbtn'+(isBound(c.id)?' dim':'')+'" id="vSel"'+(isBound(c.id)?' disabled':'')+'>'
-      +(isBound(c.id)?'YOU HAUNT AS THIS GHOST':'HAUNT AS THIS GHOST')+'</button>';
+      +(isBound(c.id)?'EQUIPPED ON THE HOLLOW':'EQUIP THIS SKILL')+'</button>';
   }else if(!tierOpen(c.tier)){
     const prev=tierCount(c.tier-1);
     act='<button class="vbtn dim" disabled>SEALED BY THE ORDER OF TIERS</button>'
       +'<div class="vneed">FINISH TIER '+TIER_NAME[c.tier-1]+' FIRST \u2014 '
-      +prev.have+' OF '+prev.total+' DECLASSIFIED</div>';
+      +prev.have+' OF '+prev.total+' LEARNED</div>';
   }else{
     act='<button class="vbtn'+(save.ether<cost?' dim':'')+'" id="vUnl"'+(save.ether<cost?' disabled':'')+'>'
-      +'DECLASSIFY'+(cost?' \u2014 '+cost+' '+EG:' \u2014 FREE')+'</button>'
+      +'LEARN THIS SKILL'+(cost?' \u2014 '+cost+' '+EG:' \u2014 FREE')+'</button>'
       +(save.ether<cost?'<div class="vneed">'+EG+' '+(cost-save.ether)
         +' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   }
   $('vDossBody').innerHTML=
-     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':c.combo?'COMBINED \u00b7 '+c.p.length+' LEGENDS':pad2(ORD[c.id])+' / '+BASE_COUNT)+'</span><span>\u00b7</span>'
+     '<div class="vd-tag"><span>'+(c.id==='god'?'\u2726':c.combo?'COMBINATION \u00b7 '+c.p.length+' SKILLS':'SKILL '+pad2(ORD[c.id])+' / '+BASE_COUNT)+'</span><span>\u00b7</span>'
       +'<b>'+c.r+'</b></div>'
     +'<div class="vd-note">'+ROLE_NOTE[c.r]+'</div>'
-    +'<div class="vd-name">'+c.n+'</div>'
-    +'<div class="vd-epi">'+c.e+' \u00b7 '+c.c+'</div>'
+    +'<div class="vd-name">'+escHTML(skillName(c))+'</div>'
+    +'<div class="vd-epi">'+(c.combo?'A COMBINATION FOR THE HOLLOW':c.e+' \u00b7 '+c.c)+'</div>'
     +'<div class="vd-rule"></div>'
-    +'<div class="vd-label">WHAT THE ABILITY DOES</div>'
-    +'<div class="vd-ability">'+a.n+'</div>'
+    +'<div class="vd-label">WHAT THE SKILL DOES</div>'
     +'<div class="vd-plain">'+a.p+'</div>'
     +'<div class="vd-chips">'
       +'<span class="vd-chip">LASTS <b>'+abLasts(a)+'</b></span>'
@@ -5610,8 +5719,6 @@ function renderVault(){
     +'<div class="vd-stats">'+bars+'</div>'
     +upgradeHTML(c)
     +comboAddHTML(c)
-    +(un?'<div class="vd-lore">'+c.l+'</div>'
-        :'<div class="vd-lore">Record sealed. Declassify this ghost to read its file.</div>')
     +'<div class="vd-act">'+act+'</div>';
   document.documentElement.style.setProperty('--vt',c.t);
   $('vDoss').style.setProperty('--vt',c.t);
@@ -5620,15 +5727,15 @@ function renderVault(){
   const sel=$('vSel');
   if(sel)sel.addEventListener('click',function(e){e.stopPropagation();
     if(c.id==='god')setGod(true);else{if(GOD.on)setGod(false,true);setLegend(c.id);}
-    renderVault();toast(c.n+' \u2014 BOUND',2.4);});
+    renderVault();toast(skillName(c)+' \u2014 EQUIPPED',2.4);});
   const upb=$('vUp');
   if(upb)upb.addEventListener('click',function(e){e.stopPropagation();
     if(!upgradeLegend(c))return;
-    renderVault();SFX.chime();toast(c.n+' \u2014 LEVEL '+upLevel(c.id),2.4);});
+    renderVault();SFX.chime();toast(skillName(c)+' \u2014 LEVEL '+upLevel(c.id),2.4);});
   const upa=$('vUpAll');
   if(upa)upa.addEventListener('click',function(e){e.stopPropagation();
     if(!upgradeCombo(c))return;
-    renderVault();SFX.chime();toast(c.n+' \u2014 UPGRADED',2.4);});
+    renderVault();SFX.chime();toast(skillName(c)+' \u2014 UPGRADED',2.4);});
   $('vDossBody').querySelectorAll('[data-ap]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();
     const id=el.getAttribute('data-ap');vAdd.pick=vAdd.pick===id?'':id;
     if(typeof SFX.uiPick==='function')SFX.uiPick();
@@ -5637,26 +5744,26 @@ function renderVault(){
   if(addb)addb.addEventListener('click',e=>{e.stopPropagation();
     const id=comboAddLegend(c,vAdd.pick);if(!id)return;
     vAdd={id:'',pick:''};vSel=ROSTER.indexOf(BYID[id]);
-    renderVault();SFX.chime();toast(BYID[id].n+' \u2014 '+BYID[id].p.length+' LEGENDS',3);});
+    renderVault();SFX.chime();toast(BYID[id].p.length+' SKILLS COMBINED',3);});
   const unl=$('vUnl');
   if(unl)unl.addEventListener('click',function(e){e.stopPropagation();
     if(!canBuy(c))return;
     save.ether-=cost;save.unlocked.push(c.id);saveNow();
     setLegend(c.id);renderVault();
-    SFX.chime();toast(c.n+' \u2014 DECLASSIFIED',2.8);});
+    SFX.chime();toast(skillName(c)+' \u2014 LEARNED AND EQUIPPED',2.8);});
 }
 /* the upgrade block in a legend's dossier */
 function upgradeHTML(c){
   const AS='<span class="ash"></span>';
   if(c.id==='god'||!isUnlocked(c.id))return '';
   if(c.combo){
-    let h='<div class="vd-label">UPGRADES</div><div class="vup"><div class="vup-txt">A combined legend grows with the legends it was fused from: '
-      +'upgrade '+c.p.map(id=>escHTML(shortName(BYID[id]))+' (level '+upLevel(id)+')').join(', ')+' and it takes their highest stats and each power\u2019s shorter cooldown.</div>';
+    let h='<div class="vd-label">UPGRADES</div><div class="vup"><div class="vup-txt">A combination grows with the skills it was fused from: '
+      +'upgrade '+c.p.map(id=>escHTML(BYID[id].ab.n)+' (level '+upLevel(id)+')').join(', ')+' and it takes their highest stats and each power\u2019s shorter cooldown.</div>';
     const cost=comboUpCost(c);
-    if(!cost)return h+'<button class="vbtn dim" disabled>EVERY LEGEND IN IT IS FULLY UPGRADED</button></div>';
+    if(!cost)return h+'<button class="vbtn dim" disabled>EVERY SKILL IN IT IS FULLY UPGRADED</button></div>';
     const ok=(save.ash||0)>=cost;
     return h+'<button class="vbtn'+(ok?'':' dim')+'" id="vUpAll"'+(ok?'':' disabled')+'>UPGRADE THE WHOLE COMBINATION \u2014 '+cost+' '+AS+'</button>'
-      +'<div class="vneed">'+(ok?'EVERY LEGEND IN IT GOES UP ONE LEVEL':AS+' '+(cost-(save.ash||0))+' MORE ASH \u2014 GATHER EMBERS AND MEMORIES, SURVIVE HUNTS, ESCAPE')+'</div></div>';
+      +'<div class="vneed">'+(ok?'EVERY SKILL IN IT GOES UP ONE LEVEL':AS+' '+(cost-(save.ash||0))+' MORE ASH \u2014 GATHER EMBERS AND MEMORIES, SURVIVE HUNTS, ESCAPE')+'</div></div>';
   }
   const l=upLevel(c.id),pips=Array.from({length:UP_MAX},(_,i)=>'<i'+(i<l?' class="on"':'')+'></i>').join('');
   let h='<div class="vd-label">UPGRADES \u2014 LEVEL '+l+' / '+UP_MAX+'</div><div class="vup"><div class="vup-lv">'+pips+'</div>';
@@ -5699,20 +5806,20 @@ function comboAddHTML(c){
   if(!c.combo)return '';
   if(vAdd.id!==c.id)vAdd={id:c.id,pick:''};
   const n=c.p.length;
-  if(n>=COMBO_MAX)return '<div class="vd-label">ADD A LEGEND</div><div class="vup-txt">It already holds '+COMBO_MAX+' legends, the most a combined legend can.</div>';
+  if(n>=COMBO_MAX)return '<div class="vd-label">ADD A SKILL</div><div class="vup-txt">It already holds '+COMBO_MAX+' skills, the most a combination can.</div>';
   const can=comboAddable(c),cost=comboAddCost(n);
   if(vAdd.pick&&!can.some(o=>o.id===vAdd.pick))vAdd.pick='';
   const pick=vAdd.pick,next=pick?c.p.concat(pick):null;
   const dup=!!next&&save.combos.some(x=>x.id!==c.id&&comboKey(x.p)===comboKey(next));
   const ok=!!pick&&!dup&&save.ether>=cost;
-  let h='<div class="vd-label">ADD A LEGEND \u2014 '+n+' TO '+(n+1)+'</div>'
-    +'<div class="vup-txt">Fuse one more legend you own into it for the difference in price: <b>'+cost.toLocaleString('en-IN')+' '+EG+'</b>. '
-    +'It gains that legend\u2019s power and keeps the higher of each stat. It still looks like '+escHTML(titleCase(BYID[c.p[0]].n))+', and your originals stay yours.</div>';
-  if(!can.length)return h+'<div class="vneed">YOU OWN NO OTHER LEGEND TO ADD \u2014 DECLASSIFY ONE FIRST</div>';
-  h+='<div class="vcmb-list">'+can.map(o=>'<span class="vcmb-pick'+(o.id===pick?' on':'')+'" data-ap="'+o.id+'" style="--pt:'+o.t+'">'+(o.id===pick?'<b>+</b>':'')+escHTML(shortName(o))+'</span>').join('')+'</div>';
-  if(!pick)h+='<button class="vbtn dim" disabled>PICK A LEGEND TO ADD</button>';
+  let h='<div class="vd-label">ADD A SKILL \u2014 '+n+' TO '+(n+1)+'</div>'
+    +'<div class="vup-txt">Fuse one more skill you know into it for the difference in price: <b>'+cost.toLocaleString('en-IN')+' '+EG+'</b>. '
+    +'It gains that power and keeps the higher of each stat, and the single skill stays yours.</div>';
+  if(!can.length)return h+'<div class="vneed">YOU KNOW NO OTHER SKILL TO ADD \u2014 LEARN ONE FIRST</div>';
+  h+='<div class="vcmb-list">'+can.map(o=>'<span class="vcmb-pick'+(o.id===pick?' on':'')+'" data-ap="'+o.id+'" style="--pt:'+o.t+'">'+(o.id===pick?'<b>+</b>':'')+escHTML(o.ab.n)+'</span>').join('')+'</div>';
+  if(!pick)h+='<button class="vbtn dim" disabled>PICK A SKILL TO ADD</button>';
   else if(dup)h+='<button class="vbtn dim" disabled>YOU ALREADY HAVE THIS COMBINATION</button>';
-  else h+='<button class="vbtn'+(ok?'':' dim')+'" id="vAddGo"'+(ok?'':' disabled')+'>ADD '+escHTML(shortName(BYID[pick]))+' \u2014 '+cost.toLocaleString('en-IN')+' '+EG+'</button>'
+  else h+='<button class="vbtn'+(ok?'':' dim')+'" id="vAddGo"'+(ok?'':' disabled')+'>ADD '+escHTML(BYID[pick].ab.n)+' \u2014 '+cost.toLocaleString('en-IN')+' '+EG+'</button>'
     +(save.ether<cost?'<div class="vneed">'+EG+' '+(cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   return '<div class="vup">'+h+'</div>';
 }
@@ -5726,6 +5833,52 @@ function comboAddLegend(c,pick){
   if(isBound(x.id))setLegend(x.id);
   return x.id;
 }
+/* the SKINS tab: the gallery shows the Hollow's skins, the dossier the one picked */
+function renderSkins(){
+  const own=id=>(save.skins||[]).indexOf(id)>=0;
+  vSkinSel=Math.max(0,Math.min(SKINS.length-1,vSkinSel|0));
+  $('vGrid').innerHTML=SKINS.map((k,i)=>{
+    const cls=['vcard'];if(i===vSkinSel)cls.push('on');if(mySkin()===k.id)cls.push('bound');
+    if(!own(k.id))cls.push('sealed',save.ether>=k.cost?'afford':'poor');
+    return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-k="'+i+'" style="--vt:'+k.t+'">'
+      +'<div class="vc-top"><span>'+pad2(i+1)+'</span><span class="vc-tier">SKIN</span></div>'
+      +'<div class="vc-name">'+escHTML(k.n.replace(/^THE /,''))+'</div>'
+      +'<div class="vc-role">LOOK ONLY</div>'
+      +'<div class="vc-foot">'+(own(k.id)?'<span class="vc-state">'+(mySkin()===k.id?'WORN':'OWNED')+'</span>'
+        :'<span class="vc-cost">'+(k.cost?EG+' '+k.cost.toLocaleString('en-IN'):'FREE')+'</span><span class="vc-state">FOR SALE</span>')+'</div></div>';
+  }).join('');
+  Array.prototype.forEach.call($('vGrid').children,card=>card.addEventListener('click',e=>{e.stopPropagation();
+    vSkinSel=parseInt(card.getAttribute('data-k'),10);
+    if(typeof SFX.uiPick==='function')SFX.uiPick();
+    if(isTouch)$('vaultOv').classList.add('sheet');
+    renderVault();}));
+  const k=SKINS[vSkinSel],has=own(k.id),worn=mySkin()===k.id,ok=save.ether>=k.cost;
+  pvShow(k.ch);
+  let act;
+  if(worn)act='<button class="vbtn dim" disabled>THE HOLLOW WEARS THIS SKIN</button>';
+  else if(has)act='<button class="vbtn" id="vSkinWear">WEAR THIS SKIN</button>';
+  else act='<button class="vbtn'+(ok?'':' dim')+'" id="vSkinBuy"'+(ok?'':' disabled')+'>BUY \u2014 '+k.cost.toLocaleString('en-IN')+' '+EG+'</button>'
+    +(ok?'':'<div class="vneed">'+EG+' '+(k.cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>');
+  $('vDossBody').innerHTML=
+     '<div class="vd-tag"><span>\u2727 SKIN '+pad2(vSkinSel+1)+' / '+SKINS.length+'</span><span>\u00b7</span><b>'+(has?'OWNED':'FOR SALE')+'</b></div>'
+    +'<div class="vd-name">'+escHTML(k.n)+'</div>'
+    +'<div class="vd-epi">A SKIN FOR THE HOLLOW</div>'
+    +'<div class="vd-rule"></div>'
+    +'<div class="vd-plain">'+escHTML(k.d)+'</div>'
+    +'<div class="vd-plain">A skin is a look only: your skills, combinations, stats and upgrades stay exactly as they are. Everyone you play with sees it.</div>'
+    +'<div class="vd-act">'+act+'</div>';
+  document.documentElement.style.setProperty('--vt',k.t);$('vDoss').style.setProperty('--vt',k.t);
+  const wear=$('vSkinWear');
+  if(wear)wear.addEventListener('click',e=>{e.stopPropagation();setSkin(k.id);renderVault();toast(k.n+' \u2014 WORN',2.4);});
+  const buy=$('vSkinBuy');
+  if(buy)buy.addEventListener('click',e=>{e.stopPropagation();
+    if(own(k.id)||save.ether<k.cost)return;
+    save.ether-=k.cost;save.skins.push(k.id);
+    if(!Array.isArray(save.skinPend))save.skinPend=[];
+    if(save.skinPend.indexOf(k.id)<0)save.skinPend.push(k.id);
+    setSkin(k.id);cloudPush();   /* straight to the account, like a combination */
+    renderVault();SFX.chime();toast(k.n+' \u2014 BOUGHT AND WORN',2.8);});
+}
 /* the combine panel (in the dossier's place) */
 function renderCombine(){
   const owned=ORDER.filter(c=>!c.combo&&c.id!=='god'&&save.unlocked.indexOf(c.id)>=0);
@@ -5735,28 +5888,28 @@ function renderCombine(){
   const full=save.combos.length>=COMBO_LIMIT;
   const ok=n>=2&&!dup&&!full&&save.ether>=cost;
   const lead=ps[0]||null;
-  if(lead)pvShow(lead);else pvClear();
+  pvShow(myChar());
   const KEYS=['MIGHT','GRACE','WITS','SPIRIT'];
   let bars='';
   if(n>=2)KEYS.forEach((k,i)=>{const v=Math.max.apply(null,ps.map(c=>effSt(c)[i]));
     bars+='<div class="vd-stat"><span>'+k+'</span><span class="vd-track"><span class="vd-fill" style="width:'+v+'%"></span></span><span class="vd-val">'+v+'</span><span class="vd-mean"></span></div>';});
   let act;
   if(n<2)act='<button class="vbtn dim" disabled>PICK '+(2-n)+' MORE</button>';
-  else if(full)act='<button class="vbtn dim" disabled>THE VAULT HOLDS '+COMBO_LIMIT+' COMBINED LEGENDS AT MOST</button>';
+  else if(full)act='<button class="vbtn dim" disabled>THE HOLLOW HOLDS '+COMBO_LIMIT+' COMBINATIONS AT MOST</button>';
   else if(dup)act='<button class="vbtn dim" disabled>YOU ALREADY HAVE THIS COMBINATION</button>';
   else act='<button class="vbtn'+(ok?'':' dim')+'" id="vCmbGo"'+(ok?'':' disabled')+'>COMBINE \u2014 '+cost.toLocaleString('en-IN')+' '+EG+'</button>'
     +(save.ether<cost?'<div class="vneed">'+EG+' '+(cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>':'');
   $('vDossBody').innerHTML=
      '<div class="vd-tag"><span>\u2726 THE FORGE</span></div>'
-    +'<div class="vd-name">COMBINE LEGENDS</div>'
-    +'<div class="vd-plain">Fuse 2 to '+COMBO_MAX+' legends you own into a new one. It keeps <b>every</b> power \u2014 each with its own essence and cooldown, fired alone or together \u2014 and the highest of each stat. It looks like the first legend you pick, and that is the legend everyone else sees. Your originals stay yours.</div>'
-    +'<div class="vcmb-price">'+[2,3,4,5].slice(0,COMBO_MAX-1).map(k=>'<span class="'+(n===k?'on':'')+'">'+k+' LEGENDS \u2014 '+comboCost(k).toLocaleString('en-IN')+'</span>').join('')+'</div>'
-    +'<div class="vd-label">YOUR LEGENDS \u2014 TAP TO PICK, IN ORDER</div>'
+    +'<div class="vd-name">COMBINE SKILLS</div>'
+    +'<div class="vd-plain">Fuse 2 to '+COMBO_MAX+' skills the Hollow knows into one combination. It keeps <b>every</b> power \u2014 each with its own essence and cooldown, fired alone or together \u2014 and the highest of each stat. The single skills stay yours.</div>'
+    +'<div class="vcmb-price">'+[2,3,4,5].slice(0,COMBO_MAX-1).map(k=>'<span class="'+(n===k?'on':'')+'">'+k+' SKILLS \u2014 '+comboCost(k).toLocaleString('en-IN')+'</span>').join('')+'</div>'
+    +'<div class="vd-label">YOUR SKILLS \u2014 TAP TO PICK, IN ORDER</div>'
     +'<div class="vcmb-list">'+owned.map(c=>{const k=vCmbPick.indexOf(c.id);
-        return '<span class="vcmb-pick'+(k>=0?' on':(n>=COMBO_MAX?' full':''))+'" data-cp="'+c.id+'" style="--pt:'+c.t+'">'+(k>=0?'<b>'+(k+1)+'</b>':'')+escHTML(shortName(c))+'</span>';}).join('')+'</div>'
-    +(n?'<div class="vd-label">THE NEW LEGEND</div>'
-      +'<div class="vd-ability">'+escHTML(ps.map(shortName).join(' + '))+'</div>'
-      +'<div class="vcmb-pw">Looks like <b>'+escHTML(titleCase(lead.n))+'</b>'+(n<2?' \u2014 pick at least one more.':'')+'</div>'
+        return '<span class="vcmb-pick'+(k>=0?' on':(n>=COMBO_MAX?' full':''))+'" data-cp="'+c.id+'" style="--pt:'+c.t+'">'+(k>=0?'<b>'+(k+1)+'</b>':'')+escHTML(c.ab.n)+'</span>';}).join('')+'</div>'
+    +(n?'<div class="vd-label">THE NEW COMBINATION</div>'
+      +'<div class="vd-ability">'+escHTML(ps.map(c=>c.ab.n).join(' + '))+'</div>'
+      +(n<2?'<div class="vcmb-pw">Pick at least one more.</div>':'')
       +ps.map(c=>'<div class="vcmb-pw"><i style="background:'+c.t+'"></i>'+escHTML(c.ab.n)+' \u2014 '+escHTML(c.ab.p)+'</div>').join(''):'')
     +(bars?'<div class="vd-label">STATS (THE HIGHEST OF EACH)</div><div class="vd-stats">'+bars+'</div>':'')
     +'<div class="vd-act">'+act+'</div>';
@@ -5778,7 +5931,7 @@ function renderCombine(){
     setLegend(id);
     vCombining=false;vCmbPick=[];vSel=ROSTER.indexOf(BYID[id]);vFilter='ALL';
     renderVault();
-    SFX.chime();toast(BYID[id].n+' \u2014 COMBINED AND BOUND',3);});
+    SFX.chime();toast(p.length+' SKILLS COMBINED AND EQUIPPED',3);});
 }
 $('vaultOv').addEventListener('click',e=>e.stopPropagation());
 $('vClose').addEventListener('click',e=>{e.stopPropagation();closeVault();});
@@ -5876,8 +6029,8 @@ function finishClaim(box){
   if(!pendingTotal()){
     const afford=ROSTER.filter(canBuy).length;
     const d=box.querySelector('.claimdone');
-    if(afford&&d)d.insertAdjacentHTML('afterend','<div class="claimnew">'+afford+' SEALED LEGEND'
-      +(afford>1?'S':'')+' CAN BE DECLASSIFIED \u2014 OPEN THE VAULT</div>');
+    if(afford&&d)d.insertAdjacentHTML('afterend','<div class="claimnew">'+afford+' NEW SKILL'
+      +(afford>1?'S':'')+' CAN BE LEARNED \u2014 OPEN THE VAULT</div>');
   }
   if(vaultOpen)renderVault();
 }
@@ -6145,8 +6298,8 @@ function pvShow(c){
   PV.model.light.distance=6;
   const lk=c.look||{};
   /* frame the whole figure, hat to hem, with a little air */
-  PV.dist=lk.mounted?4.0:3.5;
-  PV.aim=lk.mounted?0.78:0.92;
+  PV.dist=lk.mounted?4.0:lk.hero?4.1:3.5;
+  PV.aim=lk.mounted?0.78:lk.hero?1.0:0.92;
   PV.rotY=0.55;PV.spin=0;PV.idle=0;
   const tint=new THREE.Color(c.t);
   PV.ring.material.color.set(tint);
@@ -7257,7 +7410,7 @@ function updateFlashlight(dt,t){
   if(DARK.t>0)fl*=0.55;
   /* the house's dead-torch scare: stutters out and back (a smooth fade with reduced flashing) */
   if(DREAD.darkT>0)fl*=settings.reduceFlash?Math.max(0.02,Math.abs(DREAD.darkT-0.85)/0.85):(DREAD.darkT>1.45||DREAD.darkT<0.2?(Math.random()<0.5?0.05:0.6):0.02);
-  const tint=_tint.set(curLegend().t).lerp(_white,0.82);
+  const tint=_tint.set(myChar().t).lerp(_white,0.82);
   L.color.copy(tint);
   L.intensity=40*FLASH.level*fl;L.visible=L.intensity>0.05;
   FLASH.cone.visible=false;
@@ -7269,9 +7422,9 @@ function updateFlashlight(dt,t){
   updateLightPool(dt,t,camera.position.x,camera.position.y,camera.position.z,cf,DARK.t>0?0.12:1);
   /* your own faint glow — enough to see your feet by */
   if(ghost&&ghost.light){const fp=FP()&&state!=='title'&&!vaultOpen;
-    if(fp){ghost.light.position.set(P.x,P.y+1.4,P.z);ghost.light.color.set(curLegend().t).lerp(_white,0.7);
+    if(fp){ghost.light.position.set(P.x,P.y+1.4,P.z);ghost.light.color.set(myChar().t).lerp(_white,0.7);
       ghost.light.intensity=(P.hiding?0.15:P.veiling?0.5:1.3);ghost.light.distance=6;}
-    else if(state==='play'||state==='caught'){ghost.light.color.set(curLegend().t);ghost.light.distance=10;}}
+    else if(state==='play'||state==='caught'){ghost.light.color.set(myChar().t);ghost.light.distance=10;}}
   document.getElementById('hideOv').classList.toggle('on',FP()&&P.hiding&&state==='play');
   updateAudio3D(dt);}
 
@@ -7350,14 +7503,15 @@ function cloudPush(create){
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
     pending:save.pending.map(e=>({l:e.l,n:e.n})),music:save.music,lastDay:save.lastDay,v:SAVE_V,
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
-      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),bty:{d:(save.bty&&save.bty.d)||'',p:Object.assign({},save.bty&&save.bty.p),done:((save.bty&&save.bty.done)||[]).slice()},ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id])}),
+      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),bty:{d:(save.bty&&save.bty.d)||'',p:Object.assign({},save.bty&&save.bty.p),done:((save.bty&&save.bty.done)||[]).slice()},ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id]),skins:(save.skins||['hollow']).slice(),skin:save.skin||'hollow'}),
     live:liveNow()};
   const gone=Array.from(UPS_GONE).filter(id=>!(save.ups||{})[id]);
-  const sent=(save.cmbPend||[]).slice(),uid=cloudUser.uid;
+  const sent=(save.cmbPend||[]).slice(),sentSk=(save.skinPend||[]).slice(),uid=cloudUser.uid;
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
-    .then(()=>{   /* the account has these combined legends now */
-      if(!sent.length||!cloudUser||cloudUser.uid!==uid)return;
+    .then(()=>{   /* the account has these combined legends (and skins) now */
+      if(!(sent.length||sentSk.length)||!cloudUser||cloudUser.uid!==uid)return;
       save.cmbPend=(save.cmbPend||[]).filter(id=>sent.indexOf(id)<0);
+      save.skinPend=(save.skinPend||[]).filter(id=>sentSk.indexOf(id)<0);
       try{store(saveKey).setItem(saveKey,JSON.stringify(save));}catch(e){}})
     .then(()=>gone.length&&typeof cloud.dropUps==='function'?cloud.dropUps(cloudUser.uid,gone,UP_MAX).then(()=>gone.forEach(id=>UPS_GONE.delete(id))):0)
     .then(()=>{lastSync=Date.now();syncBad=false;updateAcctLive();})
@@ -7382,7 +7536,7 @@ function replaceSave(next){
   comboSync(save.combos);
   if(typeof vSel==='number'&&vSel>=ROSTER.length)vSel=0;
   const c=curLegend();
-  if(ghost&&ghost.legend&&ghost.legend.id!==c.id)setLegend(c.id);
+  if(ghost&&ghost.legend&&ghost.legend.id!==myChar().id){if(c.id==='god'){if(GOD.on)setGod(true);}else setLegend(c.id);}
   else{computePS(c);AB.cdMax=cdFor(c.ab);refreshLegendHUD();}
   refreshClaims();
   if(vaultOpen)renderVault();
@@ -7460,7 +7614,12 @@ async function applyUser(u){
         x.p.forEach(l=>{if(next.unlocked.indexOf(l)<0)next.unlocked.push(l);});
         if(next.cmbPend.indexOf(id)<0)next.cmbPend.push(id);back=true;});
       if(back){next.ether=Math.max(0,Math.min(next.ether,mc.ether));
-        if(next.combos.some(y=>y.id===mine.main))next.main=mine.main;}}}
+        if(next.combos.some(y=>y.id===mine.main))next.main=mine.main;}}
+    /* skins bought on this device that had not reached the account: put back, with the ether this device had left */
+    if(mine&&Array.isArray(mine.skinPend)&&mine.skinPend.length){const mc=cleanSave(mine,false);let back=false;
+      mc.skinPend.forEach(id=>{if(next.skins.indexOf(id)>=0)return;next.skins.push(id);
+        if(next.skinPend.indexOf(id)<0)next.skinPend.push(id);back=true;});
+      if(back){next.ether=Math.max(0,Math.min(next.ether,mc.ether));if(next.skins.indexOf(mc.skin)>=0)next.skin=mc.skin;}}}
   if(wantName&&wantName.uid===u.uid)u.name=wantName.name;
   else if(data&&data.name)u.name=String(data.name).slice(0,40);
   /* progress moves, it is not copied: the guest slot in this browser starts fresh */
@@ -7855,7 +8014,7 @@ function renderBoard(){
     let meta,val;
     if(lbTab==='esc'){
       const c=BYID[r.legend];
-      meta=(r.team?'Co-op · ':'')+(c?'<i class="lbdot" style="background:'+c.t+'"></i>'+escHTML(titleCase(c.n))+' · ':'')
+      meta=(r.team?'Co-op · ':'')+(c?'<i class="lbdot" style="background:'+c.t+'"></i>'+escHTML(titleCase(c.ab.n))+' · ':'')
         +(r.deaths===1?'1 death':(r.deaths||0)+' deaths');
       val=fmtTime(r.time);
     }else{meta='';val=fmtDur(r.seconds);}
@@ -8138,10 +8297,11 @@ function mpApplyStateRaw(uid,v){
   const jump=!r.seen||Math.hypot(r.tx-r.ent.x,r.tz-r.ent.z)>6||Math.abs(r.ty-r.ent.y)>4;
   if(jump){r.seen=true;r.ent.x=r.tx;r.ent.y=r.ty;r.ent.z=r.tz;r.gy=r.yaw;}
   ipPush(r.ip,r.tx,r.ty,r.tz,r.yaw,r.ent.floor,jump,+v.ts);
-  if(v.lg&&v.lg!==r.lg){
-    r.lg=v.lg;if(r.gh){disposeLegend(r.gh);r.gh=null;}
-    const c=BYID[v.lg]||ROSTER[0];
-    const gh=buildLegend(c);scene.remove(gh.light);gh.g.scale.setScalar(0.92);gh.g.visible=false;r.gh=gh;}
+  const sk=skinOK(v.sk)?v.sk:'hollow';
+  if(v.lg&&(v.lg!==r.lg||sk!==r.sk)){
+    r.lg=v.lg;r.sk=sk;if(r.gh){disposeLegend(r.gh);r.gh=null;}
+    /* everyone is the Hollow: what differs is the skin */
+    const gh=buildLegend(heroChar(sk));scene.remove(gh.light);gh.g.scale.setScalar(0.92);gh.g.visible=false;r.gh=gh;}
   if(!mpSyncing&&prev!==r.ph){
     const n=r.name.toUpperCase();
     if(r.ph===2)toast(n+' WAS TAKEN',3);
@@ -8287,7 +8447,7 @@ function mpStateNow(){
   const fl=(P.hiding?1:0)|(P.veiling?2:0)|(P.dashing?4:0)|(P.moving?8:0)|(AB.invisT>0?16:0)|(AB.silentT>0?32:0);
   const nr=ph===1&&!(P.veiling||AB.invisT>0||AB.silentT>0)?((P.dashing&&P.moving)?PS.noiseB:(P.moving?PS.noise:0))*(AB.loudT>0?1.7:1):0;
   const ts=Math.round(performance.now());   /* when this was sent, so the others can play it back evenly */
-  const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:pubLegend(),ts};
+  const so={x:r2(P.x),y:r2(P.y),z:r2(P.z),f:P.floor,r:r2(ghostYaw),fl,nz:Math.round(nr*10)/10,ph,lg:pubLegend(),sk:mySkin(),ts};
   if(ph===3)so.et=TEAM.myOut;   /* when I got out: the team's time is the latest of these */
   const row=m=>{const st={patrol:0,investigate:1,search:2,chase:3}[m.state]||0;
     const tg=m.state==='chase'&&m.tgt?(m.tgt===P?MP.uid:(m.tgt.uid||'')):'';
@@ -8632,9 +8792,9 @@ function socialTick(now){
   const monRow=m=>[q(m.x),q(m.y),q(m.z),m.floor,q(m.yaw||0),{patrol:0,investigate:1,search:2,chase:3}[m.state]||0,m.goneT>0?1:0];
   const mates=[];
   REMOTE.forEach(r=>{if(r.ph===1&&r.lg)mates.push([q(r.ent.x),q(r.ent.y),q(r.ent.z),r.ent.floor,q(r.gy||r.yaw||0),r.lg,String(r.name).slice(0,24),
-    (r.ent.hiding?1:0)|(r.ent.veiling?2:0)|(r.ent.dashing?4:0)|(r.ent.moving?8:0)]);});
+    (r.ent.hiding?1:0)|(r.ent.veiling?2:0)|(r.ent.dashing?4:0)|(r.ent.moving?8:0),r.sk||'hollow']);});
   SOC.net.publishWatch(SOC.uid,{
-    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,hs:HOUSE_SEED,mp:MP?MP.code:'',lg:pubLegend(),n:cloudUser.name,ts:Math.round(performance.now()),
+    st:state,el:Math.round(elapsed*10)/10,d:runDiff,nf:NF,hs:HOUSE_SEED,mp:MP?MP.code:'',lg:pubLegend(),sk:mySkin(),n:cloudUser.name,ts:Math.round(performance.now()),
     p:[q(P.x),q(P.y),q(P.z),P.floor,q(ghostYaw),fl],
     m:[monRow(M)].concat(PUP.map(p=>monRow(p.M))),
     o:mates,
@@ -9042,9 +9202,10 @@ function watchEmbers(){
   ep.forEach((p,i)=>{const e=embers[i];if(!e||!p)return;
     e.f=p[0];e.x=p[1];e.z=p[2];e.grp.position.set(e.x,e.f*FH+1.15,e.z);});}
 /* the friend's legend look, without touching this player's own choice */
-function watchLook(id){
-  if(!BYID[id]||(ghost&&ghost.legend&&ghost.legend.id===id))return;
-  disposeLegend(ghost);ghost=buildLegend(BYID[id]);ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;}
+function watchLook(sk){
+  const c=heroChar(skinOK(sk)?sk:'hollow');
+  if(ghost&&ghost.legend&&ghost.legend.id===c.id)return;
+  disposeLegend(ghost);ghost=buildLegend(c);ghost.g.scale.setScalar(0.92);ghost.mat.opacity=0.85;}
 function watchFrame(dt,t){
   const s=WV.s;
   if(!WV.ok)return;
@@ -9062,7 +9223,7 @@ function watchFrame(dt,t){
   let dy=wy-ghostYaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;ghostYaw+=dy*Math.min(1,dt*10);
   let cy=ghostYaw-camYaw;while(cy>Math.PI)cy-=2*Math.PI;while(cy<-Math.PI)cy+=2*Math.PI;camYaw+=cy*Math.min(1,dt*3);
   /* their ghost */
-  watchLook(s.lg);
+  watchLook(s.sk);
   ghost.g.visible=s.st==='play'||s.st==='caught';
   ghost.g.position.set(P.x,P.y+0.22+Math.sin(t*2.1)*0.07,P.z);ghost.g.rotation.y=ghostYaw;
   ghost.mat.opacity+=((P.hiding?0.04:P.veiling?0.16:0.85)-ghost.mat.opacity)*Math.min(1,dt*8);
@@ -9092,7 +9253,7 @@ function watchFrame(dt,t){
   const seen=new Set();
   (s.o||[]).forEach(o=>{const id='w_'+o[6];seen.add(id);
     const had=REMOTE.has(id);
-    mpApplyStateRaw(id,{x:o[0],y:o[1],z:o[2],f:o[3],r:o[4],fl:o[7]|0,nz:0,ph:1,lg:o[5],ts:+s.ts||0});
+    mpApplyStateRaw(id,{x:o[0],y:o[1],z:o[2],f:o[3],r:o[4],fl:o[7]|0,nz:0,ph:1,lg:o[5],sk:o[8],ts:+s.ts||0});
     const r=REMOTE.get(id);
     if(r&&r.name!==o[6]){r.name=o[6];const old=r.label;r.label=makeLabel(o[6]);scene.remove(old);old.material.map.dispose();old.material.dispose();}
     if(!had&&r)r.seen=false;});
