@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # to publish the unsigned build to the hollowmere-android-build branch
 
 jobs:
   build:
@@ -38,3 +38,11 @@ jobs:
           name: hollowmere-v3-unsigned
           path: out/
           retention-days: 14
+      # The unsigned APK also goes to its own branch so it can be fetched with plain git and signed.
+      - name: Publish unsigned build to the hollowmere-android-build branch
+        run: |
+          cd out
+          git init -q -b hollowmere-android-build
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com add .
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -qm "Unsigned Hollowmere V3 APK, build ${{ github.run_number }} (${{ github.sha }})"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" hollowmere-android-build
