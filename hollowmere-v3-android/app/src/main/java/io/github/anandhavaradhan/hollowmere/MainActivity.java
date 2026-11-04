@@ -106,6 +106,18 @@ public class MainActivity extends Activity {
         s.setSupportZoom(false);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
+        s.setTextZoom(100);                                  // the game's layout ignores the phone's font size
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.setLongClickable(false);                         // holding BURST / VEIL must not open a menu
+        web.setOnLongClickListener(v -> true);
+        web.setHapticFeedbackEnabled(false);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            web.setOnApplyWindowInsetsListener((v, insets) -> {
+                v.setPadding(0, 0, 0, insets.getInsets(WindowInsets.Type.ime()).bottom);
+                return insets;
+            });
+        }
 
         web.addJavascriptInterface(new Bridge(), "HollowmereAndroid");
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
@@ -272,11 +284,17 @@ public class MainActivity extends Activity {
         if (hasFocus) immersive();
     }
 
+    /* Back: a page back if there is one (lobby -> game). On the game page it opens the game's own settings
+       (Escape) during a night instead of closing the app by accident, and only leaves the app from the title. */
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        if (web == null) { super.onBackPressed(); return; }
+        if (web.canGoBack()) { web.goBack(); return; }
+        web.evaluateJavascript("(function(){var t=document.getElementById('titleOv');"
+                + "if(!t||!t.classList.contains('hidden'))return 'exit';"
+                + "document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',keyCode:27,bubbles:true}));"
+                + "return 'esc';})()", value -> { if (value != null && value.contains("exit")) finish(); });
     }
 
     @Override
