@@ -20,10 +20,10 @@ export const NEWS = [
     date: '2026-11-04',
     tag: 'NEW',
     title: 'One ghost: the Hollow, and skins',
-    body: 'You now play one ghost of your own, the Hollow: a hooded spirit with a lantern that never goes out and a blade of cold light. ' +
+    body: 'You now play one ghost of your own, the Hollow: a hooded spirit in a torn, glowing robe, nothing in its hood but two cold lights, a caged lantern that never goes out and a blade of pale fire. ' +
       'The 41 legends have become the Hollow\'s skills. Everything you had is still yours: the skills you learned, your combinations, your upgrades and your ash. ' +
       'Equip a skill or a combination in the vault, exactly as before.\n\n' +
-      'The vault has a new SKINS tab. Spend ether on new looks for the Hollow: Mistveil, Emberwraith, Rimeshade, Gravebloom, the Drowned, Blood Moon, Voidcaller and the Pale Seraph. ' +
+      'The vault has a new SKINS tab. Spend ether on new looks for the Hollow: Mistveil, Emberwraith (horns, a scythe and rising sparks), Rimeshade (a crown of ice), Gravebloom (glowing antlers), the Drowned (chains and dripping water), Blood Moon (twin blades, red eyes), Voidcaller (a broken halo) and the Pale Seraph (feathered wings and a double halo). ' +
       'A skin is a look only and never changes a stat or a power. The friends you play with, and anyone watching you, see the skin you wear.'
   },
   {
