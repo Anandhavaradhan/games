@@ -991,7 +991,7 @@ function godSection(p){
   return '<h3>GOD skin <small>'+(on?'lent until '+esc(new Date(until).toLocaleString())+' \u00b7 '+dur((until-Date.now())/1000)+' left':'not lent')+'</small></h3>'
     +'<div class="editbar" style="margin-top:6px">'+GOD_LEND.map(([s,l])=>'<button class="btn" data-god="'+s+'">'+(on?'Reset to ':'Lend for ')+l+'</button>').join('')
     +(on?'<button class="btn bad" id="e_godoff">Take it back</button>':'')+'</div>'
-    +'<p class="dsub" style="margin-top:6px">Puts the GOD skin in their vault for that long. Wearing it gives the GOD skill (locked while worn), the Pale Seraph look and the best trinket. When it runs out, or you take it back, they go back to their own skin and skill.</p>';
+    +'<p class="dsub" style="margin-top:6px">Puts the GOD skin in their vault for that long. It is shared, not handed over: you keep yours, and you can lend it to several players at once. Wearing it gives the GOD skill (locked while worn), the Pale Seraph look and the best trinket. When it runs out, or you take it back, they go back to their own skin and skill.</p>';
 }
 async function godLend(uid,sec){
   const p=players.find(x=>x.uid===uid);if(!p)return;
