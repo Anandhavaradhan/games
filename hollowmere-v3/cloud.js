@@ -285,6 +285,13 @@ export async function addEscape(uid, e, id) {
   const r = await F.addDoc(F.collection(db, BOARD), escapeDoc(uid, e));
   return r.id;
 }
+/* this player's fastest solo escape on this game's board (any difficulty), or 0 if none */
+export async function myBestEscape(uid) {
+  const snap = await F.getDocs(F.query(F.collection(db, BOARD), F.where('uid', '==', uid), F.where('team', '==', false)));
+  let best = 0;
+  snap.docs.forEach(d => { const t = +d.data().time; if (t >= 20 && (!best || t < best)) best = t; });
+  return best;
+}
 export async function loadEscape(id) {
   const snap = await F.getDoc(F.doc(db, BOARD, id));
   return snap.exists() ? snap.data() : null;

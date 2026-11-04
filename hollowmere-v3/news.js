@@ -16,6 +16,13 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-04-v3-own-best-night',
+    date: '2026-11-04',
+    tag: 'FIX',
+    title: 'V3 keeps its own best night',
+    body: 'Best night on your account card was showing your best night from Hollowmere V2. V3 now keeps its own: your fastest solo escape in V3. If you have already escaped in V3, it starts from your fastest solo night on the V3 leaderboard. Your V2 best night stays in V2.'
+  },
+  {
     id: '2026-11-04-guests-try-everything',
     date: '2026-11-04',
     tag: 'NEW',

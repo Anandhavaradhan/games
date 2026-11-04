@@ -1560,10 +1560,12 @@ setInterval(()=>guestFlush(false),60000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)guestFlush(true);});
 addEventListener('pagehide',()=>guestFlush(true));
 const NEWS_ID_RE=/^[a-z0-9-]{1,60}$/,NEWS_KEEP=500;
-const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','memories','etherEarned','story'];
+/* bestTime3 is V3's own best night. V2 keeps its best night in stats.bestTime of the same shared account,
+   so V3 never reads or writes that one. */
+const STAT_KEYS=['runs','deaths','bestTime3','playTime','activeTime','embers','memories','etherEarned','story'];
 /* the ids today's bounties can have (see DAILY_POOL) */
 const DAILY_IDS_SAVE=['d_emb','d_mem','d_lure','d_close','d_hunt','d_esc','d_hide','d_bnt'];
-function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
+function freshStats(){return {runs:0,deaths:0,bestTime3:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
 function freshSave(){return {skins:['hollow','t_bottle'],skin:'hollow',tskin:'t_bottle',skinPend:[],bty:{d:'',p:{},done:[]},combos:[],cmbPend:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
@@ -5329,7 +5331,7 @@ function endRun(win){
   st.legendRuns[save.main]=(st.legendRuns[save.main]||0)+1;
   /* best escape = the night clock at the front door (deaths included); feeds the leaderboard */
   let newBest=false;
-  if(win){const nt=Math.round(elapsed*10)/10;if(SOLO_RANKED&&(!st.bestTime||nt<st.bestTime)){st.bestTime=nt;newBest=true;}}
+  if(win){const nt=Math.round(elapsed*10)/10;if(SOLO_RANKED&&(!st.bestTime3||nt<st.bestTime3)){st.bestTime3=nt;newBest=true;}}
   else st.deaths++;
   if(win){
     RUN.ether+=PAY.escape;RUN.tally['ESCAPED THE HOUSE']=PAY.escape;RUN.ash+=ASH_PAY.escape;
@@ -8089,6 +8091,7 @@ function cloudPush(create){
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
       combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),bty:{d:(save.bty&&save.bty.d)||'',p:Object.assign({},save.bty&&save.bty.p),done:((save.bty&&save.bty.done)||[]).slice()},ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id]),skins:(save.skins||['hollow']).slice(),skin:save.skin||'hollow',tskin:save.tskin||'t_bottle'}),
     live:liveNow()};
+  if(!st.bestTime3)delete data.stats.bestTime3;   /* no V3 best yet: sign-in keeps looking for one on the V3 board */
   const gone=Array.from(UPS_GONE).filter(id=>!(save.ups||{})[id]);
   const sent=(save.cmbPend||[]).slice(),sentSk=(save.skinPend||[]).slice(),uid=cloudUser.uid;
   return cloud.savePlayer(cloudUser.uid,data,{create:!!create})
@@ -8205,6 +8208,11 @@ async function applyUser(u){
       mc.skinPend.forEach(id=>{if(next.skins.indexOf(id)>=0)return;next.skins.push(id);
         if(next.skinPend.indexOf(id)<0)next.skinPend.push(id);back=true;});
       if(back){next.ether=Math.max(0,Math.min(next.ether,mc.ether));if(next.skins.indexOf(mc.skin)>=0)next.skin=mc.skin;if(next.skins.indexOf(mc.tskin)>=0)next.tskin=mc.tskin;}}}
+  /* V3's best night used to share stats.bestTime with V2. An account with no V3 best of its own yet
+     takes its fastest solo escape on the V3 board (V3 nights only), never V2's number. */
+  if(data&&!(data.stats&&data.stats.bestTime3>0)&&typeof cloud.myBestEscape==='function'){
+    try{const b=await cloud.myBestEscape(u.uid);if(b>0&&(!next.stats.bestTime3||b<next.stats.bestTime3))next.stats.bestTime3=b;}
+    catch(e){console.warn('V3 best night not read:',e);}}
   if(wantName&&wantName.uid===u.uid)u.name=wantName.name;
   else if(data&&data.name)u.name=String(data.name).slice(0,40);
   /* progress moves, it is not copied: the guest slot in this browser starts fresh */
@@ -8327,7 +8335,7 @@ function renderAcct(){
      +'<div>Ether<b>'+save.ether+'</b></div>'
      +'<div>Legends<b>'+save.unlocked.length+' / '+BASE_COUNT+'</b></div>'
      +'<div>Escapes<b>'+save.escapes+'</b></div>'
-     +'<div>Best night<b>'+(st.bestTime?fmtTime(st.bestTime):'\u2014')+'</b></div>'
+     +'<div>Best night<b>'+(st.bestTime3?fmtTime(st.bestTime3):'\u2014')+'</b></div>'
      +'<div>Deaths<b>'+st.deaths+'</b></div>'
      +'<div>Time in the house<b>'+fmtDur(st.playTime)+'</b></div>'
      +'<div>Active time (leaderboard)<b>'+fmtDur(ptShown())+'</b></div>'
