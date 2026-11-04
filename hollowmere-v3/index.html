@@ -1510,6 +1510,8 @@ const SKIN_BY={};SKINS.forEach(s=>{SKIN_BY[s.id]=s;
   const lk=Object.assign({hero:1,cape:s.look.nocape?0:1},s.look);
   s.ch={id:'skin_'+s.id,n:s.n,t:s.t,e:s.e,look:lk};});
 const skinOK=id=>!!SKIN_BY[id];
+/* the trinket skins' ids (their looks are in TRINKET SKINS, near the trinkets) */
+const TSKIN_IDS=['t_bottle','t_skull','t_bell','t_doll','t_orb','t_lantern','t_crystal'];
 /* every skin also adds a fixed bonus to MIGHT, GRACE, WITS and SPIRIT (on top of the skill and its upgrades, up to 100) */
 const STAT_NAMES=['MIGHT','GRACE','WITS','SPIRIT'];
 const skinBonusText=k=>k.b.every(v=>!v)?'':k.b.every(v=>v===k.b[0])?'+'+k.b[0]+' TO ALL FOUR':k.b.map((v,i)=>v?'+'+v+' '+STAT_NAMES[i]:'').filter(Boolean).join(' \u00b7 ');
@@ -1562,7 +1564,7 @@ const STAT_KEYS=['runs','deaths','bestTime','playTime','activeTime','embers','me
 /* the ids today's bounties can have (see DAILY_POOL) */
 const DAILY_IDS_SAVE=['d_emb','d_mem','d_lure','d_close','d_hunt','d_esc','d_hide','d_bnt'];
 function freshStats(){return {runs:0,deaths:0,bestTime:0,playTime:0,activeTime:0,embers:0,memories:0,etherEarned:0,story:0,legendRuns:{}};}
-function freshSave(){return {skins:['hollow'],skin:'hollow',skinPend:[],bty:{d:'',p:{},done:[]},combos:[],cmbPend:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
+function freshSave(){return {skins:['hollow','t_bottle'],skin:'hollow',tskin:'t_bottle',skinPend:[],bty:{d:'',p:{},done:[]},combos:[],cmbPend:[],newsRead:[],ash:0,ups:{},ether:0,unlocked:FREE.slice(),main:FIRST_GHOST,lastDay:'',escapes:0,pending:[],music:true,v:SAVE_V,stats:freshStats()};}
 /* GUESTS ARE TEMPORARY: a guest's progress (LS_KEY) is kept in sessionStorage, so it lasts only
    while the game is open and is gone when the tab or browser closes. Signing in moves it into the
    new account. A signed-in account's local copy (LS_KEY:uid) stays in localStorage as before. */
@@ -1631,11 +1633,14 @@ function cleanSave(raw,isLocal){
     if(Array.isArray(bty.done))out.bty.done=bty.done.filter((id,i,a)=>DAILY_IDS_SAVE.indexOf(id)>=0&&a.indexOf(id)===i);}
   /* the Hollow's skins (kept in the cloud inside stats, like the combined legends) */
   const sk=Array.isArray(src.skins)?src.skins:(src.stats&&Array.isArray(src.stats.skins))?src.stats.skins:[];
-  out.skins=['hollow'].concat(sk.filter((id,i,a)=>id!=='hollow'&&skinOK(id)&&a.indexOf(id)===i));
+  /* the Hollow's skins and the trinket skins share one list (trinket ids start t_) */
+  out.skins=['hollow','t_bottle'].concat(sk.filter((id,i,a)=>id!=='hollow'&&id!=='t_bottle'&&(skinOK(id)||TSKIN_IDS.indexOf(id)>=0)&&a.indexOf(id)===i));
+  const tw=typeof src.tskin==='string'?src.tskin:(src.stats&&typeof src.stats.tskin==='string')?src.stats.tskin:'t_bottle';
+  out.tskin=out.skins.indexOf(tw)>=0?tw:'t_bottle';
   const worn=typeof src.skin==='string'?src.skin:(src.stats&&typeof src.stats.skin==='string')?src.stats.skin:'hollow';
   out.skin=out.skins.indexOf(worn)>=0?worn:'hollow';
   /* skins bought on this device that the account has not confirmed yet (only kept on the device) */
-  if(Array.isArray(src.skinPend))out.skinPend=src.skinPend.filter((id,i,a)=>out.skins.indexOf(id)>=0&&id!=='hollow'&&a.indexOf(id)===i);
+  if(Array.isArray(src.skinPend))out.skinPend=src.skinPend.filter((id,i,a)=>out.skins.indexOf(id)>=0&&id!=='hollow'&&id!=='t_bottle'&&a.indexOf(id)===i);
   if(BYID[src.main]&&!BYID[src.main].combo&&out.unlocked.indexOf(src.main)>=0)out.main=src.main;
   else if(out.combos.some(x=>x.id===src.main))out.main=src.main;
   return out;
@@ -3645,6 +3650,12 @@ function buildHollow(c,parent){
 }
 function buildLegend(c,parent){
   if(c.look&&c.look.hero)return buildHollow(c,parent);
+  if(c.trinket){   /* a trinket skin in the vault's portrait: the trinket, large */
+    const host=parent||scene,g=new THREE.Group(),b=tBody(c.trinket);b.scale.setScalar(4.6);b.position.y=0.3;g.add(b);
+    const halo=glowSprite(new THREE.Color(c.t),1.5);halo.position.y=0.75;halo.material.opacity=0.5;g.add(halo);host.add(g);
+    const light=new THREE.PointLight(new THREE.Color(c.t),30,13,2);host.add(light);
+    return{g,inner:g,rig:g,mat:new THREE.MeshBasicMaterial(),coreMat:new THREE.MeshBasicMaterial(),light,geos:[],legend:c,host,phase:0,parts:null,
+      anim:null,body:b,core:halo,wisps:[]};}
   const host=parent||scene;
   const outer=new THREE.Group(), inner=new THREE.Group(), rig=new THREE.Group();
   outer.add(inner); inner.add(rig);
@@ -3878,6 +3889,7 @@ function disposeLegend(gh){
   host.remove(gh.g);host.remove(gh.light);
   gh.geos.forEach(g=>{try{g.dispose();}catch(e){}});
   try{gh.mat.dispose();gh.coreMat.dispose();}catch(e){}
+  if(gh.legend&&gh.legend.trinket)gh.g.traverse(o=>{if(o.isSprite)o.material.dispose();});
   if(gh.mats)gh.mats.forEach(q=>{try{q.m.dispose();}catch(e){}});
 }
 function setLegend(id){
@@ -5105,7 +5117,7 @@ function syncSetUI(){
    if(mb)mb.textContent=(save.music!==false)?'ON \u2014 THE HOUSE HUMS':'OFF \u2014 SILENCE IN THE MENUS';}
   $('setClose').textContent=(state==='play')?'RESUME':'CLOSE';
   $('gamRange').value=settings.gamma;$('gamVal').textContent=Math.round(settings.gamma*100)+'%';
-  $('viewBtn').textContent=settings.view==='tp'?'OVER THE SHOULDER \u2014 SEE YOUR LEGEND':'FIRST PERSON \u2014 THROUGH YOUR OWN EYES';
+  $('viewBtn').textContent=settings.view==='tp'?'OVER THE SHOULDER \u2014 SEE YOUR GHOST':'FIRST PERSON \u2014 THROUGH YOUR OWN EYES';
   $('qualBtn').textContent={high:'HIGH \u2014 SHADOWS, BLOOM, FILM GRAIN',medium:'MEDIUM \u2014 LIGHTER SHADOWS, NO BLOOM',low:'LOW \u2014 FOR OLDER DEVICES'}[settings.quality];}
 volRange.addEventListener('input',()=>{settings.vol=parseFloat(volRange.value);volVal.textContent=Math.round(settings.vol*100)+'%';
   if(master)master.gain.value=settings.vol;saveSettings();});
@@ -5795,13 +5807,13 @@ function previewGhost(t){
 }
 
 /* --- THE VAULT ------------------------------------------------- */
-let vaultOpen=false,vSel=0,vaultRed=null,vFilter='ALL',vCombining=false,vSkins=false,vSkinSel=0,vCmbPick=[],vAdd={id:'',pick:''};
+let vaultOpen=false,vSel=0,vaultRed=null,vFilter='ALL',vCombining=false,vSkins=false,vSkinSel=0,vSkinKind='ghost',vTSel=0,vCmbPick=[],vAdd={id:'',pick:''};
 function openVault(){
   if(vaultOpen)return;
   vaultOpen=true;
   if(settingsOpen)closeSettings();
   vSel=Math.max(0,ROSTER.findIndex(c=>isBound(c.id)));
-  vFilter='ALL';vCombining=false;vSkins=true;vCmbPick=[];vSkinSel=Math.max(0,SKINS.findIndex(x=>x.id===mySkin()));
+  vFilter='ALL';vCombining=false;vSkins=true;vSkinKind='ghost';vCmbPick=[];vSkinSel=Math.max(0,SKINS.findIndex(x=>x.id===mySkin()));
   $('vaultOv').classList.remove('sheet');
   renderVault();
   dressVault();
@@ -5835,7 +5847,7 @@ function renderVault(){
   $('vEther').textContent=save.ether;
   $('vAsh').textContent=save.ash||0;
   $('vCount').textContent=save.unlocked.length;$('vTotal').textContent=BASE_COUNT;
-  $('vSkinCount').textContent=(save.skins||['hollow']).length;$('vSkinTotal').textContent=SKINS.length;
+  $('vSkinCount').textContent=(save.skins||['hollow']).length;$('vSkinTotal').textContent=SKINS.length+TSKIN_IDS.length;
   refreshClaims();
 
   /* --- filters --- */
@@ -5843,9 +5855,11 @@ function renderVault(){
   ROLES.forEach(function(r){counts[r]=ROSTER.filter(function(c){return c.r===r;}).length;});
   /* two sections: SKINS first, then SKILLS with its own subtopics (the roles, and COMBINE) */
   $('vFilters').innerHTML='<div class="vtabs">'
-      +'<button class="vtab skin'+(vSkins?' on':'')+'" id="vSkinBtn">\u2727 SKINS<i>'+(save.skins||['hollow']).length+' / '+SKINS.length+'</i></button>'
+      +'<button class="vtab skin'+(vSkins?' on':'')+'" id="vSkinBtn">\u2727 SKINS<i>'+(save.skins||['hollow']).length+' / '+(SKINS.length+TSKIN_IDS.length)+'</i></button>'
       +'<button class="vtab'+(vSkins?'':' on')+'" id="vSkillBtn">\u2726 SKILLS<i>'+save.unlocked.length+' / '+BASE_COUNT+'</i></button></div>'
-    +(vSkins?'':'<div class="vsubs">'+['ALL'].concat(ROLES).map(function(r){
+    +(vSkins?'<div class="vsubs"><button class="vchip'+(vSkinKind==='ghost'?' on':'')+'" data-sk="ghost">THE HOLLOW<i>'+SKINS.filter(x=>save.skins.indexOf(x.id)>=0).length+' / '+SKINS.length+'</i></button>'
+      +'<button class="vchip'+(vSkinKind==='trinket'?' on':'')+'" data-sk="trinket">TRINKETS<i>'+TSKINS.filter(x=>save.skins.indexOf(x.id)>=0).length+' / '+TSKINS.length+'</i></button></div>'
+     :'<div class="vsubs">'+['ALL'].concat(ROLES).map(function(r){
     return '<button class="vchip'+(r===vFilter&&!vCombining?' on':'')+'" data-r="'+r+'">'
       +r+'<i>'+counts[r]+'</i></button>';}).join('')
     +'<button class="vchip cmb'+(vCombining?' on':'')+'" id="vCmbBtn">\u2726 COMBINE</button></div>');
@@ -5853,6 +5867,8 @@ function renderVault(){
     vSkins=true;vCombining=false;
     if(typeof SFX.uiPick==='function')SFX.uiPick();
     renderVault();});
+  $('vFilters').querySelectorAll('[data-sk]').forEach(ch=>ch.addEventListener('click',e=>{e.stopPropagation();
+    vSkinKind=ch.getAttribute('data-sk');if(typeof SFX.uiPick==='function')SFX.uiPick();renderVault();}));
   $('vSkillBtn').addEventListener('click',function(e){e.stopPropagation();
     vSkins=false;vCombining=false;vFilter='ALL';
     if(typeof SFX.uiPick==='function')SFX.uiPick();
@@ -6065,7 +6081,65 @@ function comboAddLegend(c,pick){
   return x.id;
 }
 /* the SKINS tab: the gallery shows the Hollow's skins, the dossier the one picked */
+/* the trinket skins (SKINS > TRINKETS): the same shop, for what you throw */
+function renderTSkins(){
+  const own=id=>(save.skins||[]).indexOf(id)>=0,cur=myTSkin();
+  const open=i=>TSKINS.slice(0,i).every(x=>own(x.id));
+  vTSel=Math.max(0,Math.min(TSKINS.length-1,vTSel|0));
+  const hex=n=>'#'+n.toString(16).padStart(6,'0');
+  $('vGrid').innerHTML=TSKINS.map((k,i)=>{
+    const cls=['vcard'];if(i===vTSel)cls.push('on');if(cur===k.id)cls.push('bound');
+    if(!own(k.id))cls.push('sealed',!open(i)?'locked':save.ether>=k.cost?'afford':'poor');
+    return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-k="'+i+'" style="--vt:'+hex(k.col)+'">'
+      +'<div class="vc-top"><span>'+pad2(i+1)+'</span><span class="vc-tier">TRINKET</span></div>'
+      +'<div class="vc-name">'+escHTML(k.n)+'</div>'
+      +'<div class="vc-role">LOOK \u00b7 THROW \u00b7 LANDING</div>'
+      +'<div class="vc-foot">'+(own(k.id)?'<span class="vc-state">'+(cur===k.id?'IN USE':'OWNED')+'</span>'
+        :!open(i)?'<span class="vc-cost lock">LOCKED</span><span class="vc-state">'+EG+' '+k.cost.toLocaleString('en-IN')+'</span>'
+        :'<span class="vc-cost">'+(k.cost?EG+' '+k.cost.toLocaleString('en-IN'):'FREE')+'</span><span class="vc-state">FOR SALE</span>')+'</div></div>';
+  }).join('');
+  Array.prototype.forEach.call($('vGrid').children,card=>card.addEventListener('click',e=>{e.stopPropagation();
+    vTSel=parseInt(card.getAttribute('data-k'),10);
+    if(typeof SFX.uiPick==='function')SFX.uiPick();
+    if(isTouch)$('vaultOv').classList.add('sheet');
+    renderVault();}));
+  const k=TSKINS[vTSel],has=own(k.id),inUse=cur===k.id,ok=save.ether>=k.cost,isOpen=open(vTSel);
+  const need=TSKINS.find((x,i)=>i<vTSel&&!own(x.id));
+  pvShow({id:'tsk_'+k.id,trinket:k.id,t:hex(k.col),look:{}});
+  let act;
+  if(inUse)act='<button class="vbtn dim" disabled>YOU THROW THIS ONE</button>';
+  else if(has)act='<button class="vbtn" id="vTWear">THROW THIS ONE</button>';
+  else if(!isOpen)act='<button class="vbtn dim" disabled>LOCKED \u2014 SKINS ARE COLLECTED IN ORDER</button>'
+    +'<div class="vneed">BUY '+escHTML(need.n)+' FIRST</div>';
+  else act='<button class="vbtn'+(ok?'':' dim')+'" id="vTBuy"'+(ok?'':' disabled')+'>BUY \u2014 '+k.cost.toLocaleString('en-IN')+' '+EG+'</button>'
+    +(ok?'':'<div class="vneed">'+EG+' '+(k.cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>');
+  const TH={tumble:'tumbles end over end',flat:'spins flat',wobble:'swings and rings',slow:'a high, slow lob',pulse:'low and fast, pulsing',spiral:'corkscrews'};
+  const LD={glass:'bursts into green glass',sparks:'a shower of sparks and a flash',bell:'tolls three times, rings of sound rolling out',crack:'cracks open in a puff of dust',
+    burst:'bursts into motes that drift up',flame:'smashes and leaves a small fire burning',void:'shatters with a violet shockwave'};
+  $('vDossBody').innerHTML=
+     '<div class="vd-tag"><span>\u2727 TRINKET '+pad2(vTSel+1)+' / '+TSKINS.length+'</span><span>\u00b7</span><b>'+(has?'OWNED':isOpen?'FOR SALE':'LOCKED')+'</b></div>'
+    +'<div class="vd-name">'+escHTML(k.n)+'</div>'
+    +'<div class="vd-epi">A SKIN FOR YOUR TRINKETS</div>'
+    +'<div class="vd-rule"></div>'
+    +'<div class="vd-plain">'+escHTML(k.d)+'</div>'
+    +'<div class="vd-chips"><span class="vd-chip">THROW <b>'+TH[k.thr.spin]+(k.thr.trail?', with a trail':'')+'</b></span>'
+      +'<span class="vd-chip">LANDING <b>'+LD[k.land]+'</b></span></div>'
+    +'<div class="vd-plain">Every trinket you find in the house takes this look. A look only: each one lures the thing exactly the same way.</div>'
+    +'<div class="vd-act">'+act+'</div>';
+  document.documentElement.style.setProperty('--vt',hex(k.col));$('vDoss').style.setProperty('--vt',hex(k.col));
+  const wear=$('vTWear');
+  if(wear)wear.addEventListener('click',e=>{e.stopPropagation();save.tskin=k.id;saveNow();dressAllTrinkets();renderVault();toast(k.n+' \u2014 IN USE',2.4);});
+  const buy=$('vTBuy');
+  if(buy)buy.addEventListener('click',e=>{e.stopPropagation();
+    if(own(k.id)||!open(TSKINS.indexOf(k))||save.ether<k.cost)return;
+    save.ether-=k.cost;save.skins.push(k.id);
+    if(!Array.isArray(save.skinPend))save.skinPend=[];
+    if(save.skinPend.indexOf(k.id)<0)save.skinPend.push(k.id);
+    save.tskin=k.id;saveNow();dressAllTrinkets();cloudPush();
+    renderVault();SFX.chime();toast(k.n+' \u2014 BOUGHT, AND IN USE',2.8);});
+}
 function renderSkins(){
+  if(vSkinKind==='trinket'){renderTSkins();return;}
   const own=id=>(save.skins||[]).indexOf(id)>=0;
   /* skins are collected in order: one goes on sale only once every skin before it is yours */
   const open=i=>SKINS.slice(0,i).every(x=>own(x.id));
@@ -6597,14 +6671,154 @@ const trinketGeo=(()=>{const p=[[0,0],[0.045,0],[0.05,0.02],[0.05,0.13],[0.03,0.
 const trinketMat=std({color:0x3a7a55,roughness:0.15,metalness:0.2,emissive:0x2f9a66,emissiveIntensity:1.1});
 /* big enough to spot across a room, with a green glow that does not need your torch to find it */
 function makeTrinket(){const grp=new THREE.Group();
-  const b=new THREE.Mesh(trinketGeo,trinketMat);b.rotation.z=Math.PI/2.3;b.position.y=0.05;b.castShadow=true;grp.add(b);
+  /* the body itself is the trinket skin's (dressTrinket, below) */
   const halo=glowSprite(0x8fe8b8,0.85);halo.position.y=0.12;halo.material.fog=false;grp.add(halo);
   const core=glowSprite(0xd8ffe8,0.22);core.position.y=0.1;core.material.fog=false;grp.add(core);
-  grp.userData.halo=halo;grp.scale.setScalar(1.7);
+  grp.userData.halo=halo;grp.userData.core=core;grp.scale.setScalar(1.7);
   grp.position.set(0,-10,0);scene.add(grp);return grp;}
 const trinkets=[];
 for(let i=0;i<NF*TRINKET_MAX;i++)trinkets.push({x:0,z:0,f:0,grp:makeTrinket(),taken:true});
 const thrown=makeTrinket();thrown.visible=false;
+/* ---- TRINKET SKINS: what the trinkets look like, how they fly when thrown, and how they land ----
+   Bought with ether in the vault (SKINS > TRINKETS), in order like the Hollow's skins. Looks only: every
+   one lures the thing exactly the same way. Owned ids share save.skins (they start 't_'); the one in use
+   is save.tskin. Every trinket on the floor, and the one in the air, wears it. */
+const TSKINS=[
+ {id:'t_bottle',n:'GREEN BOTTLE',cost:0,col:0x8fe8b8,core:0xd8ffe8,
+  d:'An old green bottle. Tumbles end over end and bursts into green glass.',
+  thr:{arc:1.1,spin:'tumble',trail:0,dur:1},land:'glass'},
+ {id:'t_skull',n:'CANDLE SKULL',cost:300,col:0xffb35e,core:0xffe2b0,
+  d:'A small skull with a candle stuck in its crown. Spins flat through the air trailing embers, and bursts in a shower of sparks.',
+  thr:{arc:0.9,spin:'flat',trail:0xff9a3d,dur:1},land:'sparks'},
+ {id:'t_bell',n:'GRAVE BELL',cost:500,col:0xffd98a,core:0xfff0c8,
+  d:'A bronze bell off a grave. It swings and rings as it flies, and on landing tolls three times, rings of sound rolling out across the floor.',
+  thr:{arc:1.3,spin:'wobble',trail:0,dur:1.1},land:'bell'},
+ {id:'t_doll',n:'PORCELAIN HEAD',cost:700,col:0xf4e6ff,core:0xffffff,
+  d:'A doll’s porcelain head. Lobbed high and slow, it cracks open on the boards in a puff of old dust.',
+  thr:{arc:1.8,spin:'slow',trail:0,dur:1.3},land:'crack'},
+ {id:'t_orb',n:'SPIRIT ORB',cost:1000,col:0x7fe8ff,core:0xe0fbff,
+  d:'A ball of trapped ghost-light. Flies low and fast on a comet tail, then bursts into motes that drift up into the dark.',
+  thr:{arc:0.55,spin:'pulse',trail:0x9feeff,dur:0.8},land:'burst'},
+ {id:'t_lantern',n:'TINY LANTERN',cost:1400,col:0xffa040,core:0xffe0a0,
+  d:'A doll’s-house lantern. Flies on a ribbon of flame, smashes, and leaves a little fire burning where it fell.',
+  thr:{arc:1.1,spin:'tumble',trail:0xff7a2a,dur:1},land:'flame'},
+ {id:'t_crystal',n:'VOID CRYSTAL',cost:2000,col:0xb08cff,core:0xeadcff,
+  d:'A shard of something that should not exist. Corkscrews through the air and shatters with a shockwave of violet light.',
+  thr:{arc:1.0,spin:'spiral',trail:0xb08cff,dur:1},land:'void'}
+];
+const TSKIN_BY={};TSKINS.forEach(k=>{TSKIN_BY[k.id]=k;});
+const tskinOK=id=>!!TSKIN_BY[id];
+const myTSkin=()=>(save.skins||[]).indexOf(save.tskin)>=0&&tskinOK(save.tskin)?save.tskin:'t_bottle';
+/* the body of a trinket: built from shared geometry and materials (made once per skin) */
+const TB={};
+function tBody(id){
+  let s=TB[id];
+  if(!s){s=TB[id]={};const G=s;
+    const lathe=(pts,seg)=>new THREE.LatheGeometry(pts.map(([r,y])=>new THREE.Vector2(r,y)),seg||14);
+    switch(id){
+      case't_skull':G.bone=std({color:0xd9cfb8,roughness:0.75,emissive:0x3a2810,emissiveIntensity:0.45});
+        G.dark=new THREE.MeshBasicMaterial({color:0x080504});
+        G.wax=std({color:0xeee0c0,roughness:0.6,emissive:0x40301a,emissiveIntensity:0.5});
+        G.head=new THREE.SphereGeometry(0.075,14,10);G.jaw=new THREE.BoxGeometry(0.08,0.035,0.06);
+        G.eye=new THREE.SphereGeometry(0.019,8,6);G.candle=new THREE.CylinderGeometry(0.018,0.02,0.07,8);break;
+      case't_bell':G.bronze=std({color:0x9a7430,roughness:0.3,metalness:0.85,emissive:0x40280a,emissiveIntensity:0.6});
+        G.bell=lathe([[0,0.15],[0.03,0.15],[0.045,0.12],[0.05,0.06],[0.07,0.01],[0.078,0],[0.07,0.005],[0.045,0.06],[0.04,0.12],[0.025,0.14],[0,0.14]],16);
+        G.loop=new THREE.TorusGeometry(0.02,0.006,6,12);G.clap=new THREE.SphereGeometry(0.018,8,6);break;
+      case't_doll':G.porc=std({color:0xf3e8de,roughness:0.3,emissive:0x2a2420,emissiveIntensity:0.35});
+        G.hair=std({color:0x3a2416,roughness:0.8});G.eyeM=std({color:0x203a7a,roughness:0.1,emissive:0x0a1430,emissiveIntensity:0.6});
+        G.head=new THREE.SphereGeometry(0.075,16,12);G.cap=new THREE.SphereGeometry(0.079,16,8,0,Math.PI*2,0,Math.PI*0.45);
+        G.eye=new THREE.SphereGeometry(0.014,8,6);break;
+      case't_orb':G.glass=std({color:0x9feeff,roughness:0.05,metalness:0.1,emissive:0x2fb8e0,emissiveIntensity:1.6,transparent:true,opacity:0.75});
+        G.ball=new THREE.SphereGeometry(0.065,18,14);break;
+      case't_lantern':G.iron=std({color:0x2a2420,roughness:0.5,metalness:0.7,emissive:0x1a0c04,emissiveIntensity:0.6});
+        G.glassM=std({color:0xffc070,roughness:0.1,emissive:0xff8a2a,emissiveIntensity:1.6,transparent:true,opacity:0.6});
+        G.cage=new THREE.CylinderGeometry(0.045,0.045,0.09,6,1,true);G.cap=new THREE.ConeGeometry(0.055,0.04,6);
+        G.base=new THREE.CylinderGeometry(0.05,0.05,0.015,6);G.post=new THREE.BoxGeometry(0.006,0.09,0.006);G.ring=new THREE.TorusGeometry(0.018,0.004,5,10);break;
+      case't_crystal':G.xtal=std({color:0xb69cff,roughness:0.15,metalness:0.3,emissive:0x6a3cff,emissiveIntensity:1.3,flatShading:true});
+        G.shard=new THREE.OctahedronGeometry(0.06,0);break;
+    }}
+  const b=new THREE.Group(),M=(g,m,x,y,z)=>{const o=new THREE.Mesh(g,m);o.position.set(x||0,y||0,z||0);o.castShadow=true;b.add(o);return o;};
+  switch(id){
+    case't_skull':{M(s.head,s.bone,0,0.08,0).scale.set(1,0.92,1.12);M(s.jaw,s.bone,0,0.025,0.03);
+      M(s.eye,s.dark,0.028,0.085,0.065);M(s.eye,s.dark,-0.028,0.085,0.065);M(s.candle,s.wax,0,0.175,-0.01);
+      const f=glowSprite(0xffb050,0.12);f.position.set(0,0.23,-0.01);f.material.fog=false;b.add(f);break;}
+    case't_bell':{M(s.bell,s.bronze,0,0,0);M(s.loop,s.bronze,0,0.165,0);M(s.clap,s.bronze,0.01,0.015,0);break;}
+    case't_doll':{M(s.head,s.porc,0,0.075,0);M(s.cap,s.hair,0,0.08,-0.006).rotation.x=-0.35;
+      M(s.eye,s.eyeM,0.026,0.08,0.066);M(s.eye,s.eyeM,-0.026,0.08,0.066);break;}
+    case't_orb':{M(s.ball,s.glass,0,0.08,0);break;}
+    case't_lantern':{M(s.cage,s.glassM,0,0.06,0);M(s.cap,s.iron,0,0.125,0);M(s.base,s.iron,0,0.01,0);M(s.ring,s.iron,0,0.16,0);
+      for(let i=0;i<6;i++){const a=i/6*Math.PI*2;M(s.post,s.iron,Math.sin(a)*0.046,0.06,Math.cos(a)*0.046);}
+      const f=glowSprite(0xffa040,0.14);f.position.y=0.06;f.material.fog=false;b.add(f);break;}
+    case't_crystal':{const o=M(s.shard,s.xtal,0,0.09,0);o.scale.set(0.8,1.8,0.8);o.rotation.y=0.4;break;}
+    default:{const o=M(trinketGeo,trinketMat,0,0.05,0);o.rotation.z=Math.PI/2.3;}
+  }
+  return b;
+}
+/* dress one trinket group in a skin: a new body, and its glow in the skin's colour */
+function dressTrinket(grp,id){
+  const k=TSKIN_BY[id]||TSKINS[0];
+  if(grp.userData.body){grp.remove(grp.userData.body);grp.userData.body.traverse(o=>{if(o.isSprite)o.material.dispose();});}
+  const b=tBody(k.id);grp.add(b);grp.userData.body=b;grp.userData.tskin=k.id;
+  grp.userData.halo.material.color.set(k.col);if(grp.userData.core)grp.userData.core.material.color.set(k.core);
+}
+function dressAllTrinkets(){const id=myTSkin();
+  trinkets.forEach(t=>{if(t.grp.userData.tskin!==id)dressTrinket(t.grp,id);});
+  if(thrown.userData.tskin!==id)dressTrinket(thrown,id);}
+dressAllTrinkets();
+/* landing effects that live a little longer than a spark: rings of sound, shockwaves, a fire that burns down */
+const TFX=[];
+function tfxRing(x,y,z,col,r1,dur,delay){
+  const m=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  const o=new THREE.Mesh(new THREE.RingGeometry(0.9,1,40),m);o.rotation.x=-Math.PI/2;o.position.set(x,y+0.03,z);o.scale.setScalar(0.05);scene.add(o);
+  TFX.push({o,t:-(delay||0),dur,r1,kind:'ring'});}
+function tfxFire(x,y,z,dur){TFX.push({x,y,z,t:0,dur,kind:'fire'});}
+function tfxTick(dt){
+  for(let i=TFX.length-1;i>=0;i--){const f=TFX[i];f.t+=dt;
+    if(f.kind==='ring'){if(f.t<0)continue;const k=f.t/f.dur;
+      if(k>=1){scene.remove(f.o);f.o.geometry.dispose();f.o.material.dispose();TFX.splice(i,1);continue;}
+      f.o.scale.setScalar(0.05+f.r1*k);f.o.material.opacity=0.85*(1-k);}
+    else if(f.kind==='fire'){if(f.t>=f.dur){TFX.splice(i,1);continue;}
+      const n=Math.random()<0.6?1:2;for(let j=0;j<n;j++)spawnPart(f.x+(Math.random()-.5)*0.3,f.y+0.05,f.z+(Math.random()-.5)*0.3,
+        Math.random()<0.5?0xff7a2a:0xffc060,{x:(Math.random()-.5)*0.2,y:0.6+Math.random()*0.7,z:(Math.random()-.5)*0.2},0.5,0.16*(1-f.t/f.dur)+0.05);}}
+}
+/* how a trinket moves in the air (k runs 0 to 1 along the throw) */
+function trinketFly(fl,k,dt){
+  const sk=TSKIN_BY[fl.sk]||TSKINS[0],th=sk.thr;
+  let x=fl.x0+(fl.x1-fl.x0)*k,y=fl.y0+(fl.y1-fl.y0)*k+Math.sin(k*Math.PI)*th.arc,z=fl.z0+(fl.z1-fl.z0)*k;
+  const r=thrown.rotation;
+  switch(th.spin){
+    case'flat':r.set(0.25,r.y+dt*18,0);break;
+    case'wobble':r.set(Math.sin(fl.t*16)*0.7,r.y+dt*3,Math.cos(fl.t*13)*0.5);
+      if(!fl.rang||fl.t-fl.rang>0.22){fl.rang=fl.t;tone({f:1320,f2:1300,type:'sine',dur:.35,vol:.03,a:.003,echo:.5});}break;
+    case'slow':r.x+=dt*4;r.z+=dt*2.5;break;
+    case'pulse':thrown.scale.setScalar(1.7*(1+Math.sin(fl.t*30)*0.12));break;
+    case'spiral':{const dx=fl.x1-fl.x0,dz=fl.z1-fl.z0,L=Math.hypot(dx,dz)||1,a=fl.t*22,rr=0.28*Math.sin(k*Math.PI);
+      x+=(-dz/L)*Math.cos(a)*rr;z+=(dx/L)*Math.cos(a)*rr;y+=Math.sin(a)*rr;r.y+=dt*12;r.x=0.5;break;}
+    default:r.x+=dt*14;r.z+=dt*9;
+  }
+  thrown.position.set(x,y,z);
+  if(th.trail&&Math.random()<0.85)spawnPart(x,y+0.1,z,th.trail,{x:(Math.random()-.5)*0.3,y:0.15+Math.random()*0.3,z:(Math.random()-.5)*0.3},0.45,0.13);
+}
+/* how it lands (the lure itself is the same for every skin) */
+function trinketLand(fl,pan,v){
+  const x=fl.x1,y=fl.y1,z=fl.z1,R=Math.random,burst=(n,col,sp,up,ttl,sc)=>{for(let i=0;i<n;i++)spawnPart(x,y+0.1,z,typeof col==='function'?col():col,
+    {x:(R()-.5)*sp,y:R()*up,z:(R()-.5)*sp},ttl,sc);};
+  switch((TSKIN_BY[fl.sk]||TSKINS[0]).land){
+    case'sparks':burst(22,()=>R()<0.5?0xff9a3d:0xffd08a,3.2,2.4,.55,.14);spawnPart(x,y+0.15,z,0xffb050,{x:0,y:0,z:0},.22,1.4);
+      tone({f:180,f2:90,type:'sawtooth',dur:.25,vol:.03*v,a:.002,pan});break;
+    case'bell':burst(6,0xffd98a,1.4,1.0,.5,.12);
+      [0,0.45,0.9].forEach((d,i)=>{tfxRing(x,y,z,0xffd98a,3.2,1.1,d);
+        tone({f:880,f2:872,type:'sine',dur:1.4,vol:.05*v,a:.003,pan,echo:.8,delay:d});tone({f:2217,type:'sine',dur:.9,vol:.02*v,a:.003,pan,echo:.8,delay:d});});break;
+    case'crack':burst(9,0xfff4ea,1.6,0.9,.6,.12);burst(10,0x8a8072,1.0,0.5,1.1,.32);break;
+    case'burst':spawnPart(x,y+0.15,z,0xe0fbff,{x:0,y:0,z:0},.25,1.6);
+      for(let i=0;i<18;i++){const a=i/18*Math.PI*2;spawnPart(x,y+0.15,z,i%2?0x7fe8ff:0xe0fbff,{x:Math.cos(a)*0.9,y:0.5+R()*0.8,z:Math.sin(a)*0.9},1.4,.14);}
+      tone({f:520,f2:1560,type:'sine',dur:.5,vol:.04*v,a:.01,pan,echo:.7});break;
+    case'flame':burst(10,0x9a7a5a,1.6,1.0,.5,.12);spawnPart(x,y+0.15,z,0xffa040,{x:0,y:0,z:0},.3,1.2);tfxFire(x,y,z,1.6);break;
+    case'void':burst(20,()=>R()<0.5?0xb08cff:0xeadcff,3.6,1.6,.6,.15);spawnPart(x,y+0.15,z,0xb08cff,{x:0,y:0,z:0},.3,2.0);
+      tfxRing(x,y,z,0xb08cff,4.2,0.6,0);tone({f:110,f2:55,type:'sine',dur:.6,vol:.07*v,a:.004,pan,echo:.6});break;
+    default:burst(12,0x8fd1b0,2.2,1.6,.6,.18);
+  }
+}
 function scatterTrinkets(){
   let i=0;
   for(let f=0;f<NF;f++){
@@ -6724,8 +6938,9 @@ function tryThrow(){
     if(!blocksSight(P.floor,cx,cz)&&losClear(P.floor,P.x,P.z,tx,tz))break;}
   if(d<1){tx=P.x+fx*0.6;tz=P.z+fz*0.6;}
   ENG.carry--;
-  ENG.fly={x0:P.x,z0:P.z,y0:P.y+1.35,x1:tx,z1:tz,y1:P.floor*FH+0.08,f:P.floor,t:0,dur:0.35+d*0.035};
-  thrown.visible=true;thrown.position.set(P.x,P.y+1.35,P.z);
+  const sk=myTSkin();
+  ENG.fly={x0:P.x,z0:P.z,y0:P.y+1.35,x1:tx,z1:tz,y1:P.floor*FH+0.08,f:P.floor,t:0,dur:(0.35+d*0.035)*TSKIN_BY[sk].thr.dur,sk};
+  thrown.visible=true;thrown.position.set(P.x,P.y+1.35,P.z);thrown.rotation.set(0,0,0);thrown.scale.setScalar(1.7);
   noiseHit({dur:.18,vol:.05,type:'bandpass',f:900,q:1.5});}
 function shatter(fl){
   thrown.visible=false;ENG.fly=null;
@@ -6733,7 +6948,7 @@ function shatter(fl){
   const v=0.4+0.6*volAt(Math.hypot(fl.x1-P.x,fl.z1-P.z),18);
   noiseHit({dur:.45,vol:.5*v,type:'highpass',f:3200,f2:1800,q:0.8,pan,echo:.6,att:0.002});
   [2200,3100,4150].forEach((f,i)=>tone({f,f2:f*0.92,type:'triangle',dur:.25,vol:.035*v,a:.002,pan,echo:.5,delay:i*0.03+Math.random()*0.04}));
-  for(let i=0;i<12;i++)spawnPart(fl.x1,fl.y1+0.1,fl.z1,0x8fd1b0,{x:(Math.random()-.5)*2.2,y:Math.random()*1.6,z:(Math.random()-.5)*2.2},.6,.18);
+  trinketLand(fl,pan,v);   /* and lands its own way */
   /* the thing goes to look: on this floor from across the house, through the ceiling or floor if it is close */
   /* the thing hears breaking glass from anywhere in the house and comes to look, down or up the stairs
      if it has to. You are always told what came of it, so a throw never seems to do nothing. */
@@ -6766,8 +6981,7 @@ function engPlayer(dt){
   /* in flight: a lob that tumbles */
   const fl=ENG.fly;
   if(fl){fl.t+=dt;const k=Math.min(1,fl.t/fl.dur);
-    thrown.position.set(fl.x0+(fl.x1-fl.x0)*k,fl.y0+(fl.y1-fl.y0)*k+Math.sin(k*Math.PI)*1.1,fl.z0+(fl.z1-fl.z0)*k);
-    thrown.rotation.x+=dt*14;thrown.rotation.z+=dt*9;
+    trinketFly(fl,k,dt);   /* each trinket skin flies its own way */
     if(k>=1)shatter(fl);}
   if(P.hiding)ENG.hidT+=dt;
   /* close calls: it came within reach while you were tucked away or creeping, and went on without you */
@@ -7537,6 +7751,7 @@ function updateFX(dt,t){
     if(p.ttl<=0){p.sp.visible=false;partPool.push(p.sp);parts.splice(i,1);continue;}
     p.sp.position.x+=p.vx*dt;p.sp.position.y+=p.vy*dt;p.sp.position.z+=p.vz*dt;
     p.sp.material.opacity=p.ttl/p.ttl0;}
+  tfxTick(dt);
   if(AC && state==='play' && !vaultOpen && !settingsOpen){
     const onFloor = M.floor === P.floor;
     const hunts = M.state === 'chase' && M.goneT <= 0;
@@ -7742,7 +7957,7 @@ function cloudPush(create){
     ether:save.ether,unlocked:save.unlocked.slice(),main:save.main,escapes:save.escapes,
     pending:save.pending.map(e=>({l:e.l,n:e.n})),music:save.music,lastDay:save.lastDay,v:SAVE_V,
     stats:Object.assign({},st,{playTime:Math.round(st.playTime),activeTime:Math.round(st.activeTime||0),legendRuns:Object.assign({},st.legendRuns),
-      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),bty:{d:(save.bty&&save.bty.d)||'',p:Object.assign({},save.bty&&save.bty.p),done:((save.bty&&save.bty.done)||[]).slice()},ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id]),skins:(save.skins||['hollow']).slice(),skin:save.skin||'hollow'}),
+      combos:(save.combos||[]).map(x=>({id:x.id,p:x.p.slice()})),newsRead:(save.newsRead||[]).slice(),bty:{d:(save.bty&&save.bty.d)||'',p:Object.assign({},save.bty&&save.bty.p),done:((save.bty&&save.bty.done)||[]).slice()},ash:save.ash||0,ups:Object.keys(save.ups||{}).map(id=>id+':'+save.ups[id]),skins:(save.skins||['hollow']).slice(),skin:save.skin||'hollow',tskin:save.tskin||'t_bottle'}),
     live:liveNow()};
   const gone=Array.from(UPS_GONE).filter(id=>!(save.ups||{})[id]);
   const sent=(save.cmbPend||[]).slice(),sentSk=(save.skinPend||[]).slice(),uid=cloudUser.uid;
@@ -7778,6 +7993,7 @@ function replaceSave(next){
   if(ghost&&ghost.legend&&ghost.legend.id!==myChar().id){if(c.id==='god'){if(GOD.on)setGod(true);}else setLegend(c.id);}
   else{computePS(c);AB.cdMax=cdFor(c.ab);refreshLegendHUD();}
   refreshClaims();
+  if(typeof dressAllTrinkets==='function')dressAllTrinkets();
   if(vaultOpen)renderVault();
   if(settingsOpen)syncSetUI();
   UIM.want=null;uiMusicTick();
@@ -7858,7 +8074,7 @@ async function applyUser(u){
     if(mine&&Array.isArray(mine.skinPend)&&mine.skinPend.length){const mc=cleanSave(mine,false);let back=false;
       mc.skinPend.forEach(id=>{if(next.skins.indexOf(id)>=0)return;next.skins.push(id);
         if(next.skinPend.indexOf(id)<0)next.skinPend.push(id);back=true;});
-      if(back){next.ether=Math.max(0,Math.min(next.ether,mc.ether));if(next.skins.indexOf(mc.skin)>=0)next.skin=mc.skin;}}}
+      if(back){next.ether=Math.max(0,Math.min(next.ether,mc.ether));if(next.skins.indexOf(mc.skin)>=0)next.skin=mc.skin;if(next.skins.indexOf(mc.tskin)>=0)next.tskin=mc.tskin;}}}
   if(wantName&&wantName.uid===u.uid)u.name=wantName.name;
   else if(data&&data.name)u.name=String(data.name).slice(0,40);
   /* progress moves, it is not copied: the guest slot in this browser starts fresh */
@@ -9674,7 +9890,7 @@ if(DEBUG)window.__hm={get P(){return P;},get M(){return M;},get state(){return s
   get MP(){return MP;},embers,stairs,nodes,adj,findPath,nk,NF,CS,FH,PATROL,maps,entAt,TOTAL_EMBERS,startGame,warpTo,openDoor,camera,scene,get REMOTE(){return typeof REMOTE!=='undefined'?REMOTE:null;},
   get PUP(){return typeof PUP!=='undefined'?PUP:null;},
   get graceT(){return graceT;},setGrace(v){graceT=v;},updateHunters,respawn,triggerJumpscare,doDeath,settings,keys,setDiff(d){runDiff=d;}};
-if(DEBUG)Object.assign(window.__hm,{PER_FLOOR,STAIRHOLD,emberPools,REACH,FURN_CELLS,shards,localHunters,hideSpots0,get catchM(){return catchM;},HOUSE,ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare,DAILY,dailyDefs,btyToday,dailyAdd,openBty,doWin,doDeath,getSave:()=>save,setGot:v=>{got=v;}});
+if(DEBUG)Object.assign(window.__hm,{PER_FLOOR,STAIRHOLD,emberPools,REACH,FURN_CELLS,shards,localHunters,hideSpots0,get catchM(){return catchM;},HOUSE,ENG,trinkets,tryThrow,setYaw:v=>{camYaw=v;},DREAD,phantom,phantomStart,houseScare,DAILY,dailyDefs,btyToday,dailyAdd,openBty,doWin,doDeath,getSave:()=>save,setGot:v=>{got=v;},dressAllTrinkets,TSKINS,thrown});
 window.__HM_BOOTED=true;
 /* arrived from freshNight: the short NIGHT FALLS screen instead of the whole title screen */
 if(!MP&&!WATCH&&QS.get('next')==='1'){showOv(nextOv);

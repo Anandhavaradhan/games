@@ -16,6 +16,17 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-04-trinket-skins',
+    date: '2026-11-04',
+    tag: 'NEW',
+    title: 'Trinket skins',
+    body: 'The vault\'s SKINS tab now has TRINKETS next to THE HOLLOW. Every trinket skin changes what the trinkets look like, how they fly when you throw them and how they land:\n\n' +
+      'Green Bottle (free): tumbles and bursts into green glass. Candle Skull: spins flat trailing embers, then a shower of sparks. Grave Bell: swings and rings in the air, then tolls three times with rings of sound. ' +
+      'Porcelain Head: a high, slow lob that cracks open in a puff of dust. Spirit Orb: low and fast on a comet tail, then bursts into rising motes. Tiny Lantern: a ribbon of flame, then a small fire where it lands. ' +
+      'Void Crystal: corkscrews through the air and shatters with a violet shockwave.\n\n' +
+      'Like the Hollow\'s skins they are collected in order. They are looks only: every trinket lures the thing exactly the same way.'
+  },
+  {
     id: '2026-11-04-skins-in-order',
     date: '2026-11-04',
     tag: 'CHANGE',
