@@ -1,0 +1,35 @@
+# Builds the Hollowmere V3 Android app (hollowmere-v3-android/) as an unsigned release APK.
+# The APK is signed afterwards with the app's release key, which is kept out of this repo.
+name: Hollowmere V3 Android APK
+
+on:
+  push:
+    paths:
+      - 'hollowmere-v3-android/**'
+      - '.github/workflows/hollowmere-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Build unsigned release APK
+        working-directory: hollowmere-v3-android
+        run: gradle --no-daemon assembleRelease -PversionCode=${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hollowmere-v3-unsigned
+          path: hollowmere-v3-android/app/build/outputs/apk/release/*.apk
+          retention-days: 14

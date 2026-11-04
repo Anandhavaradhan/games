@@ -1,0 +1,32 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.anandhavaradhan.hollowmere'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.anandhavaradhan.hollowmere'
+        minSdk 21
+        targetSdk 35
+        // CI passes -PversionCode=<run number> so every build can install over the last one
+        versionCode (project.findProperty('versionCode') ?: '1') as int
+        versionName '3.0.' + ((project.findProperty('versionCode') ?: '1') as String)
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

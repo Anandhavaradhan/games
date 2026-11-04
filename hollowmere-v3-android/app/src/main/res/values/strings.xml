@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appName">Hollowmere</string>
+    <string name="launchUrl">https://anandhavaradhan.github.io/games/hollowmere-v3/</string>
+    <string name="hostName">anandhavaradhan.github.io</string>
+    <string name="providerAuthority">io.github.anandhavaradhan.hollowmere.fileprovider</string>
+    <string name="assetStatements">
+        [{ \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+           \"target\": {\"namespace\": \"web\", \"site\": \"https://anandhavaradhan.github.io\"} }]
+    </string>
+</resources>
