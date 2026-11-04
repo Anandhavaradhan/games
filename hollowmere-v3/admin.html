@@ -577,7 +577,7 @@ const COLS=[
   ['main','Haunts as',p=>legendName(p.main)],
   ['escapes','Escapes',p=>p.escapes||0,'r'],
   ['deaths','Deaths',p=>(p.stats||{}).deaths||0,'r'],
-  ['best','Best night',p=>(p.stats||{}).bestTime||1e12,'r'],
+  ['best','Best night',p=>(p.stats||{}).bestTime3||1e12,'r'],
   ['time','Time played',p=>(p.stats||{}).playTime||0,'r'],
   ['active','Active time',p=>(p.stats||{}).activeTime||0,'r'],
   ['lastSeen','Last seen',p=>ms(p.lastSeen),'r'],
@@ -705,7 +705,7 @@ function fillRows(){
       +'<td><span class="dot" style="background:'+legendColour(p.main)+'"></span>'+esc(legendName(p.main))+'</td>'
       +'<td class="r">'+(p.escapes||0)+'</td>'
       +'<td class="r">'+(st.deaths||0)+'</td>'
-      +'<td class="r">'+(st.bestTime?clock(st.bestTime):'—')+'</td>'
+      +'<td class="r">'+(st.bestTime3?clock(st.bestTime3):'—')+'</td>'
       +'<td class="r">'+dur(st.playTime)+'</td>'
       +'<td class="r">'+dur(st.activeTime)+'</td>'
       +'<td class="r">'+(live?'now':ago(ms(p.lastSeen)))+'</td>'
@@ -795,7 +795,7 @@ function saveForm(uid){
   st.ash=int('e_ash',ashOf(p));
   delete st.ups;   /* levels are only added by the game; writing this copy back could undo one bought a moment ago */
   const best=flt('e_best',0);
-  if(best>0)st.bestTime=best;else delete st.bestTime;
+  if(best>0)st.bestTime3=best;else delete st.bestTime3;
   const newName=String(val('e_name')||p.name||'Unnamed').replace(/\s+/g,' ').trim().slice(0,24);
   saveWithName(uid,p,newName,st);
 }
@@ -836,12 +836,12 @@ async function saveWithName(uid,p,newName,st){
 async function postToLeaderboard(uid){
   const p=players.find(x=>x.uid===uid);if(!p)return;
   const st=p.stats||{};
-  if(!st.bestTime){alert('Player has no best time set. Set one in the form and save first.');return;}
+  if(!st.bestTime3){alert('Player has no best time set. Set one in the form and save first.');return;}
   try{
     await F.addDoc(F.collection(db,BOARD),{
       uid,diff:'normal',
       name:String(p.name||'Unnamed').slice(0,40),
-      time:st.bestTime,
+      time:st.bestTime3,
       legend:String(p.main||'').slice(0,40),
       deaths:0,
       embers:8,
@@ -919,7 +919,7 @@ function renderDrawer(){
     +'<div><span>Escapes</span><b class="num">'+(p.escapes||0)+'</b></div>'
     +'<div><span>Deaths</span><b class="num">'+(st.deaths||0)+'</b></div>'
     +'<div><span>Runs</span><b class="num">'+(st.runs||0)+'</b></div>'
-    +'<div><span>Best night</span><b class="num">'+(st.bestTime?clock(st.bestTime):'—')+'</b></div>'
+    +'<div><span>Best night</span><b class="num">'+(st.bestTime3?clock(st.bestTime3):'—')+'</b></div>'
     +'<div><span>Time played</span><b class="num">'+dur(st.playTime)+'</b></div>'
     +'<div><span>Embers carried</span><b class="num">'+(st.embers||0)+'</b></div>'
     +'<div><span>Memories found</span><b class="num">'+(st.memories||0)+'</b></div>'
@@ -1062,7 +1062,7 @@ function editPanel(p){
     +field('e_escapes','Escapes',p.escapes||0)
     +field('e_deaths','Deaths',st.deaths||0)
     +field('e_runs','Runs',st.runs||0)
-    +field('e_best','Best night (sec)',st.bestTime||'','step="0.1"')
+    +field('e_best','Best night (sec)',st.bestTime3||'','step="0.1"')
     +field('e_play','Time played (min)',Math.round((st.playTime||0)/60))
     +field('e_embers','Embers carried',st.embers||0)
     +field('e_mem','Memories found',st.memories||0)

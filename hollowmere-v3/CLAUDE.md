@@ -18,6 +18,7 @@ Follow the format and id rules at the top of `news.js`; never change or reuse an
 
 ## Kept apart from V2
 V2 and V3 share one Firebase project. Accounts, usernames, players/, friends and time played are shared.
+- Best night: V3 keeps it in `stats.bestTime3`; `stats.bestTime` is V2's and V3 never reads or writes it. An account with no `bestTime3` takes its fastest solo entry on `escapes_v3/` at sign-in (`cloud.myBestEscape`).
 - Fastest escapes: V3 posts to and reads `escapes_v3/` (`BOARD` in cloud.js and admin.html). Username renames touch both boards.
 - Co-op: multiplayer.js maps `rooms`, `live`, `presence`, `watch` and `invites` to `*_v3` paths, so V2 and V3 players never meet in a room.
 - Both rules files (firestore.rules, database.rules.json) are kept identical in hollowmere-v2/ and hollowmere-v3/ and hold the rules for both games. Publish either copy.
