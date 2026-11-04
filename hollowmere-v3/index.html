@@ -515,8 +515,15 @@
   /* combining legends */
   .vchip.cmb{color:#ffcf8a;border-color:rgba(255,207,138,.5)}
   .vchip.cmb.on{background:rgba(255,207,138,.12)}
-  .vchip.cmb.skin{color:#bfe3ff;border-color:rgba(191,227,255,.5)}
-  .vchip.cmb.skin.on{background:rgba(191,227,255,.12)}
+  .vtabs{display:flex;gap:8px;width:100%}
+  .vsubs{display:flex;gap:7px;flex-wrap:wrap;width:100%;padding-top:2px}
+  .vtab{flex:0 0 auto;border:1px solid #3a352c;background:rgba(10,12,18,.7);color:#8f8874;cursor:pointer;
+    font-family:'Cormorant SC',serif;font-size:15px;letter-spacing:4px;padding:9px 20px}
+  .vtab i{font-style:normal;opacity:.55;margin-left:10px;font-size:12px;letter-spacing:2px}
+  .vtab:hover{color:#d8cfb6;border-color:#8a7f60}
+  .vtab.on{color:#ffbe6f;border-color:#ffbe6f;background:rgba(60,44,20,.5)}
+  .vtab.skin.on{color:#bfe3ff;border-color:#bfe3ff;background:rgba(40,60,80,.45)}
+  @media (max-width:700px){.vtab{font-size:12px;letter-spacing:2px;padding:7px 12px}}
   .vcmb-price{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
   .vcmb-price span{font-size:10px;letter-spacing:1.5px;padding:5px 8px;border:1px solid #33302a;color:#8f8874}
   .vcmb-price span.on{border-color:#ffcf8a;color:#ffcf8a}
@@ -5794,7 +5801,7 @@ function openVault(){
   vaultOpen=true;
   if(settingsOpen)closeSettings();
   vSel=Math.max(0,ROSTER.findIndex(c=>isBound(c.id)));
-  vFilter='ALL';vCombining=false;vSkins=false;vCmbPick=[];vSkinSel=Math.max(0,SKINS.findIndex(x=>x.id===mySkin()));
+  vFilter='ALL';vCombining=false;vSkins=true;vCmbPick=[];vSkinSel=Math.max(0,SKINS.findIndex(x=>x.id===mySkin()));
   $('vaultOv').classList.remove('sheet');
   renderVault();
   dressVault();
@@ -5834,15 +5841,23 @@ function renderVault(){
   /* --- filters --- */
   const counts={ALL:ROSTER.length};
   ROLES.forEach(function(r){counts[r]=ROSTER.filter(function(c){return c.r===r;}).length;});
-  $('vFilters').innerHTML=['ALL'].concat(ROLES).map(function(r){
-    return '<button class="vchip'+(r===vFilter&&!vSkins?' on':'')+'" data-r="'+r+'">'
+  /* two sections: SKINS first, then SKILLS with its own subtopics (the roles, and COMBINE) */
+  $('vFilters').innerHTML='<div class="vtabs">'
+      +'<button class="vtab skin'+(vSkins?' on':'')+'" id="vSkinBtn">\u2727 SKINS<i>'+(save.skins||['hollow']).length+' / '+SKINS.length+'</i></button>'
+      +'<button class="vtab'+(vSkins?'':' on')+'" id="vSkillBtn">\u2726 SKILLS<i>'+save.unlocked.length+' / '+BASE_COUNT+'</i></button></div>'
+    +(vSkins?'':'<div class="vsubs">'+['ALL'].concat(ROLES).map(function(r){
+    return '<button class="vchip'+(r===vFilter&&!vCombining?' on':'')+'" data-r="'+r+'">'
       +r+'<i>'+counts[r]+'</i></button>';}).join('')
-    +'<button class="vchip cmb'+(vCombining?' on':'')+'" id="vCmbBtn">\u2726 COMBINE</button>'
-    +'<button class="vchip cmb skin'+(vSkins?' on':'')+'" id="vSkinBtn">\u2727 SKINS<i>'+SKINS.length+'</i></button>';
+    +'<button class="vchip cmb'+(vCombining?' on':'')+'" id="vCmbBtn">\u2726 COMBINE</button></div>');
   $('vSkinBtn').addEventListener('click',function(e){e.stopPropagation();
     vSkins=true;vCombining=false;
     if(typeof SFX.uiPick==='function')SFX.uiPick();
     renderVault();});
+  $('vSkillBtn').addEventListener('click',function(e){e.stopPropagation();
+    vSkins=false;vCombining=false;vFilter='ALL';
+    if(typeof SFX.uiPick==='function')SFX.uiPick();
+    renderVault();});
+  if(vSkins){renderSkins();return;}
   $('vCmbBtn').addEventListener('click',function(e){e.stopPropagation();
     vCombining=true;vSkins=false;vCmbPick=[];
     if(typeof SFX.uiPick==='function')SFX.uiPick();
@@ -5854,7 +5869,6 @@ function renderVault(){
       if(typeof SFX.uiPick==='function')SFX.uiPick();
       renderVault();});
   });
-  if(vSkins){renderSkins();return;}
 
   /* --- the gallery --- */
   const list=vaultList();
@@ -6053,15 +6067,18 @@ function comboAddLegend(c,pick){
 /* the SKINS tab: the gallery shows the Hollow's skins, the dossier the one picked */
 function renderSkins(){
   const own=id=>(save.skins||[]).indexOf(id)>=0;
+  /* skins are collected in order: one goes on sale only once every skin before it is yours */
+  const open=i=>SKINS.slice(0,i).every(x=>own(x.id));
   vSkinSel=Math.max(0,Math.min(SKINS.length-1,vSkinSel|0));
   $('vGrid').innerHTML=SKINS.map((k,i)=>{
     const cls=['vcard'];if(i===vSkinSel)cls.push('on');if(mySkin()===k.id)cls.push('bound');
-    if(!own(k.id))cls.push('sealed',save.ether>=k.cost?'afford':'poor');
+    if(!own(k.id))cls.push('sealed',!open(i)?'locked':save.ether>=k.cost?'afford':'poor');
     return '<div class="'+cls.join(' ')+'" role="button" tabindex="0" data-k="'+i+'" style="--vt:'+k.t+'">'
       +'<div class="vc-top"><span>'+pad2(i+1)+'</span><span class="vc-tier">SKIN</span></div>'
       +'<div class="vc-name">'+escHTML(k.n.replace(/^THE /,''))+'</div>'
       +'<div class="vc-role">'+(escHTML(skinBonusText(k))||'NO BONUS')+'</div>'
       +'<div class="vc-foot">'+(own(k.id)?'<span class="vc-state">'+(mySkin()===k.id?'WORN':'OWNED')+'</span>'
+        :!open(i)?'<span class="vc-cost lock">LOCKED</span><span class="vc-state">'+EG+' '+k.cost.toLocaleString('en-IN')+'</span>'
         :'<span class="vc-cost">'+(k.cost?EG+' '+k.cost.toLocaleString('en-IN'):'FREE')+'</span><span class="vc-state">FOR SALE</span>')+'</div></div>';
   }).join('');
   Array.prototype.forEach.call($('vGrid').children,card=>card.addEventListener('click',e=>{e.stopPropagation();
@@ -6069,15 +6086,18 @@ function renderSkins(){
     if(typeof SFX.uiPick==='function')SFX.uiPick();
     if(isTouch)$('vaultOv').classList.add('sheet');
     renderVault();}));
-  const k=SKINS[vSkinSel],has=own(k.id),worn=mySkin()===k.id,ok=save.ether>=k.cost;
+  const k=SKINS[vSkinSel],has=own(k.id),worn=mySkin()===k.id,ok=save.ether>=k.cost,isOpen=open(vSkinSel);
+  const need=SKINS.find((x,i)=>i<vSkinSel&&!own(x.id));
   pvShow(k.ch);
   let act;
   if(worn)act='<button class="vbtn dim" disabled>THE HOLLOW WEARS THIS SKIN</button>';
   else if(has)act='<button class="vbtn" id="vSkinWear">WEAR THIS SKIN</button>';
+  else if(!isOpen)act='<button class="vbtn dim" disabled>LOCKED \u2014 SKINS ARE COLLECTED IN ORDER</button>'
+    +'<div class="vneed">BUY '+escHTML(need.n)+' FIRST</div>';
   else act='<button class="vbtn'+(ok?'':' dim')+'" id="vSkinBuy"'+(ok?'':' disabled')+'>BUY \u2014 '+k.cost.toLocaleString('en-IN')+' '+EG+'</button>'
     +(ok?'':'<div class="vneed">'+EG+' '+(k.cost-save.ether).toLocaleString('en-IN')+' MORE \u2014 EARN IT IN THE HOUSE</div>');
   $('vDossBody').innerHTML=
-     '<div class="vd-tag"><span>\u2727 SKIN '+pad2(vSkinSel+1)+' / '+SKINS.length+'</span><span>\u00b7</span><b>'+(has?'OWNED':'FOR SALE')+'</b></div>'
+     '<div class="vd-tag"><span>\u2727 SKIN '+pad2(vSkinSel+1)+' / '+SKINS.length+'</span><span>\u00b7</span><b>'+(has?'OWNED':isOpen?'FOR SALE':'LOCKED')+'</b></div>'
     +'<div class="vd-name">'+escHTML(k.n)+'</div>'
     +'<div class="vd-epi">A SKIN FOR THE HOLLOW</div>'
     +'<div class="vd-rule"></div>'
@@ -6091,7 +6111,7 @@ function renderSkins(){
   if(wear)wear.addEventListener('click',e=>{e.stopPropagation();setSkin(k.id);renderVault();toast(k.n+' \u2014 WORN',2.4);});
   const buy=$('vSkinBuy');
   if(buy)buy.addEventListener('click',e=>{e.stopPropagation();
-    if(own(k.id)||save.ether<k.cost)return;
+    if(own(k.id)||!open(SKINS.indexOf(k))||save.ether<k.cost)return;
     save.ether-=k.cost;save.skins.push(k.id);
     if(!Array.isArray(save.skinPend))save.skinPend=[];
     if(save.skinPend.indexOf(k.id)<0)save.skinPend.push(k.id);

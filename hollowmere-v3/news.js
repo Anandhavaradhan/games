@@ -16,6 +16,14 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-04-skins-in-order',
+    date: '2026-11-04',
+    tag: 'CHANGE',
+    title: 'Skins in order, and a tidier vault',
+    body: 'Skins are now collected in order: each one goes on sale once you own every skin before it, from Mistveil all the way to the Pale Seraph. Skins you already own stay yours.\n\n' +
+      'The vault now opens on SKINS, with SKILLS next to it. Under SKILLS you can pick a kind of skill (Control, Escape, Stealth, Insight or Support) or COMBINE to fuse skills together.'
+  },
+  {
     id: '2026-11-04-the-hollow',
     date: '2026-11-04',
     tag: 'NEW',
