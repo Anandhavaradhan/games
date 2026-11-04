@@ -28,8 +28,14 @@ jobs:
       - name: Build unsigned release APK
         working-directory: hollowmere-v3-android
         run: gradle --no-daemon assembleRelease -PversionCode=${{ github.run_number }}
+      - name: Collect APK and the signing tool
+        run: |
+          mkdir out
+          cp hollowmere-v3-android/app/build/outputs/apk/release/*.apk out/
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          cp "$BT/lib/apksigner.jar" "$BT/zipalign" out/
       - uses: actions/upload-artifact@v4
         with:
           name: hollowmere-v3-unsigned
-          path: hollowmere-v3-android/app/build/outputs/apk/release/*.apk
+          path: out/
           retention-days: 14
