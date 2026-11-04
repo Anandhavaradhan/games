@@ -337,7 +337,8 @@ function viewLobby() {
   const n = Math.max(1, here.length), amHost = room.meta.host === mp.me.uid, diff = roomDiff();
   /* friends are in a night this player is not part of (they came back after it began) */
   const busyNight = room.meta.status !== 'lobby';
-  const link = location.origin + location.pathname + '?join=' + code;
+  /* in the Android app the page lives inside the app, so invite with the web address instead */
+  const link = (window.HollowmereAndroid ? 'https://anandhavaradhan.github.io/games/hollowmere-v3/lobby.html' : location.origin + location.pathname) + '?join=' + code;
   shell(`
     <div class="code-cap">ROOM CODE</div>
     <div class="code-big" id="bigcode">${esc(code)}</div>
