@@ -453,7 +453,7 @@ async function migrateBoard(adminUid,force){
 }
 let players=[], unsub=null, sortKey='lastSeen', sortDir=-1, filter='', openUid=null, runsCache={};
 let editing=false, note='', noteTimer=null;
-let godPasses={}, unsubGod=null;   /* godPass/{uid} -> until (ms): who has the GOD skill lent to them */   /* drawer edit mode + transient "Saved" flash */
+let godPasses={}, unsubGod=null;   /* godPass/{uid} -> until (ms): who has the GOD skin lent to them */   /* drawer edit mode + transient "Saved" flash */
 
 function signInView(msg){
   who.innerHTML='';
@@ -519,7 +519,7 @@ A.onAuthStateChanged(auth,async u=>{
     guestTotal={seconds:d.seconds||0,active:d.active||0,escapes:d.escapes||0};
     if(playersLoaded)render();
   },e=>console.warn('Guest total read failed:',e));
-  /* who has the GOD skill lent to them right now, live */
+  /* who has the GOD skin lent to them right now, live */
   unsubGod=F.onSnapshot(F.collection(db,'godPass'),snap=>{
     godPasses={};snap.docs.forEach(d=>{const t=d.data().until;godPasses[d.id]=t&&t.toMillis?t.toMillis():0;});
     if(openUid)renderDrawer();
@@ -982,21 +982,21 @@ function renderDrawer(){
   drawer.querySelectorAll('[data-crm]').forEach(b=>b.onclick=()=>removeCombo(p.uid,b.dataset.crm));
   on('e_cadd',()=>addCombo(p.uid));
 }
-/* Lend the admin-only GOD skill to a player for a while. godPass/{uid} holds when it runs out; their game
-   puts GOD in their vault until then (live, even mid-session) and then drops it, back to the skill they
-   had bound. Lending again replaces the end time; taking it back deletes the pass at once. */
+/* Lend the admin-only GOD skin (the GOD skill comes with it, plus the best Hollow and trinket skins) to a
+   player for a while. godPass/{uid} holds when it runs out; their game puts the GOD skin in their vault until
+   then (live, even mid-session) and then drops it, back to their own skin and skill. Lending again replaces the end time; taking it back deletes the pass at once. */
 const GOD_LEND=[[3600,'1 hour'],[86400,'1 day'],[604800,'7 days']];
 function godSection(p){
   const until=godPasses[p.uid]||0,on=until>Date.now();
-  return '<h3>GOD skill <small>'+(on?'lent until '+esc(new Date(until).toLocaleString())+' \u00b7 '+dur((until-Date.now())/1000)+' left':'not lent')+'</small></h3>'
+  return '<h3>GOD skin <small>'+(on?'lent until '+esc(new Date(until).toLocaleString())+' \u00b7 '+dur((until-Date.now())/1000)+' left':'not lent')+'</small></h3>'
     +'<div class="editbar" style="margin-top:6px">'+GOD_LEND.map(([s,l])=>'<button class="btn" data-god="'+s+'">'+(on?'Reset to ':'Lend for ')+l+'</button>').join('')
     +(on?'<button class="btn bad" id="e_godoff">Take it back</button>':'')+'</div>'
-    +'<p class="dsub" style="margin-top:6px">Puts the GOD skill in their vault for that long. When it runs out, or you take it back, they go back to their own skill.</p>';
+    +'<p class="dsub" style="margin-top:6px">Puts the GOD skin in their vault for that long. Wearing it gives the GOD skill (locked while worn), the Pale Seraph look and the best trinket. When it runs out, or you take it back, they go back to their own skin and skill.</p>';
 }
 async function godLend(uid,sec){
   const p=players.find(x=>x.uid===uid);if(!p)return;
   const label=(GOD_LEND.find(x=>x[0]===sec)||[0,sec+'s'])[1];
-  if(!confirm('Lend the GOD skill to '+(p.name||'this player')+' for '+label+'?'))return;
+  if(!confirm('Lend the GOD skin to '+(p.name||'this player')+' for '+label+'?'))return;
   try{
     await F.setDoc(F.doc(db,'godPass',uid),{until:F.Timestamp.fromMillis(Date.now()+sec*1000),
       by:auth.currentUser.uid,byName:String(auth.currentUser.displayName||auth.currentUser.email||'').slice(0,40),at:F.serverTimestamp()});
@@ -1005,7 +1005,7 @@ async function godLend(uid,sec){
 }
 async function godTakeBack(uid){
   const p=players.find(x=>x.uid===uid);if(!p)return;
-  if(!confirm('Take the GOD skill back from '+(p.name||'this player')+' now?'))return;
+  if(!confirm('Take the GOD skin back from '+(p.name||'this player')+' now?'))return;
   try{await F.deleteDoc(F.doc(db,'godPass',uid));flash('GOD taken back');}
   catch(e){alert('Could not take GOD back: '+e.message);}
 }

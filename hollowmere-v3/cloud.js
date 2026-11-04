@@ -403,7 +403,7 @@ export function watchGifts(me, cb) {
     s => cb(s.docs.map(d => Object.assign({ id: d.id }, d.data()))), e => console.warn('Gifts read failed:', e));
 }
 
-/* the GOD skill an admin lent to this account: godPass/{uid} { until, by, byName, at }, written only by
+/* the GOD skin an admin lent to this account: godPass/{uid} { until, by, byName, at }, written only by
    admins (admin.html). cb gets { until: ms, byName } or null. Returns an unsubscribe function. */
 export function watchGodPass(uid, cb) {
   return F.onSnapshot(F.doc(db, 'godPass', uid), d => {
