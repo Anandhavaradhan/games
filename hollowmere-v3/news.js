@@ -16,6 +16,26 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-04-trinket-skins',
+    date: '2026-11-04',
+    tag: 'NEW',
+    title: 'Trinket skins',
+    body: 'The vault\'s SKINS tab now has TRINKETS next to THE HOLLOW. Every trinket skin changes what the trinkets look like, how they fly when you throw them and how they land:\n\n' +
+      'Green Bottle (free): tumbles and bursts into green glass. Candle Skull: spins flat trailing embers, then a shower of sparks. Grave Bell: swings and rings in the air, then tolls three times with rings of sound. ' +
+      'Porcelain Head: a high, slow lob that cracks open in a puff of dust. Spirit Orb: low and fast on a comet tail, then bursts into rising motes. Tiny Lantern: a ribbon of flame, then a small fire where it lands. ' +
+      'Void Crystal: corkscrews through the air and shatters with a violet shockwave.\n\n' +
+      'Like the Hollow\'s skins they are collected in order, and each one is a stronger lure than the one before: it throws further (8.5 m for the bottle up to 14.5 m for the crystal) and keeps the thing looking longer. ' +
+      'From the Porcelain Head on it also slows the thing down, and the Tiny Lantern and Void Crystal freeze it for a moment if it was close to where they land.'
+  },
+  {
+    id: '2026-11-04-skins-in-order',
+    date: '2026-11-04',
+    tag: 'CHANGE',
+    title: 'Skins in order, and a tidier vault',
+    body: 'Skins are now collected in order: each one goes on sale once you own every skin before it, from Mistveil all the way to the Pale Seraph. Skins you already own stay yours.\n\n' +
+      'The vault now opens on SKINS, with SKILLS next to it. Under SKILLS you can pick a kind of skill (Control, Escape, Stealth, Insight or Support) or COMBINE to fuse skills together.'
+  },
+  {
     id: '2026-11-04-the-hollow',
     date: '2026-11-04',
     tag: 'NEW',
