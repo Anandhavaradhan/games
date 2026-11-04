@@ -16,6 +16,13 @@
    ========================================================= */
 export const NEWS = [
   {
+    id: '2026-11-04-coop-guests-off-board',
+    date: '2026-11-04',
+    tag: 'CHANGE',
+    title: 'Co-op nights with guests stay off the leaderboard',
+    body: 'Guests are never shown on the leaderboard, and now neither is a co-op night a guest played in. If anyone in the party is a guest, the escape is not posted to Fastest Escapes. Sign in (and choose a username) with your friends to put your team on the board.'
+  },
+  {
     id: '2026-11-04-trinket-skins',
     date: '2026-11-04',
     tag: 'NEW',

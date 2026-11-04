@@ -8473,13 +8473,16 @@ async function boardAfterEscape(nt,newBest){
   }catch(e){console.warn('Escape post failed:',e);el.textContent='';}
 }
 
-/* co-op: the whole party goes up as one name, e.g. "user1+user2" */
+/* co-op: the whole party goes up as one name, e.g. "user1+user2".
+   Returns '' when anyone in the party is a guest (or cannot be confirmed as a registered player):
+   guests are never on the leaderboard, so a night they played is not posted at all. */
 async function teamBoardName(members){
   const ppl=[];
   for(const u of ((MP&&MP.cfg.order)||[])){
     if(u===MP.uid){ppl.push([cloudUser.name,u]);continue;}
     const nm=String(mpName(u));
-    if(await MP.net.isRegistered(u,nm))ppl.push([nm,u]);}   /* guests are left out */
+    if(!(await MP.net.isRegistered(u,nm)))return '';
+    ppl.push([nm,u]);}
   /* always in the same order (by name), so the same friends make the same team name however they joined */
   ppl.sort((a,b)=>lbKey(a[0])<lbKey(b[0])?-1:lbKey(a[0])>lbKey(b[0])?1:0);
   const names=ppl.map(p=>p[0]);if(members)ppl.forEach(p=>members.push(p[1]));
@@ -8495,10 +8498,11 @@ async function boardAfterTeamEscape(nt){
   await waitForAccount(el,45000);
   if(!cloud){el.textContent='';return;}
   /* guests are never on the leaderboard: only a signed-in player with a username posts the team,
-     and the team's name lists only the registered players in it */
+     and a night with a guest in the party is not posted at all */
   if(!canPost()){el.textContent=needsUname()?'CHOOSE A USERNAME IN YOUR ACCOUNT TO PUT YOUR TEAM ON THE LEADERBOARD':'GUESTS ARE NOT SHOWN ON THE LEADERBOARD \u2014 SIGN IN TO APPEAR';return;}
   const uid=cloudUser.uid;
   const members=[],team=await teamBoardName(members),id='mp_'+code0+'_'+go0;
+  if(!team){el.textContent='A GUEST PLAYED THIS NIGHT \u2014 NIGHTS WITH GUESTS ARE NOT SHOWN ON THE LEADERBOARD';return;}
   /* members: the accounts in the team, in the same order as the names, so a later rename can update it */
   const entry={name:team,time:nt,legend:pubLegend(),deaths:deaths0,embers:got0,team:true,diff:dk0,members};
   try{
