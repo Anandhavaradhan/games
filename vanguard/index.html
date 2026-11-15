@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>VANGUARD — Tactical Squad Campaign</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="topbar" class="ui hidden">
+  <div id="mission-info">
+    <div id="mission-name"></div>
+    <div id="objective"></div>
+  </div>
+  <div id="top-buttons">
+    <button id="btn-undo" title="Undo (U)">↩ Undo</button>
+    <button id="btn-end" title="End Turn (E)">End Turn ⏎</button>
+    <button id="btn-mute" title="Mute (M)">🔊</button>
+    <button id="btn-full" title="Fullscreen (F)">⛶</button>
+    <button id="btn-pause" title="Menu (Esc)">☰</button>
+  </div>
+</div>
+
+<div id="unitbar" class="ui hidden"></div>
+
+<div id="screen-title" class="screen">
+  <div class="title-box">
+    <h1>VANGUARD</h1>
+    <p class="tagline">Every enemy attack is telegraphed. Every push redirects it.<br>Command the last squad of the Riftline.</p>
+    <button id="btn-start" class="big">Start Campaign</button>
+    <button id="btn-continue" class="big hidden">Continue</button>
+    <p class="hint">Mouse or touch · Fullscreen recommended</p>
+  </div>
+</div>
+
+<div id="screen-select" class="screen hidden">
+  <div class="panel">
+    <h2>Select Mission</h2>
+    <div id="mission-list"></div>
+    <button id="btn-select-back" class="big">Back</button>
+  </div>
+</div>
+
+<div id="screen-brief" class="screen hidden">
+  <div class="panel">
+    <h2 id="brief-name"></h2>
+    <p id="brief-text"></p>
+    <div id="brief-objective"></div>
+    <div id="brief-intel"></div>
+    <button id="btn-deploy" class="big">Deploy ▶</button>
+    <button id="btn-brief-back" class="big">Back</button>
+  </div>
+</div>
+
+<div id="screen-victory" class="screen hidden">
+  <div class="panel">
+    <h2 class="win">Mission Complete</h2>
+    <p id="victory-sub"></p>
+    <h3>Choose an upgrade</h3>
+    <div id="upgrade-list"></div>
+  </div>
+</div>
+
+<div id="screen-defeat" class="screen hidden">
+  <div class="panel">
+    <h2 class="lose">Mission Failed</h2>
+    <p id="defeat-reason"></p>
+    <button id="btn-retry" class="big">Retry Mission</button>
+    <button id="btn-defeat-menu" class="big">Abandon to Menu</button>
+  </div>
+</div>
+
+<div id="screen-pause" class="screen hidden">
+  <div class="panel">
+    <h2>Paused</h2>
+    <button id="btn-resume" class="big">Resume</button>
+    <button id="btn-restart" class="big">Restart Mission</button>
+    <button id="btn-abort" class="big">Abort to Mission Select</button>
+  </div>
+</div>
+
+<div id="screen-complete" class="screen hidden">
+  <div class="panel">
+    <h2 class="win">Campaign Complete</h2>
+    <p>The Warlord is dead. The Riftline holds. The grid is safe — for now.</p>
+    <button id="btn-complete-menu" class="big">Back to Menu</button>
+  </div>
+</div>
+
+<script src="levels.js"></script>
+<script src="engine.js"></script>
+<script src="ai.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
