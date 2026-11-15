@@ -237,7 +237,7 @@ function undo() {
 function buildUnitCards() {
   unitbar.innerHTML = '';
   for (const type of ['vanguard', 'ranger', 'warden']) {
-    const u = app.state.units.find(x => x.type === type);
+    const u = app.state.units.find(x => x.type === type && x.hp > 0);
     const b = BASE[type];
     const card = document.createElement('div');
     card.className = 'unit-card' + (u ? '' : ' dead');
@@ -247,7 +247,7 @@ function buildUnitCards() {
       card.innerHTML = `<div class="uc-head"><span class="uc-name">${b.name}</span><span class="uc-hp">KIA</span></div>`;
     } else {
       const pips = '◆'.repeat(u.hp) + '◇'.repeat(u.maxHp - u.hp);
-      const mv = u.acted ? 'done' : (u.moved ? 'acted' : `move ${u.move}`);
+      const mv = u.acted ? 'done' : (u.moved ? 'moved' : `move ${u.move}`);
       card.innerHTML = `
         <div class="uc-head"><span class="uc-name" style="color:${b.color}">${b.name}</span><span class="uc-hp">${pips}${u.shield ? ' 🛡' : ''}</span></div>
         <div class="uc-stats">${b.kind === 'ranged' ? `dmg ${u.dmg} · range ${u.range}` : b.kind === 'support' ? `dmg ${u.dmg} · pull · shield` : `dmg ${u.dmg} · push`} · <i>${mv}</i></div>
@@ -347,7 +347,7 @@ function playEventFx(e) {
       SFX.attack();
       break;
     case 'shot':
-      addFx('beam', e.fx, e.fy, { dx: e.dx, dy: e.dy });
+      addFx('beam', e.fx, e.fy, { tx: e.fx + e.dx, ty: e.fy + e.dy });
       SFX.shot();
       break;
     case 'hit':
@@ -493,9 +493,9 @@ canvas.addEventListener('pointerdown', (e) => {
       const targets = attackTargets(s, u, u.x, u.y);
       if (clickedUnit && clickedUnit.side === 'enemy' && targets.some(t => t.x === tile.x && t.y === tile.y)) {
         pushUndo();
-        doAttack(s, u, tile.x, tile.y, []);
-        playEvents([{ type: 'attack', fx: u.x, fy: u.y, tx: tile.x, ty: tile.ty || tile.y }], null);
-        SFX.attack();
+        const evts = [];
+        doAttack(s, u, tile.x, tile.y, evts);
+        playEvents(evts, null);
         afterPlayerAction();
         return;
       }
@@ -503,9 +503,9 @@ canvas.addEventListener('pointerdown', (e) => {
         const shields = shieldTargets(s, u);
         if (shields.some(t => t.x === tile.x && t.y === tile.y)) {
           pushUndo();
-          doShield(s, u, tile.x, tile.y, []);
-          SFX.shield();
-          addFloat(tile.x, tile.y, 'SHIELD', '#4aa3ff');
+          const evts = [];
+          doShield(s, u, tile.x, tile.y, evts);
+          playEvents(evts, null);
           afterPlayerAction();
           return;
         }
@@ -590,6 +590,13 @@ function refreshTitle() {
 }
 
 function render() {
+  requestAnimationFrame(render);
+  try {
+    renderFrame();
+  } catch (e) {}
+}
+
+function renderFrame() {
   app.time += 1 / 60;
   const w = window.innerWidth, h = window.innerHeight;
   ctx.save();
@@ -613,12 +620,12 @@ function render() {
   }
 
   ctx.restore();
-  requestAnimationFrame(render);
 }
 
 function renderBoard() {
   const s = app.state;
   const ts = layout.ts;
+  const w = window.innerWidth, h = window.innerHeight;
 
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
