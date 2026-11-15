@@ -13,8 +13,8 @@ Play in the browser: https://anandhavaradhan.github.io/games/
 
 One app carries the hub page and every game:
 
-- **Android**: [AnandhGames.apk](https://github.com/Anandhavaradhan/games/releases/download/anandhgames-latest/AnandhGames.apk)
-- **Windows**: [AnandhGames.exe](https://github.com/Anandhavaradhan/games/releases/download/anandhgames-latest/AnandhGames.exe) (portable, no installation)
+- **Android**: [AnandhGames.apk](https://github.com/Anandhavaradhan/games/raw/downloads/AnandhGames.apk)
+- **Windows**: [AnandhGames.exe](https://github.com/Anandhavaradhan/games/raw/downloads/AnandhGames.exe) (portable, no installation)
 
 They are built by `.github/workflows/games-apps.yml` from `apps/android` and `apps/desktop` on every change to `main`.
 New game folders (any folder with an `index.html`) are included automatically.
