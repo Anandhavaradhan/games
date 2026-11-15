@@ -1,0 +1,71 @@
+plugins {
+    id 'com.android.application'
+}
+
+// CI passes -PversionCode=<run number> so every build can install over the last one,
+// and -PremoteUrl=https://... to open a hosted site instead of the bundled files.
+def buildNo = (project.findProperty('versionCode') ?: '1').toString()
+def remoteUrl = (project.findProperty('remoteUrl') ?: '').toString()
+
+android {
+    namespace 'io.github.anandhavaradhan.games'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.anandhavaradhan.games'
+        minSdk 24
+        targetSdk 35
+        versionCode buildNo.toInteger()
+        versionName '1.0.' + buildNo
+        buildConfigField 'String', 'REMOTE_URL', '"' + remoteUrl + '"'
+        buildConfigField 'boolean', 'IMMERSIVE', 'true'
+    }
+
+    buildFeatures { buildConfig true }
+
+    // One fixed key (android/app.keystore, made for this app only) signs every build,
+    // so a new APK always installs over the previous one.
+    signingConfigs {
+        app {
+            storeFile rootProject.file('app.keystore')
+            storePassword 'android'
+            keyAlias 'app'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.app
+        }
+        debug {
+            signingConfig signingConfigs.app
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint { checkReleaseBuilds false }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
+
+/* The web app is copied into the APK at build time (assets/www), so every build carries the current version. */
+def webAssets = layout.buildDirectory.dir('webAssets')
+tasks.register('copyWeb', Copy) {
+    into webAssets
+    // every game folder on the site, plus the hub page
+    from(rootProject.file('../..')) {
+        include 'index.html', '*/**'
+        exclude 'apps/**', 'hollowmere-v3-android/**', 'node_modules/**', '**/admin.html', '**/*.rules', '**/*.rules.json', '**/CLAUDE.md', '**/*.md'
+        into 'www'
+    }
+}
+android.sourceSets.main.assets.srcDir webAssets
+preBuild.dependsOn 'copyWeb'
