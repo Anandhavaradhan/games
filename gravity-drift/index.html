@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Gravity Drift</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: radial-gradient(ellipse at 50% 30%, #0a0d1f 0%, #04050c 70%);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #dfe8ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #wrap {
+    position: relative;
+    width: min(96vw, calc(96vh * 1.6));
+    aspect-ratio: 960 / 600;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 12px;
+    border: 1px solid rgba(120, 180, 255, 0.25);
+    box-shadow: 0 0 60px rgba(60, 130, 255, 0.15), inset 0 0 40px rgba(0, 0, 0, 0.6);
+    touch-action: none;
+    cursor: crosshair;
+  }
+  #hud {
+    position: absolute;
+    top: 14px;
+    left: 18px;
+    right: 18px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+  }
+  #hud-level { font-size: 17px; font-weight: 600; letter-spacing: 0.5px; color: #bfe3ff; }
+  #hud-attempts { font-size: 14px; color: #8fa3c8; }
+  #hint {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 13px;
+    color: #7688ad;
+    pointer-events: none;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+  }
+  #btn-mute {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 30;
+    background: rgba(20, 30, 55, 0.7);
+    border: 1px solid rgba(120, 180, 255, 0.3);
+    border-radius: 8px;
+    color: #dfe8ff;
+    font-size: 16px;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(4, 6, 14, 0.82);
+    backdrop-filter: blur(4px);
+    border-radius: 12px;
+    z-index: 20;
+    text-align: center;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h1 {
+    font-size: 52px;
+    font-weight: 800;
+    letter-spacing: 6px;
+    background: linear-gradient(90deg, #6fd6ff, #b48cff, #6fd6ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 6px;
+  }
+  .overlay h2 { font-size: 32px; margin-bottom: 10px; color: #bfe3ff; }
+  .overlay p { color: #8fa3c8; margin-bottom: 22px; font-size: 15px; }
+  #win-stars { font-size: 44px; color: #ffd75e; text-shadow: 0 0 20px rgba(255, 215, 94, 0.5); margin-bottom: 8px; }
+  button.big {
+    background: linear-gradient(135deg, #1b3a6b, #103055);
+    border: 1px solid rgba(120, 190, 255, 0.45);
+    color: #e8f3ff;
+    font-size: 17px;
+    font-weight: 600;
+    padding: 12px 34px;
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  button.big:hover { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(80, 160, 255, 0.3); }
+  .btn-row { display: flex; gap: 12px; margin-top: 8px; }
+  .btn-row button.big { font-size: 14px; padding: 10px 22px; }
+  #level-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-top: 20px;
+    width: min(520px, 80%);
+  }
+  .level-btn {
+    background: rgba(20, 32, 60, 0.8);
+    border: 1px solid rgba(120, 180, 255, 0.3);
+    border-radius: 8px;
+    color: #cfe2ff;
+    font-size: 13px;
+    padding: 10px 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .level-btn:hover:not(:disabled) { border-color: #6fd6ff; color: #fff; }
+  .level-btn.locked { opacity: 0.35; cursor: default; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="600"></canvas>
+  <div id="hud">
+    <span id="hud-level"></span>
+    <span id="hud-attempts"></span>
+  </div>
+  <div id="hint"></div>
+  <button id="btn-mute" title="Mute (M)">🔊</button>
+  <div id="menu" class="overlay">
+    <h1>GRAVITY DRIFT</h1>
+    <p>Slingshot your probe through planetary gravity fields.<br>
+       Drag back and release to launch — reach the wormhole.</p>
+    <button id="btn-play" class="big">Play</button>
+    <div id="level-grid"></div>
+  </div>
+  <div id="win" class="overlay hidden">
+    <h2 id="win-title">Wormhole Reached!</h2>
+    <div id="win-stars">★★★</div>
+    <p id="win-stats"></p>
+    <div class="btn-row">
+      <button id="btn-next" class="big">Next Level →</button>
+      <button id="btn-replay" class="big">Replay</button>
+      <button id="btn-menu" class="big">Menu</button>
+    </div>
+  </div>
+</div>
+<script src="physics.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
